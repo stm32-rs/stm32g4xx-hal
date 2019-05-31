@@ -1,0 +1,49 @@
+#![no_std]
+#![allow(non_camel_case_types)]
+
+// #[cfg(not(any(
+//   feature = "stm32g431",
+//   feature = "stm32g441",
+//   feature = "stm32g491",
+//   feature = "stm32g473",
+//   feature = "stm32g483",
+//   feature = "stm32g474",
+//   feature = "stm32g484",
+// )))]
+// compile_error!("This crate requires one of the following features enabled: stm32g431, stm32g441, stm32g491, stm32g473, stm32g483, stm32g474 or stm32g484");
+
+extern crate bare_metal;
+extern crate void;
+
+pub extern crate cortex_m;
+pub extern crate embedded_hal as hal;
+pub extern crate nb;
+// pub extern crate stm32g4;
+
+pub use nb::block;
+
+// #[cfg(feature = "stm32g..")]
+// pub use stm32g4::stm32g4x1 as stm32;
+
+// #[cfg(feature = "rt")]
+// pub use crate::stm32::interrupt;
+
+// pub mod adc;
+// pub mod crc;
+// pub mod dac;
+// pub mod delay;
+// pub mod dma;
+// pub mod exti;
+// pub mod gpio;
+// pub mod i2c;
+// pub mod prelude;
+// pub mod pwm;
+// pub mod qei;
+// pub mod rcc;
+// pub mod rng;
+// pub mod serial;
+// pub mod spi;
+// pub mod stopwatch;
+// pub mod time;
+// pub mod timer;
+// pub mod watchdog;
