@@ -22,20 +22,31 @@ pub enum Event {
     GPIO14 = 14,
     GPIO15 = 15,
     PVD = 16,
-    COMP1 = 17,
-    COMP2 = 18,
-    RTC = 19,
-    TAMP = 21,
+    RTC_ALARM = 17,
+    USBD_FS = 18,
+    CSS_LSE = 19,
+    RTC_WAKEUP = 20,
+    COMP1 = 21,
+    COMP2 = 22,
     I2C1 = 23,
+    I2C2 = 24,
     USART1 = 25,
     USART2 = 26,
-    CEC = 27,
-    LPUART1 = 28,
-    LPTIM1 = 29,
-    LPTIM2 = 30,
-    LSE_CSS = 31,
-    UCPD1 = 32,
-    UCPD2 = 33,
+    I2C3 = 27,
+    USART3 = 28,
+    COMP3 = 29,
+    COMP4 = 30,
+    COMP5 = 31,
+    COMP6 = 32,
+    COMP7 = 33,
+    UART4 = 34,
+    UART5 = 35,
+    LPUART1 = 36,
+    LPTIM1 = 37,
+    PVM1 = 40,
+    PVM2 = 41,
+    I2C4 = 42,
+    UCPD1 = 43,
 }
 
 impl Event {
@@ -72,26 +83,43 @@ pub trait ExtiExt {
 
 impl ExtiExt for EXTI {
     fn listen(&self, ev: Event, edge: SignalEdge) {
-        let line = ev as u8;
-        assert!(line <= 18);
-        let mask = 1 << line;
-        match edge {
-            SignalEdge::Rising => {
-                self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+        match ev as u32 {
+            line if line < 32 => {
+                let mask = 1 << line;
+                match edge {
+                    SignalEdge::Rising => {
+                        self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                    }
+                    SignalEdge::Falling => {
+                        self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                    }
+                    SignalEdge::All => {
+                        self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                        self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                    }
+                }
             }
-            SignalEdge::Falling => {
-                self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
-            }
-            SignalEdge::All => {
-                self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
-                self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+            line=> {
+                let mask = 1 << (line - 32);
+                match edge {
+                    SignalEdge::Rising => {
+                        self.rtsr2.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                    }
+                    SignalEdge::Falling => {
+                        self.ftsr2.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                    }
+                    SignalEdge::All => {
+                        self.rtsr2.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                        self.ftsr2.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                    }
+                }
             }
         }
         self.wakeup(ev);
     }
 
     fn wakeup(&self, ev: Event) {
-        match ev as u8 {
+        match ev as u32 {
             line if line < 32 => self
                 .imr1
                 .modify(|r, w| unsafe { w.bits(r.bits() | 1 << line) }),
@@ -103,42 +131,49 @@ impl ExtiExt for EXTI {
 
     fn unlisten(&self, ev: Event) {
         self.unpend(ev);
-        match ev as u8 {
+        match ev as u32 {
             line if line < 32 => {
                 let mask = !(1 << line);
                 self.imr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
-                if line <= 18 {
-                    self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
-                    self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
-                }
+                self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
+                self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
             }
             line => {
                 let mask = !(1 << (line - 32));
-                self.imr2.modify(|r, w| unsafe { w.bits(r.bits() & mask) })
+                self.imr2.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
+                self.rtsr2.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
+                self.ftsr2.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
             }
         }
     }
 
     fn is_pending(&self, ev: Event, edge: SignalEdge) -> bool {
-        let line = ev as u8;
-        if line > 18 {
-            return false;
-        }
-        let mask = 1 << line;
-        match edge {
-            SignalEdge::Rising => self.rpr1.read().bits() & mask != 0,
-            SignalEdge::Falling => self.fpr1.read().bits() & mask != 0,
-            SignalEdge::All => {
-                (self.rpr1.read().bits() & mask != 0) && (self.fpr1.read().bits() & mask != 0)
+        match ev as u32 {
+            line if line < 32 => {
+                let mask = 1 << line;
+                self.pr1.read().bits() & mask != 0
+            }
+            line => {
+                let mask = 1 << (line - 32);
+                self.pr2.read().bits() & mask != 0
             }
         }
     }
 
     fn unpend(&self, ev: Event) {
-        let line = ev as u8;
-        if line <= 18 {
-            self.rpr1.modify(|_, w| unsafe { w.bits(1 << line) });
-            self.fpr1.modify(|_, w| unsafe { w.bits(1 << line) });
+        match ev as u32 {
+            line if line < 32 => {
+                let mask = 1 << line;
+                self.pr1.modify(|_r, w| {
+                    unsafe { w.bits(mask) }
+                });
+            }
+            line => {
+                let mask = 1 << (line - 32);
+                self.pr2.modify(|_r, w| {
+                    unsafe { w.bits(mask) }
+                });
+            }
         }
     }
 }

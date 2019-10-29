@@ -1,4 +1,4 @@
-use crate::stm32::{FLASH, PWR, RCC};
+use crate::pac::{FLASH, PWR, RCC};
 use crate::time::{Hertz, U32Ext};
 
 mod clockout;
@@ -7,8 +7,9 @@ mod config;
 pub use clockout::*;
 pub use config::*;
 
-/// HSI speed
+/// HSI speeds
 pub const HSI_FREQ: u32 = 16_000_000;
+pub const HSI48_FREQ: u32 = 48_000_000;
 
 /// Clock frequencies
 #[derive(Clone, Copy)]
@@ -19,8 +20,10 @@ pub struct Clocks {
     pub core_clk: Hertz,
     /// AHB frequency
     pub ahb_clk: Hertz,
-    /// APB frequency
-    pub apb_clk: Hertz,
+    /// APB1 frequency
+    pub apb1_clk: Hertz,
+    /// APB2 frequency
+    pub apb2_clk: Hertz,
     /// APB timers frequency
     pub apb_tim_clk: Hertz,
     /// PLL frequency
@@ -41,13 +44,14 @@ pub struct PLLClocks {
 impl Default for Clocks {
     fn default() -> Clocks {
         Clocks {
-            sys_clk: 16.mhz(),
-            ahb_clk: 16.mhz(),
+            sys_clk: 170.mhz(),
+            ahb_clk: 170.mhz(),
             core_clk: 2.mhz(),
-            apb_clk: 16.mhz(),
+            apb1_clk: 170.mhz(),
+            apb2_clk: 170.mhz(),
             apb_tim_clk: 16.mhz(),
             pll_clk: PLLClocks {
-                r: 64.mhz(),
+                r: 170.mhz(),
                 q: None,
                 p: None,
             },
@@ -89,20 +93,9 @@ impl Rcc {
                 self.enable_lsi();
                 (32_768.hz(), 0b011)
             }
-            SysClockSrc::HSI(prs) => {
+            SysClockSrc::HSI => {
                 self.enable_hsi();
-                let (freq, div_bits) = match prs {
-                    Prescaler::Div2 => (HSI_FREQ / 2, 0b001),
-                    Prescaler::Div4 => (HSI_FREQ / 4, 0b010),
-                    Prescaler::Div8 => (HSI_FREQ / 8, 0b011),
-                    Prescaler::Div16 => (HSI_FREQ / 16, 0b100),
-                    Prescaler::Div32 => (HSI_FREQ / 32, 0b101),
-                    Prescaler::Div64 => (HSI_FREQ / 64, 0b110),
-                    Prescaler::Div128 => (HSI_FREQ / 128, 0b111),
-                    _ => (HSI_FREQ, 0b000),
-                };
-                self.rb.cr.write(|w| unsafe { w.hsidiv().bits(div_bits) });
-                (freq.hz(), 0b000)
+                (HSI_FREQ.hz(), 0b000)
             }
         };
 
@@ -118,7 +111,15 @@ impl Rcc {
             Prescaler::Div512 => (sys_freq / 512, 0b1111),
             _ => (sys_clk.0, 0b0000),
         };
-        let (apb_freq, apb_tim_freq, apb_psc_bits) = match rcc_cfg.apb_psc {
+        let (apb1_freq, apb_tim_freq, apb1_psc_bits) = match rcc_cfg.apb1_psc {
+            Prescaler::Div2 => (sys_freq / 2, sys_freq, 0b100),
+            Prescaler::Div4 => (sys_freq / 4, sys_freq / 2, 0b101),
+            Prescaler::Div8 => (sys_freq / 8, sys_freq / 4, 0b110),
+            Prescaler::Div16 => (sys_freq / 16, sys_freq / 8, 0b111),
+            _ => (sys_clk.0, sys_clk.0, 0b000),
+        };
+
+        let (apb2_freq, apb_tim_freq, apb2_psc_bits) = match rcc_cfg.apb2_psc {
             Prescaler::Div2 => (sys_freq / 2, sys_freq, 0b100),
             Prescaler::Div4 => (sys_freq / 4, sys_freq / 2, 0b101),
             Prescaler::Div8 => (sys_freq / 8, sys_freq / 4, 0b110),
@@ -143,8 +144,10 @@ impl Rcc {
         self.rb.cfgr.modify(|_, w| unsafe {
             w.hpre()
                 .bits(ahb_psc_bits)
-                .ppre()
-                .bits(apb_psc_bits)
+                .ppre1()
+                .bits(apb1_psc_bits)
+                .ppre2()
+                .bits(apb2_psc_bits)
                 .sw()
                 .bits(sw_bits)
         });
@@ -158,7 +161,8 @@ impl Rcc {
                 sys_clk,
                 core_clk: (ahb_freq / 8).hz(),
                 ahb_clk: ahb_freq.hz(),
-                apb_clk: apb_freq.hz(),
+                apb1_clk: apb1_freq.hz(),
+                apb2_clk: apb2_freq.hz(),
                 apb_tim_clk: apb_tim_freq.hz(),
             },
         }
@@ -169,8 +173,8 @@ impl Rcc {
         assert!(pll_cfg.r > 1 && pll_cfg.r <= 8);
 
         // Disable PLL
-        self.rb.cr.write(|w| w.pllon().clear_bit());
-        while self.rb.cr.read().pllrdy().bit_is_set() {}
+        self.rb.cr.write(|w| w.pllsyson().clear_bit());
+        while self.rb.cr.read().pllsysrdy().bit_is_set() {}
 
         let (freq, pll_sw_bits) = match pll_cfg.mux {
             PLLSrc::HSI => {
@@ -193,7 +197,7 @@ impl Rcc {
             Some(div) if div > 1 && div <= 8 => {
                 self.rb
                     .pllsyscfgr
-                    .write(move |w| unsafe { w.pllq().bits(div - 1) });
+                    .write(move |w| unsafe { w.pllsysq().bits(div - 1) });
                 let req = freq / div as u32;
                 Some(req.hz())
             }
@@ -204,7 +208,7 @@ impl Rcc {
             Some(div) if div > 1 && div <= 8 => {
                 self.rb
                     .pllsyscfgr
-                    .write(move |w| unsafe { w.pllp().bits(div - 1) });
+                    .write(move |w| unsafe { w.pllsyspdiv().bits(div - 1) });
                 let req = freq / div as u32;
                 Some(req.hz())
             }
@@ -214,19 +218,19 @@ impl Rcc {
         self.rb.pllsyscfgr.write(move |w| unsafe {
             w.pllsrc()
                 .bits(pll_sw_bits)
-                .pllm()
+                .pllsysm()
                 .bits(pll_cfg.m - 1)
-                .plln()
+                .pllsysn()
                 .bits(pll_cfg.n)
-                .pllr()
+                .pllsysr()
                 .bits(pll_cfg.r - 1)
-                .pllren()
+                .pllsysren()
                 .set_bit()
         });
 
         // Enable PLL
-        self.rb.cr.write(|w| w.pllon().set_bit());
-        while self.rb.cr.read().pllrdy().bit_is_clear() {}
+        self.rb.cr.write(|w| w.pllsyson().set_bit());
+        while self.rb.cr.read().pllsysrdy().bit_is_clear() {}
 
         PLLClocks { r, q, p }
     }
@@ -256,7 +260,7 @@ impl Rcc {
     }
 
     pub(crate) fn unlock_rtc(&self) {
-        self.rb.apbenr1.modify(|_, w| w.pwren().set_bit());
+        self.rb.apb1enr1.modify(|_, w| w.pwren().set_bit());
         let pwr = unsafe { &(*PWR::ptr()) };
         pwr.cr1.modify(|_, w| w.dbp().set_bit());
     }

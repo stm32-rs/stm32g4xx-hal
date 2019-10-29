@@ -1,6 +1,6 @@
 //! General Purpose Input / Output
 use core::marker::PhantomData;
-
+use embedded_hal as hal;
 use crate::rcc::Rcc;
 
 /// Default pin mode
@@ -78,7 +78,7 @@ macro_rules! gpio {
         pub mod $gpiox {
             use core::marker::PhantomData;
             use hal::digital::v2::{toggleable, InputPin, OutputPin, StatefulOutputPin};
-            use crate::stm32::{EXTI, $GPIOX};
+            use crate::stm32::{EXTI, $GPIOX, SYSCFG};
             use crate::exti::{ExtiExt, Event};
             use crate::rcc::Rcc;
             use super::*;
@@ -94,7 +94,7 @@ macro_rules! gpio {
                 type Parts = Parts;
 
                 fn split(self, rcc: &mut Rcc) -> Parts {
-                    rcc.rb.iopenr.modify(|_, w| w.$iopxenr().set_bit());
+                    rcc.rb.ahb2enr.modify(|_, w| w.$iopxenr().set_bit());
                     Parts {
                         $(
                             $pxi: $PXi { _mode: PhantomData },
@@ -304,7 +304,7 @@ macro_rules! gpio {
                     }
 
                     /// Configures the pin as external trigger
-                    pub fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> $PXi<Input<PushPull>> {
+                    pub fn listen(self, edge: SignalEdge, syscfg: &mut SYSCFG, exti: &mut EXTI) -> $PXi<Input<PushPull>> {
                         let offset = 2 * $i;
                         unsafe {
                             &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
@@ -318,16 +318,16 @@ macro_rules! gpio {
                         let mask = $Pxn << offset;
                         let reset = !(0xff << offset);
                         match $i as u8 {
-                            0...4   => exti.exticr1.modify(|r, w| unsafe {
+                            0..=4   => syscfg.exticr1.modify(|r, w| unsafe {
                                 w.bits(r.bits() & reset | mask)
                             }),
-                            4...8  => exti.exticr2.modify(|r, w| unsafe {
+                            4..=8  => syscfg.exticr2.modify(|r, w| unsafe {
                                 w.bits(r.bits() & reset | mask)
                             }),
-                            8...12 => exti.exticr3.modify(|r, w| unsafe {
+                            8..=12 => syscfg.exticr3.modify(|r, w| unsafe {
                                 w.bits(r.bits() & reset | mask)
                             }),
-                            12...16 => exti.exticr4.modify(|r, w| unsafe {
+                            12..=16 => syscfg.exticr4.modify(|r, w| unsafe {
                                 w.bits(r.bits() & reset | mask)
                             }),
                             _ => unreachable!(),
@@ -463,7 +463,7 @@ macro_rules! gpio {
     }
 }
 
-gpio!(GPIOA, gpioa, iopaen, PA, 0, [
+gpio!(GPIOA, gpioa, gpioaen, PA, 0, [
     PA0: (pa0, 0),
     PA1: (pa1, 1),
     PA2: (pa2, 2),
@@ -482,7 +482,7 @@ gpio!(GPIOA, gpioa, iopaen, PA, 0, [
     PA15: (pa15, 15),
 ]);
 
-gpio!(GPIOB, gpiob, iopben, PB, 1, [
+gpio!(GPIOB, gpiob, gpioben, PB, 1, [
     PB0: (pb0, 0),
     PB1: (pb1, 1),
     PB2: (pb2, 2),
@@ -501,7 +501,7 @@ gpio!(GPIOB, gpiob, iopben, PB, 1, [
     PB15: (pb15, 15),
 ]);
 
-gpio!(GPIOC, gpioc, iopcen, PC, 2, [
+gpio!(GPIOC, gpioc, gpiocen, PC, 2, [
     PC0: (pc0, 0),
     PC1: (pc1, 1),
     PC2: (pc2, 2),
@@ -520,7 +520,7 @@ gpio!(GPIOC, gpioc, iopcen, PC, 2, [
     PC15: (pc15, 15),
 ]);
 
-gpio!(GPIOD, gpiod, iopden, PD, 3, [
+gpio!(GPIOD, gpiod, gpioden, PD, 3, [
     PD0: (pd0, 0),
     PD1: (pd1, 1),
     PD2: (pd2, 2),
@@ -539,7 +539,7 @@ gpio!(GPIOD, gpiod, iopden, PD, 3, [
     PD15: (pd15, 15),
 ]);
 
-gpio!(GPIOF, gpiof, iopfen, PF, 5, [
+gpio!(GPIOF, gpiof, gpiofen, PF, 5, [
     PF0: (pf0, 0),
     PF1: (pf1, 1),
     PF2: (pf2, 2),

@@ -1,6 +1,6 @@
 use crate::gpio::*;
 use crate::rcc::*;
-use crate::stm32::RCC;
+use crate::pac::RCC;
 
 pub type LscoPin = gpioa::PA2<DefaultMode>;
 
@@ -11,12 +11,12 @@ pub struct Lsco {
 impl Lsco {
     pub fn enable(&self) {
         let rcc = unsafe { &(*RCC::ptr()) };
-        rcc.bdcr.modify(|_, w| w.lscoen().set_bit());
+        rcc.bdcr.modify(|_, w| w.lsccoen().set_bit());
     }
 
     pub fn disable(&self) {
         let rcc = unsafe { &(*RCC::ptr()) };
-        rcc.bdcr.modify(|_, w| w.lscoen().clear_bit());
+        rcc.bdcr.modify(|_, w| w.lsccoen().clear_bit());
     }
 
     pub fn release(self) -> LscoPin {

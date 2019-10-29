@@ -19,7 +19,7 @@ pub enum Prescaler {
 pub enum SysClockSrc {
     LSI,
     PLL,
-    HSI(Prescaler),
+    HSI,
     HSE(Hertz),
     HSE_BYPASS(Hertz),
     LSE(Hertz),
@@ -85,7 +85,8 @@ pub struct Config {
     pub(crate) sys_mux: SysClockSrc,
     pub(crate) pll_cfg: PllConfig,
     pub(crate) ahb_psc: Prescaler,
-    pub(crate) apb_psc: Prescaler,
+    pub(crate) apb1_psc: Prescaler,
+    pub(crate) apb2_psc: Prescaler,
 }
 
 impl Config {
@@ -97,8 +98,8 @@ impl Config {
         Config::default().clock_src(SysClockSrc::PLL)
     }
 
-    pub fn hsi(psc: Prescaler) -> Self {
-        Config::default().clock_src(SysClockSrc::HSI(psc))
+    pub fn hsi() -> Self {
+        Config::default().clock_src(SysClockSrc::HSI)
     }
 
     pub fn lsi() -> Self {
@@ -120,8 +121,13 @@ impl Config {
         self
     }
 
-    pub fn apb_psc(mut self, psc: Prescaler) -> Self {
-        self.apb_psc = psc;
+    pub fn apb1_psc(mut self, psc: Prescaler) -> Self {
+        self.apb1_psc = psc;
+        self
+    }
+
+    pub fn apb2_psc(mut self, psc: Prescaler) -> Self {
+        self.apb2_psc = psc;
         self
     }
 }
@@ -129,10 +135,11 @@ impl Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            sys_mux: SysClockSrc::HSI(Prescaler::NotDivided),
+            sys_mux: SysClockSrc::HSI,
             pll_cfg: PllConfig::default(),
             ahb_psc: Prescaler::NotDivided,
-            apb_psc: Prescaler::NotDivided,
+            apb1_psc: Prescaler::NotDivided,
+            apb2_psc: Prescaler::NotDivided,
         }
     }
 }
