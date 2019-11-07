@@ -16,15 +16,15 @@ use rt::entry;
 #[entry]
 fn main() -> ! {
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let mut rcc = dp.RCC.constrain();
+    let mut rcc = dp.RCC.freeze(hal::rcc::Config::pll());
     let gpioa = dp.GPIOA.split(&mut rcc);
     let mut led = gpioa.pa5.into_push_pull_output();
 
     loop {
-        for _ in 0..1_000_000 {
+        for _ in 0..1_00_000 {
             led.set_low().unwrap();
         }
-        for _ in 0..1_000_000 {
+        for _ in 0..1_00_000 {
             led.set_high().unwrap();
         }
     }

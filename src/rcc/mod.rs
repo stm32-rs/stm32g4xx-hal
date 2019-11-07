@@ -44,14 +44,14 @@ pub struct PLLClocks {
 impl Default for Clocks {
     fn default() -> Clocks {
         Clocks {
-            sys_clk: 170.mhz(),
-            ahb_clk: 170.mhz(),
+            sys_clk: 64.mhz(),
+            ahb_clk: 64.mhz(),
             core_clk: 2.mhz(),
-            apb1_clk: 170.mhz(),
-            apb2_clk: 170.mhz(),
-            apb_tim_clk: 16.mhz(),
+            apb1_clk: 64.mhz(),
+            apb2_clk: 64.mhz(),
+            apb_tim_clk: 64.mhz(),
             pll_clk: PLLClocks {
-                r: 170.mhz(),
+                r: 64.mhz(),
                 q: None,
                 p: None,
             },
@@ -74,28 +74,16 @@ impl Rcc {
         let (sys_clk, sw_bits) = match rcc_cfg.sys_mux {
             SysClockSrc::HSE(freq) => {
                 self.enable_hse(false);
-                (freq, 0b001)
+                (freq, 0b10)
             }
             SysClockSrc::HSE_BYPASS(freq) => {
                 self.enable_hse(true);
-                (freq, 0b001)
+                (freq, 0b10)
             }
-            SysClockSrc::PLL => (pll_clk.r, 0b010),
-            SysClockSrc::LSE(freq) => {
-                self.enable_lse(false);
-                (freq, 0b100)
-            }
-            SysClockSrc::LSE_BYPASS(freq) => {
-                self.enable_lse(true);
-                (freq, 0b100)
-            }
-            SysClockSrc::LSI => {
-                self.enable_lsi();
-                (32_768.hz(), 0b011)
-            }
+            SysClockSrc::PLL => (pll_clk.r, 0b11),
             SysClockSrc::HSI => {
                 self.enable_hsi();
-                (HSI_FREQ.hz(), 0b000)
+                (HSI_FREQ.hz(), 0b01)
             }
         };
 
@@ -111,12 +99,13 @@ impl Rcc {
             Prescaler::Div512 => (sys_freq / 512, 0b1111),
             _ => (sys_clk.0, 0b0000),
         };
-        let (apb1_freq, apb_tim_freq, apb1_psc_bits) = match rcc_cfg.apb1_psc {
-            Prescaler::Div2 => (sys_freq / 2, sys_freq, 0b100),
-            Prescaler::Div4 => (sys_freq / 4, sys_freq / 2, 0b101),
-            Prescaler::Div8 => (sys_freq / 8, sys_freq / 4, 0b110),
-            Prescaler::Div16 => (sys_freq / 16, sys_freq / 8, 0b111),
-            _ => (sys_clk.0, sys_clk.0, 0b000),
+
+        let (apb1_freq, apb1_psc_bits) = match rcc_cfg.apb1_psc {
+            Prescaler::Div2 => (sys_freq / 2, 0b100),
+            Prescaler::Div4 => (sys_freq / 4, 0b101),
+            Prescaler::Div8 => (sys_freq / 8, 0b110),
+            Prescaler::Div16 => (sys_freq / 16, 0b111),
+            _ => (sys_clk.0, 0b000),
         };
 
         let (apb2_freq, apb_tim_freq, apb2_psc_bits) = match rcc_cfg.apb2_psc {
@@ -127,16 +116,31 @@ impl Rcc {
             _ => (sys_clk.0, sys_clk.0, 0b000),
         };
 
+        // TODO - move this to a Flash module.
         unsafe {
             // Adjust flash wait states
             let flash = &(*FLASH::ptr());
             flash.acr.modify(|_, w| {
-                w.latency().bits(if sys_clk.0 <= 24_000_000 {
-                    0b000
-                } else if sys_clk.0 <= 48_000_000 {
-                    0b001
+                w.latency().bits(if sys_clk.0 <= 20_000_000 {
+                    0b0000
+                } else if sys_clk.0 <= 40_000_000 {
+                    0b0001
+                } else if sys_clk.0 <= 60_000_000 {
+                    0b0010
+                } else if sys_clk.0 <= 80_000_000 {
+                    0b0011
+                } else if sys_clk.0 <= 100_000_000 {
+                    0b0100
+                } else if sys_clk.0 <= 120_000_000 {
+                    0b0101
+                } else if sys_clk.0 <= 140_000_000 {
+                    0b0110
+                } else if sys_clk.0 <= 160_000_000 {
+                    0b0111
+                } else if sys_clk.0 <= 170_000_000 {
+                    0b1000
                 } else {
-                    0b010
+                    0b1111
                 })
             })
         }
@@ -169,8 +173,8 @@ impl Rcc {
     }
 
     fn config_pll(&self, pll_cfg: PllConfig) -> PLLClocks {
-        assert!(pll_cfg.m > 0 && pll_cfg.m <= 8);
-        assert!(pll_cfg.r > 1 && pll_cfg.r <= 8);
+        assert!(pll_cfg.m > 0 && pll_cfg.m <= 16);
+        assert!(pll_cfg.n > 7 && pll_cfg.n <= 127);
 
         // Disable PLL
         self.rb.cr.write(|w| w.pllsyson().clear_bit());
@@ -192,24 +196,24 @@ impl Rcc {
         };
 
         let pll_freq = freq / (pll_cfg.m as u32) * (pll_cfg.n as u32);
-        let r = (pll_freq / (pll_cfg.r as u32)).hz();
-        let q = match pll_cfg.q {
-            Some(div) if div > 1 && div <= 8 => {
-                self.rb
-                    .pllsyscfgr
-                    .write(move |w| unsafe { w.pllsysq().bits(div - 1) });
-                let req = freq / div as u32;
-                Some(req.hz())
-            }
-            _ => None,
+
+        let (r, pllr_bits) = match pll_cfg.r {
+            Some(PLLQRDiv::Div2) => (pll_freq/2, 0b00u8),
+            Some(PLLQRDiv::Div4) => (pll_freq/4, 0b01u8),
+            Some(PLLQRDiv::Div6) => (pll_freq/6, 0b10u8),
+            Some(PLLQRDiv::Div8) => (pll_freq/8, 0b11u8),
+            _ => (pll_freq/2, 0b00u8)
         };
 
+        let q = None;
         let p = match pll_cfg.p {
-            Some(div) if div > 1 && div <= 8 => {
+            Some(div) => {
+                let div: u8 = div as u8;
+
                 self.rb
                     .pllsyscfgr
-                    .write(move |w| unsafe { w.pllsyspdiv().bits(div - 1) });
-                let req = freq / div as u32;
+                    .write(move |w| unsafe { w.pllsyspdiv().bits(div) });
+                let req = pll_freq / div as u32;
                 Some(req.hz())
             }
             _ => None,
@@ -223,7 +227,7 @@ impl Rcc {
                 .pllsysn()
                 .bits(pll_cfg.n)
                 .pllsysr()
-                .bits(pll_cfg.r - 1)
+                .bits(pllr_bits)
                 .pllsysren()
                 .set_bit()
         });
@@ -232,12 +236,17 @@ impl Rcc {
         self.rb.cr.write(|w| w.pllsyson().set_bit());
         while self.rb.cr.read().pllsysrdy().bit_is_clear() {}
 
-        PLLClocks { r, q, p }
+        PLLClocks { r: r.hz(), q, p }
     }
 
     pub(crate) fn enable_hsi(&self) {
         self.rb.cr.write(|w| w.hsion().set_bit());
         while self.rb.cr.read().hsirdy().bit_is_clear() {}
+    }
+
+    pub(crate) fn enable_hsi48(&self) {
+        self.rb.crrcr.write(|w| w.rc48on().set_bit());
+        while self.rb.crrcr.read().rc48rdy().bit_is_clear() {}
     }
 
     pub(crate) fn enable_hse(&self, bypass: bool) {

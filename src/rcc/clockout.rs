@@ -96,23 +96,27 @@ macro_rules! mco {
                     });
 
                     let src_bits = match src {
-                        MCOSrc::SysClk => 0b001,
+                        MCOSrc::SYSCLK => 0b0001,
                         MCOSrc::HSI => {
                             rcc.enable_hsi();
-                            0b011
+                            0b0011
                         },
-                        MCOSrc::HSE => {
+                        MCOSrc::HSE(_) => {
                             rcc.enable_hse(false);
-                            0b100
+                            0b0100
                         },
-                        MCOSrc::PLL => 0b101,
+                        MCOSrc::PLL => 0b0101,
                         MCOSrc::LSI => {
                             rcc.enable_lsi();
-                            0b110
+                            0b0110
                         },
                         MCOSrc::LSE => {
                             rcc.enable_lse(false);
-                            0b111
+                            0b0111
+                        },
+                        MCOSrc::HSI48 => {
+                            rcc.enable_hsi48();
+                            0b1000
                         },
                     };
                     Mco { src_bits, pin: self }
