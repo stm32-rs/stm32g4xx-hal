@@ -44,14 +44,14 @@ pub struct PLLClocks {
 impl Default for Clocks {
     fn default() -> Clocks {
         Clocks {
-            sys_clk: 64.mhz(),
-            ahb_clk: 64.mhz(),
+            sys_clk: 16.mhz(),
+            ahb_clk: 16.mhz(),
             core_clk: 2.mhz(),
-            apb1_clk: 64.mhz(),
-            apb2_clk: 64.mhz(),
-            apb_tim_clk: 64.mhz(),
+            apb1_clk: 16.mhz(),
+            apb2_clk: 16.mhz(),
+            apb_tim_clk: 16.mhz(),
             pll_clk: PLLClocks {
-                r: 64.mhz(),
+                r: 16.mhz(),
                 q: None,
                 p: None,
             },
@@ -140,7 +140,7 @@ impl Rcc {
                 } else if sys_clk.0 <= 170_000_000 {
                     0b1000
                 } else {
-                    0b1111
+                    0b1000
                 })
             })
         }

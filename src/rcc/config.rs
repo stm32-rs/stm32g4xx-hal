@@ -259,7 +259,7 @@ impl Default for PllConfig {
         PllConfig {
             mux: PLLSrc::HSI,
             m: 2,
-            n: 16,
+            n: 64, // This should actually cause a 256MHz clock...
             r: Some(PLLQRDiv::Div2),
             q: None,
             p: None,
@@ -322,7 +322,7 @@ impl Config {
 impl Default for Config {
     fn default() -> Config {
         Config {
-            sys_mux: SysClockSrc::HSI,
+            sys_mux: SysClockSrc::PLL,
             pll_cfg: PllConfig::default(),
             ahb_psc: Prescaler::NotDivided,
             apb1_psc: Prescaler::NotDivided,

@@ -11,7 +11,7 @@ pub use hal::watchdog::WatchdogEnable as _;
 //pub use crate::dac::DacExt as _;
 //pub use crate::dac::DacOut as _;
 //pub use crate::dac::DacPin as _;
-//pub use crate::delay::DelayExt as _;
+pub use crate::delay::DelayExt as _;
 pub use crate::exti::ExtiExt as _;
 pub use crate::gpio::GpioExt as _;
 //pub use crate::i2c::I2cExt as _;

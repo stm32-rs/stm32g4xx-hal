@@ -35,7 +35,7 @@ pub use crate::pac::interrupt;
 // pub mod adc;
 // pub mod crc;
 // pub mod dac;
-// pub mod delay;
+pub mod delay;
 // pub mod dma;
 pub mod exti;
 pub mod gpio;
