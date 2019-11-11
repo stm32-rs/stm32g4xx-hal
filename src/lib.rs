@@ -49,5 +49,5 @@ pub mod rcc;
 // pub mod spi;
 // pub mod stopwatch;
 pub mod time;
-// pub mod timer;
+pub mod timer;
 // pub mod watchdog;

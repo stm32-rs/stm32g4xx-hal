@@ -6,7 +6,8 @@
 extern crate cortex_m;
 extern crate cortex_m_rt as rt;
 extern crate nb;
-extern crate panic_halt;
+//extern crate panic_halt;
+extern crate panic_semihosting;
 extern crate stm32g4xx_hal as hal;
 
 use hal::prelude::*;
@@ -22,7 +23,7 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let mut led = gpioa.pa5.into_push_pull_output();
 
-    let mut timer = dp.TIM17.timer(&mut rcc);
+    let mut timer = dp.TIM15.timer(&mut rcc);
     timer.start(500.ms());
 
     loop {
