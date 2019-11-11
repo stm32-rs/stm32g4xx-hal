@@ -1,15 +1,16 @@
-#![deny(warnings)]
+//#![deny(warnings)]
 #![deny(unsafe_code)]
 #![no_main]
 #![no_std]
 
-extern crate cortex_m;
-extern crate cortex_m_rt as rt;
-extern crate panic_halt;
-extern crate stm32g4xx_hal as hal;
+use cortex_m;
+use cortex_m_rt as rt;
+//extern crate panic_halt;
+use panic_semihosting;
+use stm32g4xx_hal as hal;
 
-use hal::prelude::*;
-use hal::stm32;
+use crate::hal::prelude::*;
+use crate::hal::stm32;
 use rt::entry;
 
 #[entry]
@@ -21,7 +22,7 @@ fn main() -> ! {
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
     let gpioc = dp.GPIOC.split(&mut rcc);
-    let button = gpioc.pc13.into_pull_up_input();
+    let button = gpioc.pc13.into_pull_down_input();
 
     let gpioa = dp.GPIOA.split(&mut rcc);
     let mut led = gpioa.pa5.into_push_pull_output();
