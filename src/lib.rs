@@ -33,7 +33,7 @@ pub use pac as stm32;
 pub use crate::pac::interrupt;
 
 // pub mod adc;
-// pub mod crc;
+pub mod crc;
 // pub mod dac;
 pub mod delay;
 // pub mod dma;

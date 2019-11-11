@@ -109,9 +109,9 @@ pub trait CrcExt {
 
 impl CrcExt for CRC {
     fn constrain(self, rcc: &mut Rcc) -> Crc {
-        rcc.rb.ahbenr.modify(|_, w| w.crcen().set_bit());
-        rcc.rb.ahbrstr.modify(|_, w| w.crcrst().set_bit());
-        rcc.rb.ahbrstr.modify(|_, w| w.crcrst().clear_bit());
+        rcc.rb.ahb1enr.modify(|_, w| w.crcen().set_bit());
+        rcc.rb.ahb1rstr.modify(|_, w| w.crcrst().set_bit());
+        rcc.rb.ahb1rstr.modify(|_, w| w.crcrst().clear_bit());
         Crc { rb: self }
     }
 }

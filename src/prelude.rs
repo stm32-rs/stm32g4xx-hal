@@ -7,7 +7,7 @@ pub use hal::watchdog::Watchdog as _;
 pub use hal::watchdog::WatchdogEnable as _;
 
 //pub use crate::adc::AdcExt as _;
-//pub use crate::crc::CrcExt as _;
+pub use crate::crc::CrcExt as _;
 //pub use crate::dac::DacExt as _;
 //pub use crate::dac::DacOut as _;
 //pub use crate::dac::DacPin as _;
