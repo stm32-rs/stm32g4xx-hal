@@ -43,26 +43,25 @@ pub use stm32g4::stm32g474 as stm32;
 #[cfg(feature = "stm32g484")]
 pub use stm32g4::stm32g484 as stm32;
 
-
 #[cfg(feature = "rt")]
 pub use crate::stm32::interrupt;
 
 // pub mod adc;
 // pub mod crc;
 // pub mod dac;
-// pub mod delay;
+pub mod delay;
 // pub mod dma;
-// pub mod exti;
-// pub mod gpio;
+pub mod exti;
+pub mod gpio;
 // pub mod i2c;
-// pub mod prelude;
+pub mod prelude;
 // pub mod pwm;
 // pub mod qei;
-// pub mod rcc;
+pub mod rcc;
 // pub mod rng;
 // pub mod serial;
 // pub mod spi;
 // pub mod stopwatch;
-// pub mod time;
+pub mod time;
 // pub mod timer;
 // pub mod watchdog;
