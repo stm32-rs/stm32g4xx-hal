@@ -199,13 +199,13 @@ impl Rcc {
                 .plln()
                 .bits(pll_cfg.n)
                 .pllr()
-                .bits(pll_cfg.r - 1)
+                .bits((pll_cfg.r / 2) - 1)
                 .pllren()
                 .set_bit()
         });
 
         // Enable PLL
-        self.rb.cr.write(|w| w.pllon().set_bit());
+        self.rb.cr.modify(|_, w| w.pllon().set_bit());
         while self.rb.cr.read().pllrdy().bit_is_clear() {}
 
         PLLClocks { r, q, p }
