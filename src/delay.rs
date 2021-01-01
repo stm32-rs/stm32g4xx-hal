@@ -18,7 +18,7 @@ impl Delay {
     pub fn new(syst: SYST, clocks: &Clocks) -> Self {
         Delay {
             syst,
-            clk: clocks.core_clk,
+            clk: clocks.ahb_clk / 8,
         }
     }
 
