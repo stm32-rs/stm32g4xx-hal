@@ -1,0 +1,32 @@
+on:
+  pull_request:
+  
+name: Continuous integration
+
+jobs:
+  ci:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        rust:
+          - stable
+        feature:
+          - stm32g431
+          - stm32g441
+          - stm32g471
+          - stm32g473
+          - stm32g474
+          - stm32g483
+          - stm32g484
+
+    steps:
+      - uses: actions/checkout@v2
+      - uses: actions-rs/toolchain@v1
+        with:
+          profile: minimal
+          toolchain: ${{ matrix.rust }}
+          target: thumbv7em-none-eabihf
+          override: true
+
+      - name: Regular build
+        run: cargo check --features ${{ matrix.feature }}
