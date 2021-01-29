@@ -87,6 +87,14 @@ impl Div for Hertz {
     }
 }
 
+impl Div<u32> for Hertz {
+    type Output = Hertz;
+
+    fn div(self, other: u32) -> Self::Output {
+        Self(self.0 / other)
+    }
+}
+
 impl MicroSecond {
     pub fn cycles(self, clk: Hertz) -> u32 {
         assert!(self.0 > 0);
