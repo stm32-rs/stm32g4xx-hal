@@ -121,7 +121,4 @@ macro_rules! mco {
     };
 }
 
-mco!(
-    gpioa::PA8<DefaultMode>,
-    gpiog::PG10<DefaultMode>
-);
+mco!(gpioa::PA8<DefaultMode>, gpiog::PG10<DefaultMode>);
