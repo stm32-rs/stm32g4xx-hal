@@ -23,6 +23,8 @@ pub use crate::delay::DelayExt as _;
 pub use crate::exti::ExtiExt as _;
 pub use crate::gpio::GpioExt as _;
 // pub use crate::i2c::I2cExt as _;
+pub use crate::opamp::prelude::*;
+pub use crate::opamp::OpampEx as _;
 pub use crate::rcc::LSCOExt as _;
 pub use crate::rcc::MCOExt as _;
 pub use crate::rcc::RccExt as _;
