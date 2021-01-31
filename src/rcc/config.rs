@@ -19,7 +19,7 @@ pub enum Prescaler {
 pub enum SysClockSrc {
     PLL,
     HSI,
-    HSE(Hertz)
+    HSE(Hertz),
 }
 
 /// Microcontroller clock output source
