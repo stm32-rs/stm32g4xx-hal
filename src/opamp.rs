@@ -89,7 +89,7 @@ macro_rules! opamps {
             }
 
             $(
-                /// States for opampX. 
+                /// States for opampX.
                 pub mod $opamp {
 
                     /// State type for disabled opamp.
@@ -336,6 +336,53 @@ macro_rules! opamps {
     };
 }
 
+#[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
+opamps! {
+    opamp1: {
+        inverting: {
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: 0b00,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: 0b01,
+        },
+        non_inverting: {
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: 0b00,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: 0b10,
+        },
+        output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
+    },
+    opamp2: {
+        inverting: {
+            crate::gpio::gpioa::PA5<crate::gpio::Analog>: 0b00,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: 0b01,
+        },
+        non_inverting: {
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: 0b00,
+            crate::gpio::gpiob::PB14<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpiod::PD14<crate::gpio::Analog>: 0b11,
+        },
+        output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
+    },
+    opamp3: {
+        inverting: {
+            crate::gpio::gpiob::PB2<crate::gpio::Analog>: 0b00,
+            crate::gpio::gpiob::PB10<crate::gpio::Analog>: 0b01,
+        },
+        non_inverting: {
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: 0b00,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: 0b10,
+        },
+        output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
+    },
+}
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+))]
 opamps! {
     opamp1: {
         inverting: {
