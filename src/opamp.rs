@@ -344,10 +344,7 @@ macro_rules! opamps {
     };
 }
 
-#[cfg(any(
-    feature = "stm32g431",
-    feature = "stm32g441",
-))]
+#[cfg(any(feature = "stm32g431", feature = "stm32g441",))]
 opamps! {
     opamp1: {
         inverting: {
@@ -388,9 +385,7 @@ opamps! {
     },
 }
 
-#[cfg(any(
-    feature = "stm32g471",
-))]
+#[cfg(any(feature = "stm32g471",))]
 opamps! {
     opamp1: {
         inverting: {
