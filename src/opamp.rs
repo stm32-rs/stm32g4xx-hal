@@ -140,7 +140,7 @@ macro_rules! opamps {
                             self.output = Some(output);
                             unsafe {
                                 (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().bit(false));
+                                    w.opaintoen().output_pin());
                             }
                         }
 
@@ -150,7 +150,7 @@ macro_rules! opamps {
                         pub fn disable_output(&mut self) -> Option<$output> {
                             unsafe {
                                 (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().bit(true));
+                                    w.opaintoen().adcchannel());
                             }
                             self.output.take()
                         }
@@ -169,7 +169,7 @@ macro_rules! opamps {
                             self.output = Some(output);
                             unsafe {
                                 (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().bit(false));
+                                    w.opaintoen().output_pin());
                             }
                         }
 
@@ -179,7 +179,7 @@ macro_rules! opamps {
                         pub fn disable_output(&mut self) -> Option<$output> {
                             unsafe {
                                 (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().bit(true));
+                                    w.opaintoen().adcchannel());
                             }
                             self.output.take()
                         }
@@ -248,18 +248,22 @@ macro_rules! opamps {
                         None => None,
                     };
                     unsafe {
+                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
                             .[<$opamp _csr>]
                             .write(|csr_w|
                                 csr_w
                                     .vp_sel()
-                                    .bits($input_mask)
+                                    .$input_mask()
                                     .vm_sel()
-                                    .bits(0b11)
+                                    .output()
                                     .opaintoen()
-                                    .bit(output.is_none())
+                                    .variant(match output {
+                                        Some(_) => OPAINTOEN_A::OUTPUTPIN,
+                                        None => OPAINTOEN_A::ADCCHANNEL,
+                                    })
                                     .opaen()
-                                    .bit(true)
+                                    .enabled()
                             );
                     }
                     Follower {input, output}
@@ -316,17 +320,21 @@ macro_rules! opamps {
                         None => None,
                     };
                     unsafe {
+                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
                             .[<$opamp _csr>]
                             .write(|csr_w|
                                 csr_w.vp_sel()
-                                    .bits($non_inverting_mask)
+                                    .$non_inverting_mask()
                                     .vm_sel()
-                                    .bits($inverting_mask)
+                                    .$inverting_mask()
                                     .opaintoen()
-                                    .bit(output.is_none())
+                                    .variant(match output {
+                                        Some(_) => OPAINTOEN_A::OUTPUTPIN,
+                                        None => OPAINTOEN_A::ADCCHANNEL,
+                                    })
                                     .opaen()
-                                    .bit(true)
+                                    .enabled()
                             );
                     }
                     OpenLoop {non_inverting, inverting, output}
@@ -336,47 +344,104 @@ macro_rules! opamps {
     };
 }
 
-#[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
+#[cfg(any(
+    feature = "stm32g431",
+    feature = "stm32g441",
+))]
 opamps! {
     opamp1: {
         inverting: {
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
     opamp2: {
         inverting: {
-            crate::gpio::gpioa::PA5<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: 0b10,
-            crate::gpio::gpiod::PD14<crate::gpio::Analog>: 0b11,
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
+            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
         },
         output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
     },
     opamp3: {
         inverting: {
-            crate::gpio::gpiob::PB2<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
     },
 }
 
+#[cfg(any(
+    feature = "stm32g471",
+))]
+opamps! {
+    opamp1: {
+        inverting: {
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
+        },
+        output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
+    },
+    opamp2: {
+        inverting: {
+            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
+            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
+        },
+        output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
+    },
+    opamp3: {
+        inverting: {
+            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
+        },
+        output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
+    },
+    opamp6: {
+        inverting: {
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiob::PB1<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpiob::PB12<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiod::PD9<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp2,
+        },
+        output: crate::gpio::gpiob::PB11<crate::gpio::Analog>,
+    },
+}
 #[cfg(any(
     feature = "stm32g473",
     feature = "stm32g474",
@@ -386,74 +451,74 @@ opamps! {
 opamps! {
     opamp1: {
         inverting: {
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
     opamp2: {
         inverting: {
-            crate::gpio::gpioa::PA5<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: 0b10,
-            crate::gpio::gpiod::PD14<crate::gpio::Analog>: 0b11,
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
+            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
         },
         output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
     },
     opamp3: {
         inverting: {
-            crate::gpio::gpiob::PB2<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
     },
     opamp4: {
         inverting: {
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiod::PD8<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiod::PD8<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiod::PD11<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpiob::PB11<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiod::PD11<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB11<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpiob::PB12<crate::gpio::Analog>,
     },
     opamp5: {
         inverting: {
-            crate::gpio::gpiob::PB15<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpiob::PB15<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiod::PD12<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpioc::PC3<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiod::PD12<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioc::PC3<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpioa::PA8<crate::gpio::Analog>,
     },
     opamp6: {
         inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiob::PB1<crate::gpio::Analog>: 0b01,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiob::PB1<crate::gpio::Analog>: vinm1,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB12<crate::gpio::Analog>: 0b00,
-            crate::gpio::gpiod::PD9<crate::gpio::Analog>: 0b01,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: 0b10,
+            crate::gpio::gpiob::PB12<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiod::PD9<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpiob::PB11<crate::gpio::Analog>,
     },
