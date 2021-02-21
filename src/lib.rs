@@ -63,6 +63,7 @@ pub mod delay;
 pub mod exti;
 pub mod gpio;
 // pub mod i2c;
+pub mod opamp;
 pub mod prelude;
 // pub mod pwm;
 // pub mod qei;
