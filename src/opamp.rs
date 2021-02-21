@@ -344,7 +344,7 @@ macro_rules! opamps {
     };
 }
 
-#[cfg(any(feature = "stm32g431", feature = "stm32g441",))]
+#[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
 opamps! {
     opamp1: {
         inverting: {
@@ -385,58 +385,6 @@ opamps! {
     },
 }
 
-#[cfg(any(feature = "stm32g471",))]
-opamps! {
-    opamp1: {
-        inverting: {
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
-        },
-        non_inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
-        },
-        output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
-    },
-    opamp2: {
-        inverting: {
-            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
-        },
-        non_inverting: {
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
-            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
-        },
-        output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
-    },
-    opamp3: {
-        inverting: {
-            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
-        },
-        non_inverting: {
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
-        },
-        output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
-    },
-    opamp6: {
-        inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpiob::PB1<crate::gpio::Analog>: vinm1,
-        },
-        non_inverting: {
-            crate::gpio::gpiob::PB12<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiod::PD9<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp2,
-        },
-        output: crate::gpio::gpiob::PB11<crate::gpio::Analog>,
-    },
-}
 #[cfg(any(
     feature = "stm32g473",
     feature = "stm32g474",
