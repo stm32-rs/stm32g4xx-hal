@@ -42,13 +42,18 @@ panic-halt = "0.2.0"
 [features]
 default = ["rt"]
 rt = ["stm32g4/rt"]
-stm32g431 = ["stm32g4/stm32g431"]
-stm32g441 = ["stm32g4/stm32g441"]
-stm32g471 = ["stm32g4/stm32g471"]
-stm32g473 = ["stm32g4/stm32g473"]
-stm32g474 = ["stm32g4/stm32g474"]
-stm32g483 = ["stm32g4/stm32g483"]
-stm32g484 = ["stm32g4/stm32g484"]
+
+gpio-g43x = []
+gpio-g47x = []
+gpio-g49x = []
+
+stm32g431 = ["gpio-g43x", "stm32g4/stm32g431"]
+stm32g441 = ["gpio-g43x", "stm32g4/stm32g441"]
+stm32g471 = ["gpio-g47x", "stm32g4/stm32g471"]
+stm32g473 = ["gpio-g47x", "stm32g4/stm32g473"]
+stm32g474 = ["gpio-g47x", "stm32g4/stm32g474"]
+stm32g483 = ["gpio-g47x", "stm32g4/stm32g483"]
+stm32g484 = ["gpio-g47x", "stm32g4/stm32g484"]
 
 [profile.dev]
 codegen-units = 1
