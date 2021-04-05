@@ -43,6 +43,54 @@ pub struct Output<MODE> {
 /// Push pull output (type state)
 pub struct PushPull;
 
+/// Alternate function 0 (type state)
+pub struct AF0;
+
+/// Alternate function 1 (type state)
+pub struct AF1;
+
+/// Alternate function 2 (type state)
+pub struct AF2;
+
+/// Alternate function 3 (type state)
+pub struct AF3;
+
+/// Alternate function 4 (type state)
+pub struct AF4;
+
+/// Alternate function 5 (type state)
+pub struct AF5;
+
+/// Alternate function 6 (type state)
+pub struct AF6;
+
+/// Alternate function 7 (type state)
+pub struct AF7;
+
+/// Alternate function 8 (type state)
+pub struct AF8;
+
+/// Alternate function 9 (type state)
+pub struct AF9;
+
+/// Alternate function 10 (type state)
+pub struct AF10;
+
+/// Alternate function 11 (type state)
+pub struct AF11;
+
+/// Alternate function 12 (type state)
+pub struct AF12;
+
+/// Alternate function 13 (type state)
+pub struct AF13;
+
+/// Alternate function 14 (type state)
+pub struct AF14;
+
+/// Alternate function 15 (type state)
+pub struct AF15;
+
 /// GPIO Pin speed selection
 pub enum Speed {
     Low = 0,
@@ -56,18 +104,6 @@ pub enum SignalEdge {
     Rising,
     Falling,
     All,
-}
-
-#[allow(dead_code)]
-pub(crate) enum AltFunction {
-    AF0 = 0,
-    AF1 = 1,
-    AF2 = 2,
-    AF3 = 3,
-    AF4 = 4,
-    AF5 = 5,
-    AF6 = 6,
-    AF7 = 7,
 }
 
 macro_rules! gpio {
@@ -292,6 +328,17 @@ macro_rules! gpio {
                     }
 
                     impl<MODE> $PXi<MODE> {
+                        $(
+                            paste::paste!{
+                                #[doc = "Configures `" $PXi "` to serve as alternate function: `" $AFi "`"]
+                                pub fn $into_afi(
+                                    self,
+                                ) -> $PXi<$AFi> {
+                                    // TODO implement AF configuration
+                                    $PXi { _mode: PhantomData }
+                                }
+                            }
+                        )*
                         /// Configures the pin to operate as a floating input pin
                         pub fn into_floating_input(self) -> $PXi<Input<Floating>> {
                             let offset = 2 * $i;
@@ -412,29 +459,6 @@ macro_rules! gpio {
                                 })
                             };
                             self
-                        }
-
-                        #[allow(dead_code)]
-                        pub(crate) fn set_alt_mode(&self, mode: AltFunction) {
-                            let mode = mode as u32;
-                            let offset = 2 * $i;
-                            let offset2 = 4 * $i;
-                            unsafe {
-                                let gpio = &(*$GPIOX::ptr());
-                                if offset2 < 32 {
-                                    gpio.afrl.modify(|r, w| {
-                                        w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
-                                    });
-                                } else {
-                                    let offset2 = offset2 - 32;
-                                    gpio.afrh.modify(|r, w| {
-                                        w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
-                                    });
-                                }
-                                gpio.moder.modify(|r, w| {
-                                    w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
-                                });
-                            }
                         }
                     }
 

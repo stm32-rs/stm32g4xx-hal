@@ -30,7 +30,6 @@ pub trait LSCOExt {
 
 impl LSCOExt for LscoPin {
     fn lsco(self, src: LSCOSrc, rcc: &mut Rcc) -> Lsco {
-        self.set_alt_mode(AltFunction::AF0);
         let src_select_bit = match src {
             LSCOSrc::LSE => {
                 rcc.enable_lse(false);
@@ -78,7 +77,7 @@ macro_rules! mco {
         $(
             impl MCOExt<$PIN> for $PIN {
                 fn mco(self, src: MCOSrc, psc: Prescaler, rcc: &mut Rcc) -> Mco<$PIN> {
-                    self.set_alt_mode(AltFunction::AF0);
+                    let pin = self.into_af0();
 
                     let psc_bits = match psc {
                         Prescaler::NotDivided => 0b000,
@@ -114,11 +113,11 @@ macro_rules! mco {
                             0b111
                         },
                     };
-                    Mco { src_bits, pin: self }
+                    Mco { src_bits, pin }
                 }
             }
         )+
     };
 }
 
-mco!(gpioa::PA8<DefaultMode>, gpiog::PG10<DefaultMode>);
+mco!(gpioa::PA8<AF0>, gpiog::PG10<AF0>);
