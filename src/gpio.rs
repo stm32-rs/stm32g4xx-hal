@@ -136,6 +136,7 @@ macro_rules! gpio {
                                 $mode,
                                 [<moder $i>],
                                 [<AFR $LH>],
+                                [<afr $lh>],
                                 [<afr  $lh $i>],
                                 [<bs $i>],
                                 [<br $i>],
@@ -174,6 +175,7 @@ macro_rules! gpio {
                         $MODE:ty,
                         $moderi:ident,
                         $AFR:ident,
+                        $afr:ident,
                         $afri:ident,
                         $bsi:ident,
                         $bri:ident,
@@ -334,7 +336,10 @@ macro_rules! gpio {
                                 pub fn $into_afi(
                                     self,
                                 ) -> $PXi<$AFi> {
-                                    // TODO implement AF configuration
+                                    let moder = unsafe { &(*$GPIOX::ptr()).moder };
+                                    moder.modify(|_, w| w.$moderi().alternate());
+                                    let afr = unsafe { &(*$GPIOX::ptr()).$afr };
+                                    afr.modify(|_, w| w.$afri().$afi());
                                     $PXi { _mode: PhantomData }
                                 }
                             }
