@@ -17,7 +17,7 @@ exclude = [
 [dependencies]
 cortex-m = "0.7.1"
 nb = "0.1.1"
-stm32g4 = "0.13.0"
+stm32g4 = { git = "https://github.com/stm32-rs/stm32-rs-nightlies" }
 paste = "1.0"
 
 [dependencies.bare-metal]
