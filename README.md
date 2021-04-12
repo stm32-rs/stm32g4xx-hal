@@ -7,6 +7,12 @@ peripheral access API for the STMicro STM32G4 series microcontrollers. The
 selection of the MCU is done by feature gates, typically specified by board
 support crates.
 
+## Features
+
+[+] RCC
+[+] GPIO
+[+] OPAMP
+
 ## Usage
 
 This crate will eventually contain support for multiple microcontrollers in the
