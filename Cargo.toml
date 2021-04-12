@@ -37,7 +37,7 @@ panic-semihosting = "0.5.3"
 panic-halt = "0.2.0"
 
 [features]
-default = ["rt"]
+default = ["rt", "stm32g474"]
 rt = ["stm32g4/rt"]
 stm32g431 = ["stm32g4/stm32g431"]
 stm32g441 = ["stm32g4/stm32g441"]
