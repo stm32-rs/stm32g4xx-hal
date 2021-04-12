@@ -107,7 +107,7 @@ pub struct InvalidConfig;
 
 impl Default for Config {
     fn default() -> Config {
-        let baudrate = 19_200.bps();
+        let baudrate = 115_200.bps();
         Config {
             baudrate,
             wordlength: WordLength::DataBits8,
