@@ -6,7 +6,7 @@ use nb;
 use void::Void;
 
 use crate::rcc::Rcc;
-use crate::stm32::{TIM1, TIM2, TIM3, TIM6, TIM7, TIM14, TIM15, TIM16, TIM17};
+use crate::stm32::{TIM1, TIM2, TIM3, TIM6, TIM7, TIM15, TIM16, TIM17};
 use crate::time::{Hertz, MicroSecond};
 
 /// Hardware timers
@@ -153,13 +153,12 @@ macro_rules! timers {
 }
 
 timers! {
-    TIM1: (tim1, tim1en, tim1rst, apbenr2, apbrstr2),
-    TIM2: (tim2, tim2en, tim2rst, apbenr1, apbrstr1),
-    TIM3: (tim3, tim3en, tim3rst, apbenr1, apbrstr1),
-    TIM6: (tim6, tim6en, tim6rst, apbenr1, apbrstr1),
-    TIM7: (tim7, tim7en, tim7rst, apbenr1, apbrstr1),
-    TIM14: (tim14, tim14en, tim14rst, apbenr2, apbrstr2),
-    TIM15: (tim15, tim15en, tim15rst, apbenr2, apbrstr2),
-    TIM16: (tim16, tim16en, tim16rst, apbenr2, apbrstr2),
-    TIM17: (tim17, tim17en, tim17rst, apbenr2, apbrstr2),
+    TIM1: (tim1, tim1en, tim1rst, apb2enr, apb2rstr),
+    TIM2: (tim2, tim2en, tim2rst, apb1enr1, apb1rstr1),
+    TIM3: (tim3, tim3en, tim3rst, apb1enr1, apb1rstr1),
+    TIM6: (tim6, tim6en, tim6rst, apb1enr1, apb1rstr1),
+    TIM7: (tim7, tim7en, tim7rst, apb1enr1, apb1rstr1),
+    TIM15: (tim15, tim15en, tim15rst, apb2enr, apb2rstr),
+    TIM16: (tim16, tim16en, tim16rst, apb2enr, apb2rstr),
+    TIM17: (tim17, tim17en, tim17rst, apb2enr, apb2rstr),
 }

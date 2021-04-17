@@ -9,7 +9,7 @@
             "request": "launch",
             "servertype": "openocd",
             "cwd": "${workspaceRoot}",
-            "executable": "./target/thumbv7em-none-eabihf/debug/examples/blinky_delay",
+            "executable": "./target/thumbv7em-none-eabihf/debug/examples/blinky_timer",
             "name": "Debug (OpenOCD)",
             "device": "STM32G474RET6",
             "svdFile": "${workspaceRoot}/STM32G474xx.svd",

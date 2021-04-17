@@ -22,9 +22,10 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let mut led = gpioa.pa5.into_push_pull_output();
 
-    let mut timer = dp.TIM17.timer(&mut rcc);
+    let mut timer = dp.TIM2.timer(&mut rcc);
     timer.start(500.ms());
 
+    
     loop {
         led.toggle().unwrap();
         block!(timer.wait()).unwrap();
