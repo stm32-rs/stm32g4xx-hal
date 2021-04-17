@@ -15,7 +15,7 @@ pub use hal::watchdog::WatchdogEnable as _;
 // pub use crate::analog::dac::DacPin as _;
 // #[cfg(any(feature = "stm32g07x", feature = "stm32g081"))]
 // pub use crate::comparator::ComparatorExt as _;
-// pub use crate::crc::CrcExt as _;
+pub use crate::crc::CrcExt as _;
 pub use crate::delay::DelayExt as _;
 pub use crate::delay::SYSTDelayExt as _;
 // pub use crate::dma::CopyDma as _;

@@ -1,5 +1,5 @@
 [package]
-authors = ["Vitaly Domnikov <oss@vitaly.codes>"]
+authors = ["Vitaly Domnikov <oss@vitaly.codes>", "Alexander Buraga <sadkotheguest@yandex.ru>"]
 categories = ["embedded", "hardware-support", "no-std"]
 description = "Peripheral access API for STM32G4 series microcontrollers"
 documentation = "https://docs.rs/stm32g4xx-hal"
