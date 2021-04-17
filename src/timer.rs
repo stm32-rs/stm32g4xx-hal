@@ -6,7 +6,7 @@ use nb;
 use void::Void;
 
 use crate::rcc::Rcc;
-use crate::stm32::{TIM1, TIM14, TIM15, TIM16, TIM17, TIM2, TIM3, TIM6, TIM7};
+use crate::stm32::{TIM1, TIM2, TIM3, TIM6, TIM7, TIM14, TIM15, TIM16, TIM17};
 use crate::time::{Hertz, MicroSecond};
 
 /// Hardware timers
