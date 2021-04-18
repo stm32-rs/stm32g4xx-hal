@@ -55,11 +55,12 @@ pub use stm32g4::stm32g484 as stm32;
 #[cfg(feature = "rt")]
 pub use crate::stm32::interrupt;
 
-// pub mod adc;
+//pub mod adc;
 pub mod crc;
 // pub mod dac;
 pub mod delay;
-// pub mod dma;
+pub mod dma;
+pub mod dmamux;
 pub mod exti;
 pub mod gpio;
 // pub mod i2c;
