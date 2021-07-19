@@ -46,6 +46,8 @@ stm32g473 = ["stm32g4/stm32g473"]
 stm32g474 = ["stm32g4/stm32g474"]
 stm32g483 = ["stm32g4/stm32g483"]
 stm32g484 = ["stm32g4/stm32g484"]
+stm32g491 = ["stm32g4/stm32g491"]
+stm32g4a1 = ["stm32g4/stm32g4a1"]
 
 [profile.dev]
 codegen-units = 1
