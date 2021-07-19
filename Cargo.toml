@@ -23,11 +23,18 @@ version = "0.2.5"
 
 [dependencies.embedded-hal]
 features = ["unproven"]
-version = "0.2.3"
+version = "0.2.4"
+
+[dependencies.embedded-dma]
+version = "0.1.2"
 
 [dependencies.void]
 default-features = false
 version = "1.0.2"
+
+[dependencies.stable_deref_trait]
+default-features = false
+version = "1.1"
 
 [dev-dependencies]
 cortex-m-rt = "0.6.10"

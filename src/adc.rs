@@ -12,6 +12,7 @@
 pub use crate::time::U32Ext as _;
 use crate::{
     delay::*,
+    dma::{mux::DmaMuxResources, traits::TargetAddress, PeripheralToMemory},
     gpio::*,
     rcc::Rcc,
     signature::{VtempCal110, VtempCal30, VDDA_CALIB},
@@ -1191,7 +1192,7 @@ macro_rules! adc {
     (additionals: $adc_type:ident => ($common_type:ident)) => {
     };
 
-    ($($adc_type:ident => ($enable_peripheral_fn_name:ident, $configure_clocks_fn_name:ident, ($common_type:ident) )),+ $(,)*) => {
+    ($($adc_type:ident => ($enable_peripheral_fn_name:ident, $configure_clocks_fn_name:ident, $mux:expr, ($common_type:ident) )),+ $(,)*) => {
         $(
             impl AdcConfig for stm32::$adc_type {
                 #[inline(always)]
@@ -2139,6 +2140,17 @@ macro_rules! adc {
                 }
             }
 
+            unsafe impl TargetAddress<PeripheralToMemory> for Adc<stm32::$adc_type, DMA> {
+                #[inline(always)]
+                fn address(&self) -> u32 {
+                    self.adc.data_register_address()
+                }
+
+                type MemSize = u16;
+
+                const REQUEST_LINE: Option<u8> = Some($mux as u8);
+            }
+
             impl<PIN> OneShot<stm32::$adc_type, u16, PIN> for Adc<stm32::$adc_type, Disabled>
             where
                 PIN: Channel<stm32::$adc_type, ID=u8>,
@@ -2164,7 +2176,7 @@ macro_rules! adc {
     feature = "stm32g491",
     feature = "stm32g4a1",
 ))]
-adc!(ADC1 => (enable_pheripheral12, configure_clock_source12, (ADC12_COMMON) ));
+adc!(ADC1 => (enable_pheripheral12, configure_clock_source12, DmaMuxResources::ADC1, (ADC12_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g431",
@@ -2177,7 +2189,7 @@ adc!(ADC1 => (enable_pheripheral12, configure_clock_source12, (ADC12_COMMON) ));
     feature = "stm32g491",
     feature = "stm32g4a1",
 ))]
-adc!(ADC2 => (enable_pheripheral12, configure_clock_source12, (ADC12_COMMON) ));
+adc!(ADC2 => (enable_pheripheral12, configure_clock_source12, DmaMuxResources::ADC2, (ADC12_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g471",
@@ -2188,7 +2200,7 @@ adc!(ADC2 => (enable_pheripheral12, configure_clock_source12, (ADC12_COMMON) ));
     feature = "stm32g491",
     feature = "stm32g4a1",
 ))]
-adc!(ADC3 => (enable_pheripheral345, configure_clock_source345, (ADC345_COMMON) ));
+adc!(ADC3 => (enable_pheripheral345, configure_clock_source345, DmaMuxResources::ADC3, (ADC345_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g473",
@@ -2196,7 +2208,7 @@ adc!(ADC3 => (enable_pheripheral345, configure_clock_source345, (ADC345_COMMON) 
     feature = "stm32g483",
     feature = "stm32g484",
 ))]
-adc!(ADC4 => (enable_pheripheral345, configure_clock_source345, (ADC345_COMMON) ));
+adc!(ADC4 => (enable_pheripheral345, configure_clock_source345, DmaMuxResources::ADC4, (ADC345_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g473",
@@ -2204,7 +2216,7 @@ adc!(ADC4 => (enable_pheripheral345, configure_clock_source345, (ADC345_COMMON) 
     feature = "stm32g483",
     feature = "stm32g484",
 ))]
-adc!(ADC5 => (enable_pheripheral345, configure_clock_source345, (ADC345_COMMON) ));
+adc!(ADC5 => (enable_pheripheral345, configure_clock_source345, DmaMuxResources::ADC5, (ADC345_COMMON) ));
 
 #[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
 adc_pins!(

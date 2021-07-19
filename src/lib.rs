@@ -60,7 +60,7 @@ pub mod bb;
 // pub mod crc;
 // pub mod dac;
 pub mod delay;
-// pub mod dma;
+pub mod dma;
 pub mod exti;
 pub mod gpio;
 // pub mod i2c;
