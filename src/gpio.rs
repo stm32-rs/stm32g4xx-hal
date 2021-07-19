@@ -2,6 +2,8 @@
 use core::marker::PhantomData;
 
 use crate::rcc::Rcc;
+use crate::stm32::EXTI;
+use crate::syscfg::SysCfg;
 
 /// Default pin mode
 pub type DefaultMode = Input<Floating>;
@@ -55,7 +57,7 @@ pub enum Speed {
 pub enum SignalEdge {
     Rising,
     Falling,
-    All,
+    RisingFalling,
 }
 
 #[allow(dead_code)]
@@ -70,9 +72,161 @@ pub(crate) enum AltFunction {
     AF7 = 7,
 }
 
+/// External Interrupt Pin
+pub trait ExtiPin {
+    fn make_interrupt_source(&mut self, syscfg: &mut SysCfg);
+    fn trigger_on_edge(&mut self, exti: &mut EXTI, level: SignalEdge);
+    fn enable_interrupt(&mut self, exti: &mut EXTI);
+    fn disable_interrupt(&mut self, exti: &mut EXTI);
+    fn clear_interrupt_pending_bit(&mut self);
+    fn check_interrupt(&self) -> bool;
+}
+
+macro_rules! exti_erased {
+    ($PIN:ty, $extigpionr:expr) => {
+        impl<MODE> ExtiPin for $PIN {
+            /// Make corresponding EXTI line sensitive to this pin
+            fn make_interrupt_source(&mut self, syscfg: &mut SysCfg) {
+                let offset = 4 * (self.i % 4);
+                match self.i {
+                    0..=3 => {
+                        syscfg.exticr1.modify(|r, w| unsafe {
+                            w.bits((r.bits() & !(0xf << offset)) | ($extigpionr << offset))
+                        });
+                    }
+                    4..=7 => {
+                        syscfg.exticr2.modify(|r, w| unsafe {
+                            w.bits((r.bits() & !(0xf << offset)) | ($extigpionr << offset))
+                        });
+                    }
+                    8..=11 => {
+                        syscfg.exticr3.modify(|r, w| unsafe {
+                            w.bits((r.bits() & !(0xf << offset)) | ($extigpionr << offset))
+                        });
+                    }
+                    12..=15 => {
+                        syscfg.exticr4.modify(|r, w| unsafe {
+                            w.bits((r.bits() & !(0xf << offset)) | ($extigpionr << offset))
+                        });
+                    }
+                    _ => {}
+                }
+            }
+
+            /// Generate interrupt on rising edge, falling edge or both
+            fn trigger_on_edge(&mut self, exti: &mut EXTI, edge: SignalEdge) {
+                match edge {
+                    SignalEdge::Rising => {
+                        exti.rtsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << self.i)) });
+                        exti.ftsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << self.i)) });
+                    }
+                    SignalEdge::Falling => {
+                        exti.ftsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << self.i)) });
+                        exti.rtsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << self.i)) });
+                    }
+                    SignalEdge::RisingFalling => {
+                        exti.rtsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << self.i)) });
+                        exti.ftsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << self.i)) });
+                    }
+                }
+            }
+
+            /// Enable external interrupts from this pin.
+            fn enable_interrupt(&mut self, exti: &mut EXTI) {
+                exti.imr1
+                    .modify(|r, w| unsafe { w.bits(r.bits() | (1 << self.i)) });
+            }
+
+            /// Disable external interrupts from this pin
+            fn disable_interrupt(&mut self, exti: &mut EXTI) {
+                exti.imr1
+                    .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << self.i)) });
+            }
+
+            /// Clear the interrupt pending bit for this pin
+            fn clear_interrupt_pending_bit(&mut self) {
+                unsafe { (*EXTI::ptr()).pr1.write(|w| w.bits(1 << self.i)) };
+            }
+
+            /// Reads the interrupt pending bit for this pin
+            fn check_interrupt(&self) -> bool {
+                unsafe { ((*EXTI::ptr()).pr1.read().bits() & (1 << self.i)) != 0 }
+            }
+        }
+    };
+}
+
+macro_rules! exti {
+    ($PIN:ty, $extigpionr:expr, $i:expr, $exticri:ident) => {
+        impl<MODE> ExtiPin for $PIN {
+            /// Configure EXTI Line $i to trigger from this pin.
+            fn make_interrupt_source(&mut self, syscfg: &mut SysCfg) {
+                let offset = 4 * ($i % 4);
+                syscfg.$exticri.modify(|r, w| unsafe {
+                    let mut exticr = r.bits();
+                    exticr = (exticr & !(0xf << offset)) | ($extigpionr << offset); //FIXME: clears other pins
+                    w.bits(exticr)
+                });
+            }
+
+            /// Generate interrupt on rising edge, falling edge or both
+            fn trigger_on_edge(&mut self, exti: &mut EXTI, edge: SignalEdge) {
+                match edge {
+                    SignalEdge::Rising => {
+                        exti.rtsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << $i)) });
+                        exti.ftsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << $i)) });
+                    }
+                    SignalEdge::Falling => {
+                        exti.ftsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << $i)) });
+                        exti.rtsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << $i)) });
+                    }
+                    SignalEdge::RisingFalling => {
+                        exti.rtsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << $i)) });
+                        exti.ftsr1
+                            .modify(|r, w| unsafe { w.bits(r.bits() | (1 << $i)) });
+                    }
+                }
+            }
+
+            /// Enable external interrupts from this pin.
+            fn enable_interrupt(&mut self, exti: &mut EXTI) {
+                exti.imr1
+                    .modify(|r, w| unsafe { w.bits(r.bits() | (1 << $i)) });
+            }
+
+            /// Disable external interrupts from this pin
+            fn disable_interrupt(&mut self, exti: &mut EXTI) {
+                exti.imr1
+                    .modify(|r, w| unsafe { w.bits(r.bits() & !(1 << $i)) });
+            }
+
+            /// Clear the interrupt pending bit for this pin
+            fn clear_interrupt_pending_bit(&mut self) {
+                unsafe { (*EXTI::ptr()).pr1.write(|w| w.bits(1 << $i)) };
+            }
+
+            /// Reads the interrupt pending bit for this pin
+            fn check_interrupt(&self) -> bool {
+                unsafe { ((*EXTI::ptr()).pr1.read().bits() & (1 << $i)) != 0 }
+            }
+        }
+    };
+}
+
 macro_rules! gpio {
     ($GPIOX:ident, $gpiox:ident, $iopxenr:ident, $PXx:ident, $Pxn:expr, [
-        $($PXi:ident: ($pxi:ident, $i:expr),)+
+        $($PXi:ident: ($pxi:ident, $i:expr, $exticri:ident),)+
     ]) => {
         /// GPIO
         pub mod $gpiox {
@@ -170,6 +324,9 @@ macro_rules! gpio {
                     Ok(is_low)
                 }
             }
+
+            exti_erased!($PXx<Output<MODE>>, $Pxn);
+            exti_erased!($PXx<Input<MODE>>, $Pxn);
 
             $(
                 pub struct $PXi<MODE> {
@@ -307,10 +464,11 @@ macro_rules! gpio {
                     pub fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> $PXi<Input<PushPull>> {
                         let offset = 2 * $i;
                         unsafe {
-                            &(*$GPIOX::ptr()).pupdr.modify(|r, w| {
+                            let gpio = &(*$GPIOX::ptr());
+                            gpio.pupdr.modify(|r, w| {
                                 w.bits(r.bits() & !(0b11 << offset))
                             });
-                            &(*$GPIOX::ptr()).moder.modify(|r, w| {
+                            gpio.moder.modify(|r, w| {
                                 w.bits(r.bits() & !(0b11 << offset))
                             })
                         };
@@ -434,6 +592,9 @@ macro_rules! gpio {
                         Ok(is_low)
                     }
                 }
+
+                exti!($PXi<Output<MODE>>, $Pxn, $i, $exticri);
+                exti!($PXi<Input<MODE>>, $Pxn, $i, $exticri);
             )+
 
             impl<TYPE> $PXx<TYPE> {
@@ -446,115 +607,134 @@ macro_rules! gpio {
 }
 
 gpio!(GPIOA, gpioa, gpioaen, PA, 0, [
-    PA0: (pa0, 0),
-    PA1: (pa1, 1),
-    PA2: (pa2, 2),
-    PA3: (pa3, 3),
-    PA4: (pa4, 4),
-    PA5: (pa5, 5),
-    PA6: (pa6, 6),
-    PA7: (pa7, 7),
-    PA8: (pa8, 8),
-    PA9: (pa9, 9),
-    PA10: (pa10, 10),
-    PA11: (pa11, 11),
-    PA12: (pa12, 12),
-    PA13: (pa13, 13),
-    PA14: (pa14, 14),
-    PA15: (pa15, 15),
+    PA0: (pa0, 0, exticr1),
+    PA1: (pa1, 1, exticr1),
+    PA2: (pa2, 2, exticr1),
+    PA3: (pa3, 3, exticr1),
+    PA4: (pa4, 4, exticr2),
+    PA5: (pa5, 5, exticr2),
+    PA6: (pa6, 6, exticr2),
+    PA7: (pa7, 7, exticr2),
+    PA8: (pa8, 8, exticr3),
+    PA9: (pa9, 9, exticr3),
+    PA10: (pa10, 10, exticr3),
+    PA11: (pa11, 11, exticr3),
+    PA12: (pa12, 12, exticr4),
+    PA13: (pa13, 13, exticr4),
+    PA14: (pa14, 14, exticr4),
+    PA15: (pa15, 15, exticr4),
 ]);
 
 gpio!(GPIOB, gpiob, gpioben, PB, 1, [
-    PB0: (pb0, 0),
-    PB1: (pb1, 1),
-    PB2: (pb2, 2),
-    PB3: (pb3, 3),
-    PB4: (pb4, 4),
-    PB5: (pb5, 5),
-    PB6: (pb6, 6),
-    PB7: (pb7, 7),
-    PB8: (pb8, 8),
-    PB9: (pb9, 9),
-    PB10: (pb10, 10),
-    PB11: (pb11, 11),
-    PB12: (pb12, 12),
-    PB13: (pb13, 13),
-    PB14: (pb14, 14),
-    PB15: (pb15, 15),
+    PB0: (pb0, 0, exticr1),
+    PB1: (pb1, 1, exticr1),
+    PB2: (pb2, 2, exticr1),
+    PB3: (pb3, 3, exticr1),
+    PB4: (pb4, 4, exticr2),
+    PB5: (pb5, 5, exticr2),
+    PB6: (pb6, 6, exticr2),
+    PB7: (pb7, 7, exticr2),
+    PB8: (pb8, 8, exticr3),
+    PB9: (pb9, 9, exticr3),
+    PB10: (pb10, 10, exticr3),
+    PB11: (pb11, 11, exticr3),
+    PB12: (pb12, 12, exticr4),
+    PB13: (pb13, 13, exticr4),
+    PB14: (pb14, 14, exticr4),
+    PB15: (pb15, 15, exticr4),
 ]);
 
 gpio!(GPIOC, gpioc, gpiocen, PC, 2, [
-    PC0: (pc0, 0),
-    PC1: (pc1, 1),
-    PC2: (pc2, 2),
-    PC3: (pc3, 3),
-    PC4: (pc4, 4),
-    PC5: (pc5, 5),
-    PC6: (pc6, 6),
-    PC7: (pc7, 7),
-    PC8: (pc8, 8),
-    PC9: (pc9, 9),
-    PC10: (pc10, 10),
-    PC11: (pc11, 11),
-    PC12: (pc12, 12),
-    PC13: (pc13, 13),
-    PC14: (pc14, 14),
-    PC15: (pc15, 15),
+    PC0: (pc0, 0, exticr1),
+    PC1: (pc1, 1, exticr1),
+    PC2: (pc2, 2, exticr1),
+    PC3: (pc3, 3, exticr1),
+    PC4: (pc4, 4, exticr2),
+    PC5: (pc5, 5, exticr2),
+    PC6: (pc6, 6, exticr2),
+    PC7: (pc7, 7, exticr2),
+    PC8: (pc8, 8, exticr3),
+    PC9: (pc9, 9, exticr3),
+    PC10: (pc10, 10, exticr3),
+    PC11: (pc11, 11, exticr3),
+    PC12: (pc12, 12, exticr4),
+    PC13: (pc13, 13, exticr4),
+    PC14: (pc14, 14, exticr4),
+    PC15: (pc15, 15, exticr4),
 ]);
 
 gpio!(GPIOD, gpiod, gpioden, PD, 3, [
-    PD0: (pd0, 0),
-    PD1: (pd1, 1),
-    PD2: (pd2, 2),
-    PD3: (pd3, 3),
-    PD4: (pd4, 4),
-    PD5: (pd5, 5),
-    PD6: (pd6, 6),
-    PD7: (pd7, 7),
-    PD8: (pd8, 8),
-    PD9: (pd9, 9),
-    PD10: (pd10, 10),
-    PD11: (pd11, 11),
-    PD12: (pd12, 12),
-    PD13: (pd13, 13),
-    PD14: (pd14, 14),
-    PD15: (pd15, 15),
+    PD0: (pd0, 0, exticr1),
+    PD1: (pd1, 1, exticr1),
+    PD2: (pd2, 2, exticr1),
+    PD3: (pd3, 3, exticr1),
+    PD4: (pd4, 4, exticr2),
+    PD5: (pd5, 5, exticr2),
+    PD6: (pd6, 6, exticr2),
+    PD7: (pd7, 7, exticr2),
+    PD8: (pd8, 8, exticr3),
+    PD9: (pd9, 9, exticr3),
+    PD10: (pd10, 10, exticr3),
+    PD11: (pd11, 11, exticr3),
+    PD12: (pd12, 12, exticr4),
+    PD13: (pd13, 13, exticr4),
+    PD14: (pd14, 14, exticr4),
+    PD15: (pd15, 15, exticr4),
+]);
+
+gpio!(GPIOE, gpioe, gpioeen, PE, 4, [
+    PE0: (pe0, 0, exticr1),
+    PE1: (pe1, 1, exticr1),
+    PE2: (pe2, 2, exticr1),
+    PE3: (pe3, 3, exticr1),
+    PE4: (pe4, 4, exticr2),
+    PE5: (pe5, 5, exticr2),
+    PE6: (pe6, 6, exticr2),
+    PE7: (pe7, 7, exticr2),
+    PE8: (pe8, 8, exticr3),
+    PE9: (pe9, 9, exticr3),
+    PE10: (pe10, 10, exticr3),
+    PE11: (pe11, 11, exticr3),
+    PE12: (pe12, 12, exticr4),
+    PE13: (pe13, 13, exticr4),
+    PE14: (pe14, 14, exticr4),
+    PE15: (pe15, 15, exticr4),
 ]);
 
 gpio!(GPIOF, gpiof, gpiofen, PF, 5, [
-    PF0: (pf0, 0),
-    PF1: (pf1, 1),
-    PF2: (pf2, 2),
-    PF3: (pf3, 3),
-    PF4: (pf4, 4),
-    PF5: (pf5, 5),
-    PF6: (pf6, 6),
-    PF7: (pf7, 7),
-    PF8: (pf8, 8),
-    PF9: (pf9, 9),
-    PF10: (pf10, 10),
-    PF11: (pf11, 11),
-    PF12: (pf12, 12),
-    PF13: (pf13, 13),
-    PF14: (pf14, 14),
-    PF15: (pf15, 15),
+    PF0: (pf0, 0, exticr1),
+    PF1: (pf1, 1, exticr1),
+    PF2: (pf2, 2, exticr1),
+    PF3: (pf3, 3, exticr1),
+    PF4: (pf4, 4, exticr2),
+    PF5: (pf5, 5, exticr2),
+    PF6: (pf6, 6, exticr2),
+    PF7: (pf7, 7, exticr2),
+    PF8: (pf8, 8, exticr3),
+    PF9: (pf9, 9, exticr3),
+    PF10: (pf10, 10, exticr3),
+    PF11: (pf11, 11, exticr3),
+    PF12: (pf12, 12, exticr4),
+    PF13: (pf13, 13, exticr4),
+    PF14: (pf14, 14, exticr4),
+    PF15: (pf15, 15, exticr4),
 ]);
 
 gpio!(GPIOG, gpiog, gpiogen, PG, 6, [
-    PG0: (pg0, 0),
-    PG1: (pg1, 1),
-    PG2: (pg2, 2),
-    PG3: (pg3, 3),
-    PG4: (pg4, 4),
-    PG5: (pg5, 5),
-    PG6: (pg6, 6),
-    PG7: (pg7, 7),
-    PG8: (pg8, 8),
-    PG9: (pg9, 9),
-    PG10: (pg10, 10),
-    PG11: (pg11, 11),
-    PG12: (pg12, 12),
-    PG13: (pg13, 13),
-    PG14: (pg14, 14),
-    PG15: (pg15, 15),
+    PG0: (pg0, 0, exticr1),
+    PG1: (pg1, 1, exticr1),
+    PG2: (pg2, 2, exticr1),
+    PG3: (pg3, 3, exticr1),
+    PG4: (pg4, 4, exticr2),
+    PG5: (pg5, 5, exticr2),
+    PG6: (pg6, 6, exticr2),
+    PG7: (pg7, 7, exticr2),
+    PG8: (pg8, 8, exticr3),
+    PG9: (pg9, 9, exticr3),
+    PG10: (pg10, 10, exticr3),
+    PG11: (pg11, 11, exticr3),
+    PG12: (pg12, 12, exticr4),
+    PG13: (pg13, 13, exticr4),
+    PG14: (pg14, 14, exticr4),
+    PG15: (pg15, 15, exticr4),
 ]);
