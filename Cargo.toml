@@ -35,6 +35,10 @@ cortex-m-rtfm = "0.5.1"
 cortex-m-semihosting = "0.3.5"
 panic-semihosting = "0.5.3"
 panic-halt = "0.2.0"
+log = "0.4.11"
+cfg-if = "0.1.10"
+rtt-target = { version = "0.3.0", features = ["cortex-m"] }
+panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
 
 [features]
 default = ["rt"]
@@ -48,6 +52,9 @@ stm32g483 = ["stm32g4/stm32g483"]
 stm32g484 = ["stm32g4/stm32g484"]
 stm32g491 = ["stm32g4/stm32g491"]
 stm32g4a1 = ["stm32g4/stm32g4a1"]
+log-itm = []
+log-rtt = []
+log-semihost = [] 
 
 [profile.dev]
 codegen-units = 1
