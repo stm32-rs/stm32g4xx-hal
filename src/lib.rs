@@ -56,6 +56,7 @@ pub use stm32g4::stm32g484 as stm32;
 pub use crate::stm32::interrupt;
 
 // pub mod adc;
+pub mod bb;
 // pub mod crc;
 // pub mod dac;
 pub mod delay;
@@ -72,6 +73,7 @@ pub mod rcc;
 // pub mod serial;
 // pub mod spi;
 // pub mod stopwatch;
+pub mod syscfg;
 pub mod time;
 // pub mod timer;
 // pub mod watchdog;
