@@ -58,6 +58,12 @@ impl PeripheralToMemory {
     }
 }
 
+impl Default for PeripheralToMemory {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Direction for PeripheralToMemory {
     #[inline(always)]
     fn direction() -> DmaDirection {
@@ -103,6 +109,12 @@ impl MemoryToPeripheral {
     }
 }
 
+impl Default for MemoryToPeripheral {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Direction for MemoryToPeripheral {
     fn direction() -> DmaDirection {
         DmaDirection::MemoryToPeripheral
@@ -125,7 +137,7 @@ unsafe impl TargetAddress<Self> for MemoryToMemory<u16> {
 
 unsafe impl TargetAddress<Self> for MemoryToMemory<u32> {
     fn address(&self) -> u32 {
-        self.data.into()
+        self.data
     }
     type MemSize = u32;
 }
