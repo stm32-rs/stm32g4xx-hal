@@ -15,5 +15,6 @@ use rt::entry;
 fn main() -> ! {
     hprintln!("Hello, STM32G4!").unwrap();
 
+    #[allow(clippy::empty_loop)]
     loop {}
 }
