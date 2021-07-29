@@ -243,10 +243,7 @@ macro_rules! opamps {
                     output: Option<IntoOutput>,
                 ) -> Follower<$input> {
                     let input = input.into();
-                    let output = match output {
-                        Some(output) => Some(output.into()),
-                        None => None,
-                    };
+                    let output = output.map(|output| output.into());
                     unsafe {
                         use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
@@ -315,10 +312,7 @@ macro_rules! opamps {
                 ) -> OpenLoop<$non_inverting, $inverting> {
                     let non_inverting = non_inverting.into();
                     let inverting = inverting.into();
-                    let output = match output {
-                        Some(output) => Some(output.into()),
-                        None => None,
-                    };
+                    let output = output.map(|output| output.into());
                     unsafe {
                         use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
