@@ -326,8 +326,8 @@ pub mod config {
     }
     impl Resolution {
         /// Return the maximum value of a sample with the given Resolution
-        pub fn to_max_sample(&self) -> u32 {
-            match *self {
+        pub fn to_max_sample(self) -> u32 {
+            match self {
                 Resolution::Twelve => (1 << 12) - 1,
                 Resolution::Ten => (1 << 10) - 1,
                 Resolution::Eight => (1 << 8) - 1,
