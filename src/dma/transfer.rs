@@ -350,7 +350,7 @@ where
             "Trying to read more than the DMA provided buffer can hold!"
         );
 
-        while !(self.elements_available() >= read) {}
+        while self.elements_available() < read {}
 
         fence(Ordering::SeqCst);
 

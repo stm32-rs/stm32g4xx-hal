@@ -87,9 +87,17 @@ pub trait Stream: Sealed {
     fn set_transfer_error_interrupt_enable(&mut self, transfer_error_interrupt: bool);
 
     /// Set the peripheral address (par) for the DMA stream.
+    ///
+    /// # Safety
+    ///
+    /// Value should be a word aligned valid peripheral address
     unsafe fn set_peripheral_address(&mut self, value: u32);
 
     /// Set the memory address (m0ar or m1ar) for the DMA stream.
+    ///
+    /// # Safety
+    ///
+    /// Value should be a word aligned valid memory address
     unsafe fn set_memory_address(&mut self, value: u32);
 
     /// Enable/disable the half transfer interrupt (htie) of the DMA stream.
