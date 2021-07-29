@@ -333,30 +333,35 @@ macro_rules! gpio {
                     _mode: PhantomData<MODE>,
                 }
 
+                #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Input<PullDown>>> for $PXi<DefaultMode> {
                     fn into(self) -> $PXi<Input<PullDown>> {
                         self.into_pull_down_input()
                     }
                 }
 
+                #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Input<PullUp>>> for $PXi<DefaultMode> {
                     fn into(self) -> $PXi<Input<PullUp>> {
                         self.into_pull_up_input()
                     }
                 }
 
+                #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Analog>> for $PXi<DefaultMode> {
                     fn into(self) -> $PXi<Analog> {
                         self.into_analog()
                     }
                 }
 
+                #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Output<OpenDrain>>> for $PXi<DefaultMode> {
                     fn into(self) -> $PXi<Output<OpenDrain>> {
                         self.into_open_drain_output()
                     }
                 }
 
+                #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Output<PushPull>>> for $PXi<DefaultMode> {
                     fn into(self) -> $PXi<Output<PushPull>> {
                         self.into_push_pull_output()
