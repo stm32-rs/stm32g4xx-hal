@@ -5,7 +5,7 @@ use crate::stm32::RCC;
 pub type LscoPin = gpioa::PA2<DefaultMode>;
 
 pub struct Lsco {
-    pin: LscoPin,
+    pin: gpioa::PA2<Alternate<AF0>>,
 }
 
 impl Lsco {
@@ -20,7 +20,7 @@ impl Lsco {
     }
 
     pub fn release(self) -> LscoPin {
-        self.pin
+        self.pin.into_floating_input()
     }
 }
 
@@ -30,7 +30,6 @@ pub trait LSCOExt {
 
 impl LSCOExt for LscoPin {
     fn lsco(self, src: LSCOSrc, rcc: &mut Rcc) -> Lsco {
-        self.set_alt_mode(AltFunction::AF0);
         let src_select_bit = match src {
             LSCOSrc::LSE => {
                 rcc.enable_lse(false);
@@ -43,7 +42,9 @@ impl LSCOExt for LscoPin {
         };
         rcc.unlock_rtc();
         rcc.rb.bdcr.modify(|_, w| w.lscosel().bit(src_select_bit));
-        Lsco { pin: self }
+        Lsco {
+            pin: self.into_alternate(),
+        }
     }
 }
 
@@ -65,7 +66,7 @@ impl<PIN> Mco<PIN> {
     }
 
     pub fn release(self) -> PIN {
-        self.pin
+        self.pin //TODO reverse pin to input<floating>
     }
 }
 
@@ -74,12 +75,10 @@ pub trait MCOExt<PIN> {
 }
 
 macro_rules! mco {
-    ($($PIN:ty),+) => {
+    ($($PIN:ident),+) => {
         $(
-            impl MCOExt<$PIN> for $PIN {
-                fn mco(self, src: MCOSrc, psc: Prescaler, rcc: &mut Rcc) -> Mco<$PIN> {
-                    self.set_alt_mode(AltFunction::AF0);
-
+            impl MCOExt<$PIN<Alternate<AF0>>> for $PIN<DefaultMode> {
+                fn mco(self, src: MCOSrc, psc: Prescaler, rcc: &mut Rcc) -> Mco<$PIN<Alternate<AF0>>> {
                     let psc_bits = match psc {
                         Prescaler::NotDivided => 0b000,
                         Prescaler::Div2 => 0b001,
@@ -114,11 +113,14 @@ macro_rules! mco {
                             0b111
                         },
                     };
-                    Mco { src_bits, pin: self }
+                    Mco { src_bits, pin: self.into_alternate() }
                 }
             }
         )+
     };
 }
 
-mco!(gpioa::PA8<DefaultMode>, gpiog::PG10<DefaultMode>);
+use crate::gpio::gpioa::PA8;
+use crate::gpio::gpiog::PG10;
+
+mco!(PA8, PG10);
