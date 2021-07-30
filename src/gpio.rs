@@ -60,17 +60,17 @@ pub enum SignalEdge {
     RisingFalling,
 }
 
-#[allow(dead_code)]
-pub(crate) enum AltFunction {
-    AF0 = 0,
-    AF1 = 1,
-    AF2 = 2,
-    AF3 = 3,
-    AF4 = 4,
-    AF5 = 5,
-    AF6 = 6,
-    AF7 = 7,
-}
+/// Altername Mode (type state)
+pub struct Alternate<const A: u8>;
+
+pub const AF0: u8 = 0;
+pub const AF1: u8 = 1;
+pub const AF2: u8 = 2;
+pub const AF3: u8 = 3;
+pub const AF4: u8 = 4;
+pub const AF5: u8 = 5;
+pub const AF6: u8 = 6;
+pub const AF7: u8 = 7;
 
 /// External Interrupt Pin
 pub trait ExtiPin {
@@ -487,9 +487,8 @@ macro_rules! gpio {
                         self
                     }
 
-                    #[allow(dead_code)]
-                    pub(crate) fn set_alt_mode(&self, mode: AltFunction) {
-                        let mode = mode as u32;
+                    pub fn into_alternate<const A: u8>(self) -> $PXi<Alternate<A>> {
+                        let mode = A as u32;
                         let offset = 2 * $i;
                         let offset2 = 4 * $i;
                         unsafe {
@@ -508,6 +507,7 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
                             });
                         }
+                        $PXi { _mode: PhantomData }
                     }
                 }
 
