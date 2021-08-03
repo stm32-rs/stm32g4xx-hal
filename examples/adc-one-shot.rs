@@ -3,6 +3,7 @@
 
 use crate::hal::{
     adc::{config::SampleTime, AdcClaim, ClockSource},
+    delay::SYSTDelayExt,
     rcc::Config,
     stm32::Peripherals,
 };
@@ -23,7 +24,7 @@ fn main() -> ! {
     info!("start");
 
     let dp = Peripherals::take().unwrap();
-    let mut cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     info!("rcc");
 
@@ -31,9 +32,8 @@ fn main() -> ! {
     let mut rcc = rcc.freeze(Config::hsi());
 
     info!("Setup Adc1");
-
-    let (mut adc, syst) = dp.ADC1.claim(ClockSource::SystemClock, &rcc, cp.SYST);
-    cp.SYST = syst;
+    let mut delay = cp.SYST.delay(&rcc.clocks);
+    let mut adc = dp.ADC1.claim(ClockSource::SystemClock, &rcc, &mut delay);
 
     info!("Setup Gpio");
 
