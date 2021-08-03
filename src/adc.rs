@@ -11,7 +11,6 @@
 //use crate::dma::traits::PeriAddress;
 pub use crate::time::U32Ext as _;
 use crate::{
-    delay::*,
     dma::{mux::DmaMuxResources, traits::TargetAddress, PeripheralToMemory},
     gpio::*,
     rcc::Rcc,
@@ -20,9 +19,10 @@ use crate::{
 };
 use core::fmt;
 use core::marker::PhantomData;
-use cortex_m::delay::Delay;
-use cortex_m::peripheral::SYST;
-use embedded_hal::adc::{Channel, OneShot};
+use embedded_hal::{
+    adc::{Channel, OneShot},
+    blocking::delay::DelayUs,
+};
 
 /// Vref internal signal, used for calibration
 pub struct Vref;
@@ -1007,16 +1007,17 @@ impl From<ClockSource> for u8 {
 /// used to create an ADC instance from the stm32::Adc
 pub trait AdcClaim<TYPE> {
     /// create a disabled ADC instance from the stm32::Adc
-    fn claim(self, cs: ClockSource, rcc: &Rcc, syst: SYST) -> (Adc<TYPE, Disabled>, SYST);
+    fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>)
+        -> Adc<TYPE, Disabled>;
 
     /// create an enabled ADC instance from the stm32::Adc
     fn claim_and_configure(
         self,
         cs: ClockSource,
         rcc: &Rcc,
-        syst: SYST,
         config: config::AdcConfig,
-    ) -> (Adc<TYPE, Configured>, SYST);
+        delay: &mut impl DelayUs<u8>,
+    ) -> Adc<TYPE, Configured>;
 }
 
 trait AdcConfig {
@@ -1223,7 +1224,7 @@ macro_rules! adc {
 
                 /// Powers-up an powered-down Adc
                 #[inline(always)]
-                pub fn power_up(&mut self, delay: &mut Delay) {
+                pub fn power_up(&mut self, delay: &mut impl DelayUs<u8>) {
                     if self.is_deeppwd_enabled() {
                         self.disable_deeppwd_down();
                     }
@@ -1256,7 +1257,7 @@ macro_rules! adc {
 
                 /// Enables the Voltage Regulator
                 #[inline(always)]
-                pub fn enable_vreg(&mut self, delay: &mut Delay) {
+                pub fn enable_vreg(&mut self, delay: &mut impl DelayUs<u8>) {
                     self.adc_reg.cr.modify(|_, w| w.advregen().set_bit());
                     while !self.adc_reg.cr.read().advregen().bit_is_set() {}
 
@@ -1264,7 +1265,7 @@ macro_rules! adc {
                     // to wait for T_ADCVREG_STUP after enabling the internal voltage
                     // regulator. For the STM32G431, this is 20 us. We choose 25 us to
                     // account for bad clocks.
-                    delay.delay(25.us() );
+                    delay.delay_us(25);
                 }
 
                 /// Disables the Voltage Regulator
@@ -1727,7 +1728,7 @@ macro_rules! adc {
                 /// * `reset` - should a reset be performed. This is provided because on some devices multiple ADCs share the same common reset
                 /// TODO: fix needing SYST
                 #[inline(always)]
-                fn claim(self, cs: ClockSource, rcc: &Rcc, syst: SYST) -> (Adc<stm32::$adc_type, Disabled>, SYST) {
+                fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>) -> Adc<stm32::$adc_type, Disabled> {
                     Self::enable_pheripheral(rcc);
                     Self::configure_clock_source(cs, rcc);
 
@@ -1742,14 +1743,13 @@ macro_rules! adc {
                         _status: PhantomData,
                     };
 
-                    let mut delay = syst.delay(&rcc.clocks);
-                    (adc.power_up(&mut delay), delay.free() )
+                    adc.power_up(delay)
                 }
 
                 /// claims and configures the Adc
                 #[inline(always)]
-                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, syst: SYST, config: config::AdcConfig) -> (Adc<stm32::$adc_type, Configured>, SYST) {
-                    let (mut adc, syst) = self.claim(cs, rcc, syst);
+                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, config: config::AdcConfig, delay: &mut impl DelayUs<u8>) -> Adc<stm32::$adc_type, Configured> {
+                    let mut adc = self.claim(cs, rcc, delay);
                     adc.adc.config = config;
 
                     // If the user specified a VDDA, use that over the internally determined value.
@@ -1757,7 +1757,7 @@ macro_rules! adc {
                         adc.adc.calibrated_vdda = vdda;
                     }
 
-                    (adc.enable(), syst)
+                    adc.enable()
                 }
             }
 
@@ -1772,7 +1772,7 @@ macro_rules! adc {
             impl Adc<stm32::$adc_type, PoweredDown> {
                 /// Powers-up an powered-down Adc
                 #[inline(always)]
-                pub fn power_up(mut self, delay: &mut Delay) -> Adc<stm32::$adc_type, Disabled> {
+                pub fn power_up(mut self, delay: &mut impl DelayUs<u8>) -> Adc<stm32::$adc_type, Disabled> {
                     self.adc.power_up(delay);
 
                     Adc {

@@ -6,6 +6,7 @@ use crate::hal::{
         config::{Continuous, SampleTime, Sequence},
         AdcClaim, ClockSource, Temperature, Vref,
     },
+    delay::SYSTDelayExt,
     gpio::GpioExt,
     rcc::{Config, RccExt},
     stm32::Peripherals,
@@ -26,7 +27,7 @@ fn main() -> ! {
     info!("start");
 
     let dp = Peripherals::take().unwrap();
-    let mut cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     info!("rcc");
 
@@ -38,8 +39,8 @@ fn main() -> ! {
     let pa0 = gpioa.pa0.into_analog();
 
     info!("Setup Adc1");
-    let (mut adc, syst) = dp.ADC1.claim(ClockSource::SystemClock, &rcc, cp.SYST);
-    cp.SYST = syst;
+    let mut delay = cp.SYST.delay(&rcc.clocks);
+    let mut adc = dp.ADC1.claim(ClockSource::SystemClock, &rcc, &mut delay);
 
     adc.enable_temperature(&dp.ADC12_COMMON);
     adc.enable_vref(&dp.ADC12_COMMON);
