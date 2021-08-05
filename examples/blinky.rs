@@ -3,27 +3,35 @@
 #![no_main]
 #![no_std]
 
-extern crate cortex_m;
-extern crate cortex_m_rt as rt;
-extern crate panic_halt;
-extern crate stm32g4xx_hal as hal;
-
 use hal::prelude::*;
 use hal::stm32;
-use rt::entry;
+use stm32g4xx_hal as hal;
+
+use cortex_m_rt::entry;
+use log::info;
+
+#[macro_use]
+mod utils;
 
 #[entry]
 fn main() -> ! {
+    utils::logger::init();
+
+    info!("start");
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let mut rcc = dp.RCC.constrain();
-    let gpiob = dp.GPIOB.split(&mut rcc);
-    let mut led = gpiob.pb8.into_push_pull_output();
+
+    info!("Init Led");
+    let gpioa = dp.GPIOA.split(&mut rcc);
+    let mut led = gpioa.pa5.into_push_pull_output();
 
     loop {
-        for _ in 0..1_000_000 {
+        info!("Set Led low");
+        for _ in 0..100_000 {
             led.set_low().unwrap();
         }
-        for _ in 0..1_000_000 {
+        info!("Set Led High");
+        for _ in 0..100_000 {
             led.set_high().unwrap();
         }
     }
