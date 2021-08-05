@@ -31,6 +31,11 @@ pub extern crate stm32g4;
 
 pub use nb::block;
 
+mod sealed {
+    pub trait Sealed {}
+}
+pub(crate) use sealed::Sealed;
+
 #[cfg(feature = "stm32g431")]
 pub use stm32g4::stm32g431 as stm32;
 
@@ -76,5 +81,5 @@ pub mod signature;
 // pub mod stopwatch;
 pub mod syscfg;
 pub mod time;
-// pub mod timer;
+pub mod timer;
 // pub mod watchdog;
