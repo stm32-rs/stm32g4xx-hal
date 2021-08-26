@@ -46,7 +46,10 @@ cortex-m-rtfm = "0.5.1"
 cortex-m-semihosting = "0.3.5"
 panic-semihosting = "0.5.3"
 panic-halt = "0.2.0"
+panic-itm = "0.4.2"
+lazy_static = { version = "1.4", features = ["spin_no_std"] }
 log = "0.4.11"
+cortex-m-log = { version = "0.7", features = ["log-integration"] }
 cfg-if = "0.1.10"
 rtt-target = { version = "0.3.0", features = ["cortex-m"] }
 panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
@@ -63,9 +66,9 @@ stm32g483 = ["stm32g4/stm32g483"]
 stm32g484 = ["stm32g4/stm32g484"]
 stm32g491 = ["stm32g4/stm32g491"]
 stm32g4a1 = ["stm32g4/stm32g4a1"]
-log-itm = []
+log-itm = ["cortex-m-log/itm"]
 log-rtt = []
-log-semihost = [] 
+log-semihost = ["cortex-m-log/semihosting"]
 
 [profile.dev]
 codegen-units = 1

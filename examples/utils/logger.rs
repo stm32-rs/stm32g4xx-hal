@@ -1,3 +1,4 @@
+#![allow(unsafe_code)]
 cfg_if::cfg_if! {
     if #[cfg(any(feature = "log-itm"))] {
         use panic_itm as _;
@@ -19,7 +20,9 @@ cfg_if::cfg_if! {
                 level: LevelFilter::Info,
                 inner: unsafe {
                     InterruptSync::new(
-                        ItmDest::new(cortex_m::Peripherals::steal().ITM)
+                        // We must not use Peripherals::steal() here to get an ITM instance, as the
+                        // code might expect to be able to call Peripherals::take() later on.
+                        ItmDest::new(core::mem::transmute(()))
                     )
                 },
             };
