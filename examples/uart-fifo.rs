@@ -61,7 +61,7 @@ fn main() -> ! {
                         // Handle other error Overrun, Framing, Noise or Parity
                     }
                     Ok(byte) => {
-                        writeln!(tx1, "{}: {}\n", cnt, byte).unwrap();
+                        writeln!(tx1, "{}: {}\r", cnt, byte).unwrap();
                         cnt += 1;
                     }
                 }

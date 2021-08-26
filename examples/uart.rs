@@ -26,6 +26,8 @@ fn main() -> ! {
     let mut rcc = dp.RCC.freeze(rcc::Config::hsi());
 
     info!("Init UART");
+    // on Nucleo-G474, the pins marked TX/RX are connected to USART1 by default, whereas USART2 is
+    // connected to the ST-Link's UART.
     let gpioa = dp.GPIOA.split(&mut rcc);
     let tx = gpioa.pa2.into_alternate();
     let rx = gpioa.pa3.into_alternate();
@@ -41,12 +43,14 @@ fn main() -> ! {
         .usart(tx, rx, FullConfig::default(), &mut rcc)
         .unwrap();*/
 
-    writeln!(usart, "Hello USART2\r\n").unwrap();
+    writeln!(usart, "Hello USART1\r\n").unwrap();
 
     let mut cnt = 0;
     loop {
-        let byte = block!(usart.read()).unwrap();
-        writeln!(usart, "{}: {}\r", cnt, byte).unwrap();
+        match block!(usart.read()) {
+            Ok(byte) => writeln!(usart, "{}: {}\r", cnt, byte).unwrap(),
+            Err(e) => writeln!(usart, "E: {:?}\r", e).unwrap(),
+        };
         cnt += 1;
     }
 }

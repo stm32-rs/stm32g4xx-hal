@@ -24,6 +24,7 @@ fn main() -> ! {
     utils::logger::init();
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
+    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     let rcc = dp.RCC.constrain();
     let mut rcc = rcc.freeze(rcc::Config::hsi());
@@ -48,26 +49,29 @@ fn main() -> ! {
         )
         .unwrap();
 
+    let mut delay_syst = cp.SYST.delay(&rcc.clocks);
     let mut led = gpioa.pa5.into_push_pull_output();
 
     info!("Start writing");
 
-    writeln!(usart, "Hello without DMA\r\n").unwrap();
+    writeln!(usart, "Hello without DMA\r").unwrap();
 
-    let tx_buffer = cortex_m::singleton!(: [u8; 16] = *b"Hello with DMA!\n").unwrap();
+    let tx_buffer = cortex_m::singleton!(: [u8; 17] = *b"Hello with DMA!\r\n").unwrap();
 
     let (tx, _rx) = usart.split();
 
-    // Setup DMA for USART1 TX with dma channel 1.
+    // Setup DMA for USART2 TX with dma channel 1.
     let mut transfer =
         streams
             .0
             .into_memory_to_peripheral_transfer(tx.enable_dma(), &mut tx_buffer[..], config);
 
+    transfer.start(|_tx| {});
     loop {
-        transfer.start(|_tx| {});
         while !transfer.get_transfer_complete_flag() {}
 
+        delay_syst.delay(1000.ms());
         led.toggle().unwrap();
+        transfer.restart(|_tx| {});
     }
 }
