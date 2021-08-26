@@ -74,26 +74,23 @@ impl Event {
 }
 
 /// Serial receiver
-pub struct Rx<USART, Pin, Config, Dma> {
+pub struct Rx<USART, Pin, Dma> {
     pin: Pin,
     _usart: PhantomData<USART>,
-    _config: PhantomData<Config>,
     _dma: PhantomData<Dma>,
 }
 
 /// Serial transmitter
-pub struct Tx<USART, Pin, Config, Dma> {
+pub struct Tx<USART, Pin, Dma> {
     pin: Pin,
     usart: USART,
-    _config: PhantomData<Config>,
     _dma: PhantomData<Dma>,
 }
 
 /// Serial abstraction
-pub struct Serial<USART, TXPin, RXPin, Config> {
-    tx: Tx<USART, TXPin, Config, NoDMA>,
-    rx: Rx<USART, RXPin, Config, NoDMA>,
-    _config: PhantomData<Config>,
+pub struct Serial<USART, TXPin, RXPin> {
+    tx: Tx<USART, TXPin, NoDMA>,
+    rx: Rx<USART, RXPin, NoDMA>,
 }
 
 /// Serial TX pin
@@ -120,15 +117,15 @@ pub trait SerialExt<USART, Config> {
         rx: RX,
         config: Config,
         rcc: &mut Rcc,
-    ) -> Result<Serial<USART, TX, RX, Config>, InvalidConfig>
+    ) -> Result<Serial<USART, TX, RX>, InvalidConfig>
     where
         TX: TxPin<USART>,
         RX: RxPin<USART>;
 }
 
-impl<USART, TX, RX, Config> fmt::Write for Serial<USART, TX, RX, Config>
+impl<USART, TX, RX> fmt::Write for Serial<USART, TX, RX>
 where
-    Serial<USART, TX, RX, Config>: hal::serial::Write<u8>,
+    Serial<USART, TX, RX>: hal::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
@@ -136,9 +133,9 @@ where
     }
 }
 
-impl<USART, Pin, Config, Dma> fmt::Write for Tx<USART, Pin, Config, Dma>
+impl<USART, Pin, Dma> fmt::Write for Tx<USART, Pin, Dma>
 where
-    Tx<USART, Pin, Config, Dma>: hal::serial::Write<u8>,
+    Tx<USART, Pin, Dma>: hal::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
@@ -165,7 +162,7 @@ macro_rules! uart_shared {
             }
         )+
 
-        impl<Pin, Config, Dma> Rx<$USARTX, Pin, Config, Dma> {
+        impl<Pin, Dma> Rx<$USARTX, Pin, Dma> {
             /// Starts listening for an interrupt event
             pub fn listen(&mut self) {
                 let usart = unsafe { &(*$USARTX::ptr()) };
@@ -183,10 +180,16 @@ macro_rules! uart_shared {
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 usart.isr.read().rxne().bit_is_set()
             }
+
+            /// Returns true if the rx fifo threshold has been reached.
+            pub fn fifo_threshold_reached(&self) -> bool {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.isr.read().rxft().bit_is_set()
+            }
         }
 
-        impl<Pin, Config> Rx<$USARTX, Pin, Config, NoDMA> {
-            pub fn enable_dma(self) -> Rx<$USARTX, Pin, Config, DMA> {
+        impl<Pin> Rx<$USARTX, Pin, NoDMA> {
+            pub fn enable_dma(self) -> Rx<$USARTX, Pin, DMA> {
                 // NOTE(unsafe) critical section prevents races
                 cortex_m::interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3;
@@ -196,14 +199,13 @@ macro_rules! uart_shared {
                 Rx {
                     pin: self.pin,
                     _usart: PhantomData,
-                    _config: PhantomData,
                     _dma: PhantomData,
                 }
             }
         }
 
-        impl<Pin, Config> Rx<$USARTX, Pin, Config, DMA> {
-            pub fn disable_dma(self) -> Rx<$USARTX, Pin, Config, NoDMA> {
+        impl<Pin> Rx<$USARTX, Pin, DMA> {
+            pub fn disable_dma(self) -> Rx<$USARTX, Pin, NoDMA> {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3;
@@ -213,13 +215,12 @@ macro_rules! uart_shared {
                 Rx {
                     pin: self.pin,
                     _usart: PhantomData,
-                    _config: PhantomData,
                     _dma: PhantomData,
                 }
             }
         }
 
-        impl<Pin, Config> hal::serial::Read<u8> for Rx<$USARTX, Pin, Config, NoDMA> {
+        impl<Pin> hal::serial::Read<u8> for Rx<$USARTX, Pin, NoDMA> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -247,7 +248,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX, Config> hal::serial::Read<u8> for Serial<$USARTX, TX, RX, Config> {
+        impl<TX, RX> hal::serial::Read<u8> for Serial<$USARTX, TX, RX> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -255,7 +256,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin, Config, Dma> Tx<$USARTX, Pin, Config, Dma> {
+        impl<Pin, Dma> Tx<$USARTX, Pin, Dma> {
             /// Starts listening for an interrupt event
             pub fn listen(&mut self) {
                 let usart = unsafe { &(*$USARTX::ptr()) };
@@ -273,10 +274,16 @@ macro_rules! uart_shared {
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 usart.isr.read().txe().bit_is_set()
             }
+
+            /// Returns true if the tx fifo threshold has been reached.
+            pub fn fifo_threshold_reached(&self) -> bool {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.isr.read().txft().bit_is_set()
+            }
         }
 
-        impl<Pin, Config> Tx<$USARTX, Pin, Config, NoDMA> {
-            pub fn enable_dma(self) -> Tx<$USARTX, Pin, Config, DMA> {
+        impl<Pin> Tx<$USARTX, Pin, NoDMA> {
+            pub fn enable_dma(self) -> Tx<$USARTX, Pin, DMA> {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3;
@@ -286,14 +293,13 @@ macro_rules! uart_shared {
                 Tx {
                     pin: self.pin,
                     usart: self.usart,
-                    _config: PhantomData,
                     _dma: PhantomData,
                 }
             }
         }
 
-        impl<Pin, Config> Tx<$USARTX, Pin, Config, DMA> {
-            pub fn disable_dma(self) -> Tx<$USARTX, Pin, Config, NoDMA> {
+        impl<Pin> Tx<$USARTX, Pin, DMA> {
+            pub fn disable_dma(self) -> Tx<$USARTX, Pin, NoDMA> {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3;
@@ -303,13 +309,12 @@ macro_rules! uart_shared {
                 Tx {
                     pin: self.pin,
                     usart: self.usart,
-                    _config: PhantomData,
                     _dma: PhantomData,
                 }
             }
         }
 
-        impl<Pin, Config> hal::serial::Write<u8> for Tx<$USARTX, Pin, Config, NoDMA> {
+        impl<Pin> hal::serial::Write<u8> for Tx<$USARTX, Pin, NoDMA> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -332,7 +337,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX, Config> hal::serial::Write<u8> for Serial<$USARTX, TX, RX, Config> {
+        impl<TX, RX> hal::serial::Write<u8> for Serial<$USARTX, TX, RX> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -345,11 +350,11 @@ macro_rules! uart_shared {
         }
 
 
-        impl<TX, RX, Config> Serial<$USARTX, TX, RX, Config> {
+        impl<TX, RX> Serial<$USARTX, TX, RX> {
 
             /// Separates the serial struct into separate channel objects for sending (Tx) and
             /// receiving (Rx)
-            pub fn split(self) -> (Tx<$USARTX, TX, Config, NoDMA>, Rx<$USARTX, RX, Config, NoDMA>) {
+            pub fn split(self) -> (Tx<$USARTX, TX, NoDMA>, Rx<$USARTX, RX, NoDMA>) {
                 (self.tx, self.rx)
             }
 
@@ -358,13 +363,12 @@ macro_rules! uart_shared {
             /// This function can be used in combination with `release()` to deinitialize the
             /// peripheral after it has been split.
             pub fn join(
-                tx: Tx<$USARTX, TX, Config, NoDMA>,
-                rx: Rx<$USARTX, RX, Config, NoDMA>,
+                tx: Tx<$USARTX, TX, NoDMA>,
+                rx: Rx<$USARTX, RX, NoDMA>,
             ) -> Self {
                 Serial{
                     tx,
                     rx,
-                    _config: PhantomData,
                 }
             }
 
@@ -384,7 +388,7 @@ macro_rules! uart_shared {
             }
         }
 
-        unsafe impl<Pin, Config> TargetAddress<MemoryToPeripheral> for Tx<$USARTX, Pin, Config, DMA> {
+        unsafe impl<Pin> TargetAddress<MemoryToPeripheral> for Tx<$USARTX, Pin, DMA> {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Tx part accesses the Tx register
@@ -396,7 +400,7 @@ macro_rules! uart_shared {
             const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::$dmamux_tx as u8);
         }
 
-        unsafe impl<Pin, Config> TargetAddress<PeripheralToMemory> for Rx<$USARTX, Pin, Config, DMA> {
+        unsafe impl<Pin> TargetAddress<PeripheralToMemory> for Rx<$USARTX, Pin, DMA> {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Rx part accesses the Rx register
@@ -410,18 +414,18 @@ macro_rules! uart_shared {
     }
 }
 
-macro_rules! uart_basic {
+macro_rules! uart_lp {
     ($USARTX:ident,
         $usartX:ident, $clk_mul:expr
     ) => {
-        impl SerialExt<$USARTX, BasicConfig> for $USARTX {
+        impl SerialExt<$USARTX, LowPowerConfig> for $USARTX {
             fn usart<TX, RX>(
                 self,
                 tx: TX,
                 rx: RX,
-                config: BasicConfig,
+                config: LowPowerConfig,
                 rcc: &mut Rcc,
-            ) -> Result<Serial<$USARTX, TX, RX, BasicConfig>, InvalidConfig>
+            ) -> Result<Serial<$USARTX, TX, RX>, InvalidConfig>
             where
                 TX: TxPin<$USARTX>,
                 RX: RxPin<$USARTX>,
@@ -430,7 +434,7 @@ macro_rules! uart_basic {
             }
         }
 
-        impl<TX, RX> Serial<$USARTX, TX, RX, BasicConfig>
+        impl<TX, RX> Serial<$USARTX, TX, RX>
         where
             TX: TxPin<$USARTX>,
             RX: RxPin<$USARTX>,
@@ -439,7 +443,7 @@ macro_rules! uart_basic {
                 usart: $USARTX,
                 tx: TX,
                 rx: RX,
-                config: BasicConfig,
+                config: LowPowerConfig,
                 rcc: &mut Rcc,
             ) -> Result<Self, InvalidConfig> {
                 // Enable clock for USART
@@ -456,17 +460,40 @@ macro_rules! uart_basic {
                 let clk = <$USARTX as RccBus>::Bus::get_frequency(&rcc.clocks).0 as u64;
                 let bdr = config.baudrate.0 as u64;
                 let div = ($clk_mul * clk) / bdr;
+                if div < 16 {
+                    // We need 16x oversampling.
+                    return Err(InvalidConfig);
+                }
                 usart.brr.write(|w| unsafe { w.bits(div as u32) });
+                // Reset the UART and disable it (UE=0)
+                usart.cr1.reset();
                 // Reset other registers to disable advanced USART features
                 usart.cr2.reset();
                 usart.cr3.reset();
 
-                // Disable USART, there are many bits where UE=0 is required
-                usart.cr1.modify(|_, w| w.ue().clear_bit());
+                usart.cr2.write(|w| unsafe {
+                    w.stop()
+                        .bits(config.stopbits.bits())
+                        .swap()
+                        .bit(config.swap)
+                });
 
-                // Enable transmission and receiving
+                usart.cr3.write(|w| unsafe {
+                    w.txftcfg()
+                        .bits(config.tx_fifo_threshold.bits())
+                        .rxftcfg()
+                        .bits(config.rx_fifo_threshold.bits())
+                        .txftie()
+                        .bit(config.tx_fifo_interrupt)
+                        .rxftie()
+                        .bit(config.rx_fifo_interrupt)
+                });
+
+                // Enable the UART and perform remaining configuration.
                 usart.cr1.write(|w| {
-                    w.te()
+                    w.ue()
+                        .set_bit()
+                        .te()
                         .set_bit()
                         .re()
                         .set_bit()
@@ -478,36 +505,21 @@ macro_rules! uart_basic {
                         .bit(config.parity != Parity::ParityNone)
                         .ps()
                         .bit(config.parity == Parity::ParityOdd)
+                        .fifoen()
+                        .bit(config.fifo_enable)
                 });
-                usart.cr2.write(|w| unsafe {
-                    w.stop()
-                        .bits(match config.stopbits {
-                            StopBits::STOP1 => 0b00,
-                            StopBits::STOP0P5 => 0b01,
-                            StopBits::STOP2 => 0b10,
-                            StopBits::STOP1P5 => 0b11,
-                        })
-                        .swap()
-                        .bit(config.swap)
-                });
-
-                // Enable USART
-                usart.cr1.modify(|_, w| w.ue().set_bit());
 
                 Ok(Serial {
                     tx: Tx {
                         pin: tx,
                         usart,
-                        _config: PhantomData,
                         _dma: PhantomData,
                     },
                     rx: Rx {
                         pin: rx,
                         _usart: PhantomData,
-                        _config: PhantomData,
                         _dma: PhantomData,
                     },
-                    _config: PhantomData,
                 })
             }
 
@@ -560,7 +572,7 @@ macro_rules! uart_full {
                 rx: RX,
                 config: FullConfig,
                 rcc: &mut Rcc,
-            ) -> Result<Serial<$USARTX, TX, RX, FullConfig>, InvalidConfig>
+            ) -> Result<Serial<$USARTX, TX, RX>, InvalidConfig>
             where
                 TX: TxPin<$USARTX>,
                 RX: RxPin<$USARTX>,
@@ -569,7 +581,7 @@ macro_rules! uart_full {
             }
         }
 
-        impl<TX, RX> Serial<$USARTX, TX, RX, FullConfig>
+        impl<TX, RX> Serial<$USARTX, TX, RX>
         where
             TX: TxPin<$USARTX>,
             RX: RxPin<$USARTX>,
@@ -596,8 +608,13 @@ macro_rules! uart_full {
                 let bdr = config.baudrate.0 as u64;
                 let clk_mul = 1;
                 let div = (clk_mul * clk) / bdr;
+                if div < 16 {
+                    // We need 16x oversampling.
+                    return Err(InvalidConfig);
+                }
                 usart.brr.write(|w| unsafe { w.bits(div as u32) });
 
+                // Reset the UART and disable it (UE=0)
                 usart.cr1.reset();
                 usart.cr2.reset();
                 usart.cr3.reset();
@@ -626,6 +643,7 @@ macro_rules! uart_full {
                         .bit(config.rx_fifo_interrupt)
                 });
 
+                // Enable the UART and perform remaining configuration.
                 usart.cr1.modify(|_, w| {
                     w.ue()
                         .set_bit()
@@ -649,16 +667,13 @@ macro_rules! uart_full {
                     tx: Tx {
                         pin: tx,
                         usart,
-                        _config: PhantomData,
                         _dma: PhantomData,
                     },
                     rx: Rx {
                         pin: rx,
                         _usart: PhantomData,
-                        _config: PhantomData,
                         _dma: PhantomData,
                     },
-                    _config: PhantomData,
                 })
             }
 
@@ -698,15 +713,7 @@ macro_rules! uart_full {
             }
         }
 
-        impl<Pin, Dma> Tx<$USARTX, Pin, FullConfig, Dma> {
-            /// Returns true if the tx fifo threshold has been reached.
-            pub fn fifo_threshold_reached(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr.read().txft().bit_is_set()
-            }
-        }
-
-        impl<Pin, Dma> Rx<$USARTX, Pin, FullConfig, Dma> {
+        impl<Pin, Dma> Rx<$USARTX, Pin, Dma> {
             /// Check if receiver timeout has lapsed
             /// Returns the current state of the ISR RTOF bit
             pub fn timeout_lapsed(&self) -> bool {
@@ -718,12 +725,6 @@ macro_rules! uart_full {
             pub fn clear_timeout(&mut self) {
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 usart.icr.write(|w| w.rtocf().set_bit());
-            }
-
-            /// Returns true if the rx fifo threshold has been reached.
-            pub fn fifo_threshold_reached(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr.read().rxft().bit_is_set()
             }
         }
     };
@@ -816,11 +817,11 @@ uart_full!(USART1, usart1);
 uart_full!(USART2, usart2);
 uart_full!(USART3, usart3);
 
-uart_basic!(UART4, uart4, 1);
+uart_full!(UART4, uart4);
 #[cfg(not(any(feature = "stm32g431", feature = "stm32g441")))]
-uart_basic!(UART5, uart5, 1);
+uart_full!(UART5, uart5);
 
 // LPUART Should be given its own implementation when it needs to be used with features not present on
 // the basic feature set such as: Dual clock domain, FIFO or prescaler.
 // Or when Synchronous mode is implemented for the basic feature set, since the LP feature set does not have support.
-uart_basic!(LPUART1, lpuart1, 256);
+uart_lp!(LPUART1, lpuart1, 256);

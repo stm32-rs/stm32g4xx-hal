@@ -55,12 +55,17 @@ impl FifoThreshold {
     }
 }
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
-pub struct BasicConfig {
+pub struct LowPowerConfig {
     pub(crate) baudrate: Bps,
     pub(crate) wordlength: WordLength,
     pub(crate) parity: Parity,
     pub(crate) stopbits: StopBits,
     pub(crate) swap: bool,
+    pub(crate) fifo_enable: bool,
+    pub(crate) tx_fifo_threshold: FifoThreshold,
+    pub(crate) rx_fifo_threshold: FifoThreshold,
+    pub(crate) tx_fifo_interrupt: bool,
+    pub(crate) rx_fifo_interrupt: bool,
 }
 
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
@@ -79,7 +84,7 @@ pub struct FullConfig {
     pub(crate) receiver_timeout: Option<u32>,
 }
 
-impl BasicConfig {
+impl LowPowerConfig {
     pub fn baudrate(mut self, baudrate: Bps) -> Self {
         self.baudrate = baudrate;
         self
@@ -120,6 +125,31 @@ impl BasicConfig {
     /// The peripheral will transmit on the pin given as the `rx` argument.
     pub fn swap_pins(mut self) -> Self {
         self.swap = true;
+        self
+    }
+
+    pub fn fifo_enable(mut self) -> Self {
+        self.fifo_enable = true;
+        self
+    }
+
+    pub fn tx_fifo_threshold(mut self, threshold: FifoThreshold) -> Self {
+        self.tx_fifo_threshold = threshold;
+        self
+    }
+
+    pub fn rx_fifo_threshold(mut self, threshold: FifoThreshold) -> Self {
+        self.rx_fifo_threshold = threshold;
+        self
+    }
+
+    pub fn tx_fifo_enable_interrupt(mut self) -> Self {
+        self.tx_fifo_interrupt = true;
+        self
+    }
+
+    pub fn rx_fifo_enable_interrupt(mut self) -> Self {
+        self.rx_fifo_interrupt = true;
         self
     }
 }
@@ -204,15 +234,20 @@ impl FullConfig {
 #[derive(Debug)]
 pub struct InvalidConfig;
 
-impl Default for BasicConfig {
-    fn default() -> BasicConfig {
+impl Default for LowPowerConfig {
+    fn default() -> LowPowerConfig {
         let baudrate = 19_200.bps();
-        BasicConfig {
+        LowPowerConfig {
             baudrate,
             wordlength: WordLength::DataBits8,
             parity: Parity::ParityNone,
             stopbits: StopBits::STOP1,
             swap: false,
+            fifo_enable: false,
+            tx_fifo_threshold: FifoThreshold::FIFO_8_BYTES,
+            rx_fifo_threshold: FifoThreshold::FIFO_8_BYTES,
+            tx_fifo_interrupt: false,
+            rx_fifo_interrupt: false,
         }
     }
 }
