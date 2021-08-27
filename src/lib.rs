@@ -77,7 +77,7 @@ pub mod rcc;
 // pub mod rng;
 pub mod serial;
 pub mod signature;
-// pub mod spi;
+pub mod spi;
 // pub mod stopwatch;
 pub mod syscfg;
 pub mod time;
