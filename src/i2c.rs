@@ -4,7 +4,15 @@ use hal::blocking::i2c::{Read, Write, WriteRead};
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, gpiog::*};
 use crate::gpio::{AlternateOD, AF2, AF3, AF4, AF8};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
-use crate::stm32::{I2C1, I2C2, I2C3, I2C4, RCC};
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484"
+))]
+use crate::stm32::I2C4;
+use crate::stm32::{I2C1, I2C2, I2C3, RCC};
 use crate::time::Hertz;
 use core::cmp;
 
