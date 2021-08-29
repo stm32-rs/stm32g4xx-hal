@@ -30,7 +30,7 @@ fn main() -> ! {
     // of with_timing() for an explanation of the constant):
     //let mut i2c = dp
     //  .I2C1
-    //  .i2c(sda, scl, Config::with_timing(0x2020_151b), &mut rcc);
+    //   .i2c(sda, scl, Config::with_timing(0x3042_0f13), &mut rcc);
 
     let buf: [u8; 1] = [0];
     loop {
