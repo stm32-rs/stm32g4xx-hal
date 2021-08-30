@@ -62,6 +62,8 @@ pub use crate::stm32::interrupt;
 
 pub mod adc;
 pub mod bb;
+// pub mod can;
+pub mod fdcan;
 // pub mod crc;
 // pub mod dac;
 pub mod delay;
