@@ -4,6 +4,6 @@
   "rust.all_features": false,
   "rust.features": [
     "rt",
-    "stm32g431"
+    "stm32g474"
   ]
 }

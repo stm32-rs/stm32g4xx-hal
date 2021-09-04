@@ -31,6 +31,11 @@ pub extern crate stm32g4;
 
 pub use nb::block;
 
+mod sealed {
+    pub trait Sealed {}
+}
+pub(crate) use sealed::Sealed;
+
 #[cfg(feature = "stm32g431")]
 pub use stm32g4::stm32g431 as stm32;
 
@@ -55,15 +60,15 @@ pub use stm32g4::stm32g484 as stm32;
 #[cfg(feature = "rt")]
 pub use crate::stm32::interrupt;
 
-//pub mod adc;
+pub mod adc;
+pub mod bb;
 pub mod crc;
 // pub mod dac;
 pub mod delay;
 pub mod dma;
-pub mod dmamux;
 pub mod exti;
 pub mod gpio;
-// pub mod i2c;
+pub mod i2c;
 pub mod opamp;
 pub mod prelude;
 // pub mod pwm;
@@ -71,8 +76,10 @@ pub mod prelude;
 pub mod rcc;
 // pub mod rng;
 pub mod serial;
+pub mod signature;
 // pub mod spi;
 // pub mod stopwatch;
+pub mod syscfg;
 pub mod time;
 pub mod timer;
 // pub mod watchdog;

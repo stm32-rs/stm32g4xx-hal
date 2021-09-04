@@ -1,117 +1,215 @@
-//! # Cyclic redundancy check calculation unit
-use crate::rcc::Rcc;
+//! CRC calculation unit
+//!
+//! This unit is modeled after the [corresponding unit in the stm32l4xx-hal](https://github.com/stm32-rs/stm32l4xx-hal/blob/master/src/crc.rs).
+//!
+
+#![deny(missing_docs)]
+
+use crate::rcc::{Enable, Reset};
+use crate::stm32::RCC;
 use crate::stm32::CRC;
+use core::hash::Hasher;
+use core::ptr;
 
-pub enum InputReverse {
-    None = 0b00,
-    Byte = 0b01,
-    HalfWord = 0b10,
-    Word = 0b11,
-}
-
-pub enum PolySize {
-    CRC32 = 0b00,
-    CRC16 = 0b01,
-    CRC8 = 0b10,
-    CRC7 = 0b11,
-}
-
-pub struct Crc {
-    rb: CRC,
-}
-
-impl Crc {
-    pub fn polynomial(&mut self, size: PolySize, poly: u32) {
-        self.reset();
-        self.rb.pol.modify(|_, w| unsafe { w.bits(poly) });
-        self.rb
-            .cr
-            .modify(|_, w| unsafe { w.polysize().bits(size as u8) });
-    }
-
-    pub fn seed(&mut self, value: u32) {
-        self.rb.init.modify(|_, w| unsafe { w.bits(value) });
-    }
-
-    pub fn reverse_output(&mut self, rev_out: bool) {
-        self.rb.cr.modify(|_, w| w.rev_out().bit(rev_out));
-    }
-
-    pub fn reverse_input(&mut self, rev_in: InputReverse) {
-        self.rb
-            .cr
-            .modify(|_, w| unsafe { w.rev_in().bits(rev_in as u8) });
-    }
-
-    pub fn reset(&mut self) {
-        self.rb.cr.modify(|_, w| w.reset().set_bit());
-    }
-
-    pub fn release(self) -> CRC {
-        self.rb
-    }
-}
-
-pub trait Digest<W> {
-    fn digest(&mut self, data: W) -> u32;
-}
-
-impl Digest<u32> for Crc {
-    fn digest(&mut self, data: u32) -> u32 {
-        self.rb.dr.write(|w| unsafe { w.dr().bits(data) });
-        self.rb.dr.read().bits()
-    }
-}
-
-impl Digest<&[u32]> for Crc {
-    fn digest(&mut self, data: &[u32]) -> u32 {
-        data.into_iter().map(|v| self.digest(*v)).last();
-        self.rb.dr.read().bits()
-    }
-}
-
-impl Digest<&[u16]> for Crc {
-    fn digest(&mut self, data: &[u16]) -> u32 {
-        data.into_iter()
-            .map(|v| unsafe {
-                core::ptr::write_volatile(&self.rb.dr as *const _ as *mut u16, *v);
-            })
-            .last();
-        self.rb.dr.read().bits()
-    }
-}
-
-impl Digest<&[u8]> for Crc {
-    fn digest(&mut self, data: &[u8]) -> u32 {
-        let words = data.len() / 4;
-        let word_slice: &[u32] =
-            unsafe { core::slice::from_raw_parts(data.as_ptr() as *const _, words) };
-        self.digest(word_slice);
-        data[words * 4..]
-            .into_iter()
-            .map(|v| unsafe {
-                core::ptr::write_volatile(&self.rb.dr as *const _ as *mut u8, *v);
-            })
-            .last();
-        self.rb.dr.read().bits()
-    }
-}
-
-impl Digest<&str> for Crc {
-    fn digest(&mut self, s: &str) -> u32 {
-        self.digest(&s.as_bytes()[..])
-    }
-}
-
+/// Extension trait to constrain the CRC peripheral.
 pub trait CrcExt {
-    fn constrain(self, rcc: &mut Rcc) -> Crc;
+    /// Constrains the CRC peripheral to play nicely with the other abstractions
+    fn constrain(self) -> Config;
 }
 
 impl CrcExt for CRC {
-    fn constrain(self, rcc: &mut Rcc) -> Crc {
-        rcc.rb.ahb1enr.modify(|_, w| w.crcen().set_bit());
-        rcc.rb.ahb1rstr.modify(|_, w| w.crcrst().set_bit());
-        rcc.rb.ahb1rstr.modify(|_, w| w.crcrst().clear_bit());
-        Crc { rb: self }
+    fn constrain(self) -> Config {
+
+
+        unsafe {
+            let rcc_ptr = &(*RCC::ptr());
+            CRC::enable(rcc_ptr);
+            CRC::reset(rcc_ptr);
+        }
+
+        //rcc.enable_crc();
+
+        // Default values
+        Config {
+            initial_value: 0xffff_ffff,
+            polynomial: Polynomial::L32(0x04c1_1db7),
+            input_bit_reversal: None,
+            output_bit_reversal: false,
+        }
     }
 }
+
+/// Polynomial settings.
+pub enum Polynomial {
+    /// 7-bit polynomial, only the lowest 7 bits are valid
+    L7(u8),
+    /// 8-bit polynomial
+    L8(u8),
+    /// 16-bit polynomial
+    L16(u16),
+    /// 32-bit polynomial
+    L32(u32),
+}
+
+/// Bit reversal settings.
+pub enum BitReversal {
+    /// Reverse bits by byte
+    ByByte,
+    /// Reverse bits by half-word
+    ByHalfWord,
+    /// Reverse bits by word
+    ByWord,
+}
+
+/// CRC configuration structure, uses builder pattern.
+pub struct Config {
+    initial_value: u32,
+    polynomial: Polynomial,
+    input_bit_reversal: Option<BitReversal>,
+    output_bit_reversal: bool,
+}
+
+impl Config {
+    /// Sets the initial value of the CRC.
+    pub fn initial_value(mut self, init: u32) -> Self {
+        self.initial_value = init;
+
+        self
+    }
+
+    /// Sets the polynomial of the CRC.
+    pub fn polynomial(mut self, polynomial: Polynomial) -> Self {
+        self.polynomial = polynomial;
+
+        self
+    }
+
+    /// Enables bit reversal of the inputs.
+    pub fn input_bit_reversal(mut self, rev: Option<BitReversal>) -> Self {
+        self.input_bit_reversal = rev;
+
+        self
+    }
+
+    /// Enables bit reversal of the outputs.
+    pub fn output_bit_reversal(mut self, rev: bool) -> Self {
+        self.output_bit_reversal = rev;
+
+        self
+    }
+
+    /// Freezes the peripheral, making the configuration take effect.
+    pub fn freeze(self) -> Crc {
+        let crc = unsafe { &(*CRC::ptr()) };
+
+        let (poly, poly_bits, init) = match self.polynomial {
+            Polynomial::L7(val) => ((val & 0x7f) as u32, 0b11, self.initial_value & 0x7f),
+            Polynomial::L8(val) => (val as u32, 0b10, self.initial_value & 0xff),
+            Polynomial::L16(val) => (val as u32, 0b01, self.initial_value & 0xffff),
+            Polynomial::L32(val) => (val, 0b00, self.initial_value),
+        };
+
+        let in_rev_bits = match self.input_bit_reversal {
+            None => 0b00,
+            Some(BitReversal::ByByte) => 0b01,
+            Some(BitReversal::ByHalfWord) => 0b10,
+            Some(BitReversal::ByWord) => 0b11,
+        };
+
+        crc.init.write(|w| unsafe { w.crc_init().bits(init) });
+        crc.pol.write(|w| unsafe { w.bits(poly) });
+        crc.cr.write(|w| {
+            unsafe {
+                w.rev_in()
+                    .bits(in_rev_bits)
+                    .polysize()
+                    .bits(poly_bits)
+                    .reset()
+                    .set_bit();
+            }
+
+            if self.output_bit_reversal {
+                w.rev_out().set_bit()
+            } else {
+                w.rev_out().clear_bit()
+            }
+        });
+
+        Crc {}
+    }
+}
+
+/// Constrained CRC peripheral.
+pub struct Crc {}
+
+impl Crc {
+    /// This will reset the CRC to its initial condition.
+    #[inline]
+    pub fn reset(&mut self) {
+        let crc = unsafe { &(*CRC::ptr()) };
+
+        crc.cr.modify(|_, w| w.reset().set_bit());
+    }
+
+    /// This will reset the CRC to its initial condition, however with a specific initial value.
+    /// This is very useful if many task are sharing the CRC peripheral, as one can read out the
+    /// intermediate result, store it until the next time a task runs, and initialize with the
+    /// intermediate result to continue where the task left off.
+    #[inline]
+    pub fn reset_with_inital_value(&mut self, initial_value: u32) {
+        let crc = unsafe { &(*CRC::ptr()) };
+
+        crc.init
+            .write(|w| unsafe { w.crc_init().bits(initial_value) });
+        crc.cr.modify(|_, w| w.reset().set_bit());
+    }
+
+    /// Feed the CRC with data
+    #[inline]
+    pub fn feed(&mut self, data: &[u8]) {
+        let crc = unsafe { &(*CRC::ptr()) };
+        for byte in data {
+            unsafe {
+                // Workaround with svd2rust, it does not generate the byte interface to the DR
+                // register
+                ptr::write_volatile(&crc.dr as *const _ as *mut u8, *byte);
+            }
+        }
+    }
+
+    /// Get the result of the CRC, depending on the polynomial chosen only a certain amount of the
+    /// bits are the result. This will reset the CRC peripheral after use.
+    #[inline]
+    pub fn result(&mut self) -> u32 {
+        let ret = self.peek_result();
+
+        self.reset();
+
+        ret
+    }
+
+    /// Get a peed at the result of the CRC, depending on the polynomial chosen only a certain
+    /// amount of the bits are the result.
+    #[inline]
+    pub fn peek_result(&self) -> u32 {
+        let crc = unsafe { &(*CRC::ptr()) };
+
+        crc.dr.read().bits()
+    }
+
+}
+
+impl Hasher for Crc {
+    #[inline]
+    fn finish(&self) -> u64 {
+        // `peek_result` as `core::hash::Hasher` required that the `finish` method does not reset
+        // the hasher.
+        self.peek_result() as u64
+    }
+
+    #[inline]
+    fn write(&mut self, data: &[u8]) {
+        self.feed(data);
+    }
+}
+

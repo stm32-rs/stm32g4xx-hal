@@ -25,5 +25,6 @@ fn main() -> ! {
     lsco.enable();
     mco.enable();
 
+    #[allow(clippy::empty_loop)]
     loop {}
 }

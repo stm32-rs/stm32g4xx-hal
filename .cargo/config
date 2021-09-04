@@ -1,8 +1,10 @@
 [target.thumbv7em-none-eabihf]
-# runner = "probe-run --chip STM32G474RETx"
-runner = 'arm-none-eabi-gdb -q'
+#runner = 'arm-none-eabi-gdb -q -x openocd.gdb'
+
+runner = "probe-run --chip STM32G474VETx"
 rustflags = [
-  "-C", "link-arg=-Tlink.x",
+  "-C", "link-arg=-Tdefmt.x",
+  "-C", "link-arg=-Tlink.x"
 ]
 
 [build]
