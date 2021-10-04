@@ -43,6 +43,7 @@ macro_rules! bus {
             impl RccBus for crate::stm32::$PER {
                 type Bus = $busX;
             }
+            impl crate::rcc::Instance for crate::stm32::$PER {}
             bus_enable!($PER => ($busX, $bit));
             bus_reset!($PER => ($busX, $bit));
         )+
@@ -129,12 +130,25 @@ bus! {
     I2C1 => (APB1_1, 21),
     I2C2 => (APB1_1, 22),
     USB_FS_DEVICE => (APB1_1, 23),
-    FDCAN => (APB1_1, 25),
+    FDCAN1 => (APB1_1, 25),
     PWR => (APB1_1, 28),
     I2C3 => (APB1_1, 30),
     LPTIMER1 => (APB1_1, 31),
     LPUART1 => (APB1_2, 0),
     UCPD1 => (APB1_2, 8),
+}
+
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4A1"
+))]
+bus! {
+    FDCAN2 => (APB1_1, 25),
 }
 
 #[cfg(any(
@@ -180,6 +194,7 @@ bus! {
     feature = "stm32g484"
 ))]
 bus! {
+    FDCAN3 => (APB1_1, 25),
     TIM20 => (APB2, 20),
 }
 
