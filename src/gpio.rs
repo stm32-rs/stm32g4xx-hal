@@ -524,6 +524,32 @@ macro_rules! gpio {
                         $PXi { _mode: PhantomData }
                     }
 
+                    pub fn into_alternate_push_pull<const A: u8>(self) -> $PXi<Alternate<A>> {
+                        let mode = A as u32;
+                        let offset = 2 * $i;
+                        let offset2 = 4 * $i;
+                        unsafe {
+                            let gpio = &(*$GPIOX::ptr());
+                            if offset2 < 32 {
+                                gpio.afrl.modify(|r, w| {
+                                    w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
+                                });
+                            } else {
+                                let offset2 = offset2 - 32;
+                                gpio.afrh.modify(|r, w| {
+                                    w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
+                                });
+                            }
+                            gpio.moder.modify(|r, w| {
+                                w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
+                            });
+                            gpio.otyper.modify(|r, w| {
+                                w.bits(r.bits() & !(0b1 << $i))
+                            });
+                        }
+                        $PXi { _mode: PhantomData }
+                    }
+
                     pub fn into_alternate_open_drain<const A: u8>(self) -> $PXi<AlternateOD<A>> {
                         let mode = A as u32;
                         let offset = 2 * $i;
