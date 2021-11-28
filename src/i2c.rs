@@ -129,7 +129,7 @@ macro_rules! flush_txdr {
     ($i2c:expr) => {
         // If a pending TXIS flag is set, write dummy data to TXDR
         if $i2c.isr.read().txis().bit_is_set() {
-            $i2c.txdr.write(|w| unsafe { w.txdata().bits(0) });
+            $i2c.txdr.write(|w| w.txdata().bits(0));
         }
 
         // If TXDR is not flagged as empty, write 1 to flush it
@@ -219,7 +219,7 @@ macro_rules! i2c {
                 i2c.timingr.write(|w| unsafe { w.bits(timing_bits) });
 
                 // Enable the I2C processing
-                i2c.cr1.modify(|_, w| unsafe {
+                i2c.cr1.modify(|_, w| {
                     w.pe()
                         .set_bit()
                         .dnf()
@@ -264,7 +264,7 @@ macro_rules! i2c {
                 // Set START and prepare to send `bytes`.
                 // The START bit can be set even if the bus is BUSY or
                 // I2C is in slave mode.
-                self.i2c.cr2.write(|w| unsafe {
+                self.i2c.cr2.write(|w| {
                     w
                         // Start transfer
                         .start().set_bit()
@@ -286,14 +286,14 @@ macro_rules! i2c {
                     busy_wait!(self.i2c, txis, bit_is_set);
 
                     // Put byte on the wire
-                    self.i2c.txdr.write(|w| unsafe { w.txdata().bits(*byte) });
+                    self.i2c.txdr.write(|w| { w.txdata().bits(*byte) });
                 }
 
                 // Wait until the write finishes before beginning to read.
                 busy_wait!(self.i2c, tc, bit_is_set);
 
                 // reSTART and prepare to receive bytes into `buffer`
-                self.i2c.cr2.write(|w| unsafe {
+                self.i2c.cr2.write(|w| {
                     w
                         // Start transfer
                         .start().set_bit()
@@ -328,7 +328,7 @@ macro_rules! i2c {
             fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
                 assert!(bytes.len() < 256 && bytes.len() > 0);
 
-                self.i2c.cr2.modify(|_, w| unsafe {
+                self.i2c.cr2.modify(|_, w| {
                     w
                         // Start transfer
                         .start().set_bit()
@@ -348,7 +348,7 @@ macro_rules! i2c {
                     busy_wait!(self.i2c, txis, bit_is_set);
 
                     // Put byte on the wire
-                    self.i2c.txdr.write(|w| unsafe { w.txdata().bits(*byte) });
+                    self.i2c.txdr.write(|w| w.txdata().bits(*byte) );
                 }
 
                 // automatic STOP
@@ -371,7 +371,7 @@ macro_rules! i2c {
                 // Set START and prepare to receive bytes into `buffer`.
                 // The START bit can be set even if the bus
                 // is BUSY or I2C is in slave mode.
-                self.i2c.cr2.modify(|_, w| unsafe {
+                self.i2c.cr2.modify(|_, w| {
                     w
                         // Start transfer
                         .start().set_bit()

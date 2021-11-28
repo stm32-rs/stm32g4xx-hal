@@ -522,7 +522,7 @@ where
     {
         I::enable(&rcc.rb);
 
-        if rcc.rb.ccipr.read().fdcansel() == 0 {
+        if rcc.rb.ccipr.read().fdcansel().is_hse() {
             // Select P clock as FDCAN clock source
             rcc.rb.ccipr.modify(|_, w| {
                 // This is sound, as `FdCanClockSource` only contains valid values for this field.
@@ -537,7 +537,7 @@ where
 
         let can = Self::create_can(FdCanConfig::default(), can_instance);
         let reg = can.registers();
-        assert!(reg.endn.read() == 0x87654321_u32);
+        assert!(reg.endn.read().bits() == 0x87654321_u32);
         can
     }
 
