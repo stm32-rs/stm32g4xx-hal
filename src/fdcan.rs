@@ -1391,6 +1391,7 @@ where
         // Check if there is a request pending to abort
         if self.has_pending_frame(idx) {
             let idx: u8 = idx.into();
+            let idx = 1u8 << idx;
 
             // Abort Request
             can.txbcr.write(|w| unsafe { w.cr().bits(idx) });
@@ -1411,6 +1412,7 @@ where
     fn has_pending_frame(&self, idx: Mailbox) -> bool {
         let can = self.registers();
         let idx: u8 = idx.into();
+        let idx = 1u8 << idx;
 
         can.txbrp.read().trp().bits() & idx != 0
     }
