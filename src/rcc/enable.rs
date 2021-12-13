@@ -129,7 +129,7 @@ bus! {
     UART4 => (APB1_1, 19),
     I2C1 => (APB1_1, 21),
     I2C2 => (APB1_1, 22),
-    USB_FS_DEVICE => (APB1_1, 23),
+    USB => (APB1_1, 23),
     FDCAN1 => (APB1_1, 25),
     PWR => (APB1_1, 28),
     I2C3 => (APB1_1, 30),

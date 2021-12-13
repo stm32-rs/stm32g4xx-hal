@@ -176,9 +176,7 @@ impl Rcc {
         let r = (pll_freq / (pll_cfg.r as u32)).hz();
         let q = match pll_cfg.q {
             Some(div) if div > 1 && div <= 8 => {
-                self.rb
-                    .pllcfgr
-                    .write(move |w| unsafe { w.pllq().bits(div - 1) });
+                self.rb.pllcfgr.write(move |w| w.pllq().bits(div - 1));
                 let req = freq / div as u32;
                 Some(req.hz())
             }
