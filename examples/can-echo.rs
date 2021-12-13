@@ -2,18 +2,18 @@
 #![no_std]
 
 use crate::hal::{
-    fdcan::{
-        config::NominalBitTiming,
-        filter::{StandardFilter, StandardFilterSlot},
-        frame::{FrameFormat, TxFrameHeader},
-        id::StandardId,
-        FdCan,
-    },
+    can::CanExt,
     gpio::{GpioExt as _, Speed},
     nb::block,
     rcc::{Config, RccExt, SysClockSrc},
     stm32::Peripherals,
     time::U32Ext,
+};
+use fdcan::{
+    config::NominalBitTiming,
+    filter::{StandardFilter, StandardFilterSlot},
+    frame::{FrameFormat, TxFrameHeader},
+    id::StandardId,
 };
 use stm32g4xx_hal as hal;
 
@@ -59,10 +59,7 @@ fn main() -> ! {
         let tx = gpiob.pb9.into_alternate().set_speed(Speed::VeryHigh);
 
         info!("-- Create CAN 1 instance");
-        let can = FdCan::new(dp.FDCAN1, tx, rx, &rcc);
-
-        info!("-- Set CAN 1 in Config Mode");
-        let mut can = can.into_config_mode();
+        let mut can = dp.FDCAN1.fdcan(tx, rx, &rcc);
         can.set_protocol_exception_handling(false);
 
         info!("-- Configure nominal timing");
@@ -87,10 +84,8 @@ fn main() -> ! {
     //     let tx = gpiob.pb13.into_alternate().set_speed(Speed::VeryHigh);
 
     //     info!("-- Create CAN 2 instance");
-    //     let can = FdCan::new(dp.FDCAN2, tx, rx, &rcc);
-
-    //     info!("-- Set CAN in Config Mode");
-    //     let mut can = can.into_config_mode();
+    //     let mut can = dp.FDCAN2.fdcan(tx, rx, &rcc);
+    //     can.set_protocol_exception_handling(false);
 
     //     info!("-- Configure nominal timing");
     //     can.set_nominal_bit_timing(btr);
@@ -109,7 +104,7 @@ fn main() -> ! {
     let mut can = can1;
 
     info!("Create Message Data");
-    let mut buffer = [0xAAAAAAAA, 0xFFFFFFFF, 0x0, 0x0, 0x0, 0x0];
+    let mut buffer: [u8; 8] = [0xAA, 0xAA, 0xAA, 0xAA, 0xFF, 0xFF, 0xFF, 0xFF];
     info!("Create Message Header");
     let header = TxFrameHeader {
         len: 2 * 4,
@@ -121,30 +116,11 @@ fn main() -> ! {
     info!("Initial Header: {:#X?}", &header);
 
     info!("Transmit initial message");
-    block!(can.transmit(header, &mut |b| {
-        let len = b.len();
-        b[..len].clone_from_slice(&buffer[..len]);
-    },))
-    .unwrap();
+    block!(can.transmit(header, &buffer)).unwrap();
 
     loop {
-        if let Ok(rxheader) = block!(can.receive0(&mut |h, b| {
-            info!("Received Header: {:#X?}", &h);
-            info!("received data: {:X?}", &b);
-
-            for (i, d) in b.iter().enumerate() {
-                buffer[i] = *d;
-            }
-            h
-        })) {
-            block!(
-                can.transmit(rxheader.unwrap().to_tx_header(None), &mut |b| {
-                    let len = b.len();
-                    b[..len].clone_from_slice(&buffer[..len]);
-                    info!("Transmit: {:X?}", b);
-                })
-            )
-            .unwrap();
+        if let Ok(rxheader) = block!(can.receive0(&mut buffer)) {
+            block!(can.transmit(rxheader.unwrap().to_tx_header(None), &mut buffer)).unwrap();
         }
     }
 }
