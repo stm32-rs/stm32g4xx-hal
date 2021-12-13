@@ -23,6 +23,10 @@ static_assertions = "1.1"
 version = "0.7.7"
 features = ["critical-section-single-core"]
 
+[dependencies.fdcan]
+version = "0.1.2"
+features = ["fdcan_g0_g4_l5"]
+
 [dependencies.cast]
 version = "0.2.7"
 default-features = false
