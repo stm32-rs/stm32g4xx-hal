@@ -127,7 +127,7 @@ impl<'a> ID_W<'a> {
     #[inline(always)]
     #[allow(dead_code)]
     pub unsafe fn bits(self, value: u32) -> &'a mut W {
-        self.w.bits[0] = (self.w.bits[0] & !(0x0FFFFFFF)) | ((value as u32) & 0x0FFFFFFF);
+        self.w.bits[0] = (self.w.bits[0] & !(0x1FFFFFFF)) | ((value as u32) & 0x1FFFFFFF);
         self.w
     }
 }

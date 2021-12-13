@@ -37,7 +37,7 @@ impl StandardFilter {
                 filter: 0x0,
                 mask: 0x0,
             },
-            action: Action::StoreInFifo0,
+            action: Action::StoreInFifo1,
         }
     }
 
@@ -80,7 +80,7 @@ impl ExtendedFilter {
                 filter: 0x0,
                 mask: 0x0,
             },
-            action: Action::StoreInFifo0,
+            action: Action::StoreInFifo1,
         }
     }
 
