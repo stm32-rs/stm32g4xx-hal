@@ -61,6 +61,7 @@ cfg-if = "0.1.10"
 rtt-target = { version = "0.3.0", features = ["cortex-m"] }
 panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
 mpu6050 = "0.1.4"
+bme680 = "0.6.0"
 
 #TODO: Separate feature sets
 [features]
