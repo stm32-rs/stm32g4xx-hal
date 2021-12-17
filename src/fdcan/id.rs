@@ -212,10 +212,14 @@ impl IdReg {
     /// Returns the identifier.
     pub fn to_id(self) -> Id {
         if self.is_extended() {
-            Id::Extended(unsafe { ExtendedId::new_unchecked(self.0 >> Self::EXTENDED_SHIFT) })
+            Id::Extended(unsafe {
+                ExtendedId::new_unchecked((self.0 >> Self::EXTENDED_SHIFT) & Self::EXTENDED_MASK)
+            })
         } else {
             Id::Standard(unsafe {
-                StandardId::new_unchecked((self.0 >> Self::STANDARD_SHIFT) as u16)
+                StandardId::new_unchecked(
+                    ((self.0 >> Self::STANDARD_SHIFT) & Self::STANDARD_MASK) as u16,
+                )
             })
         }
     }
