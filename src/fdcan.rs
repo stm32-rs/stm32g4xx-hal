@@ -435,6 +435,12 @@ where
         }
     }
 
+    /// Check if the interrupt is triggered
+    #[inline]
+    pub fn has_interrupt(&mut self, interrupt: Interrupt) -> bool {
+        self.control.has_interrupt(interrupt)
+    }
+
     /// Clear specified interrupt
     #[inline]
     pub fn clear_interrupt(&mut self, interrupt: Interrupt) {
@@ -1174,6 +1180,13 @@ where
     #[inline]
     pub fn timestamp(&self) -> u16 {
         self.registers().tscv.read().tsc().bits()
+    }
+
+    /// Check if the interrupt is triggered
+    #[inline]
+    pub fn has_interrupt(&mut self, interrupt: Interrupt) -> bool {
+        let can = self.registers();
+        can.ir.read().bits() & (interrupt as u32) > 0
     }
 
     /// Clear specified interrupt

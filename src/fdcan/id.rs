@@ -41,7 +41,7 @@ impl StandardId {
 
     /// Returns this CAN Identifier as a raw 16-bit integer.
     #[inline]
-    pub(crate) fn as_raw(&self) -> u16 {
+    pub fn as_raw(&self) -> u16 {
         self.0
     }
 }
@@ -88,7 +88,7 @@ impl ExtendedId {
 
     /// Returns this CAN Identifier as a raw 32-bit integer.
     #[inline]
-    pub(crate) fn as_raw(&self) -> u32 {
+    pub fn as_raw(&self) -> u32 {
         self.0
     }
 
@@ -212,10 +212,14 @@ impl IdReg {
     /// Returns the identifier.
     pub fn to_id(self) -> Id {
         if self.is_extended() {
-            Id::Extended(unsafe { ExtendedId::new_unchecked(self.0 >> Self::EXTENDED_SHIFT) })
+            Id::Extended(unsafe {
+                ExtendedId::new_unchecked((self.0 >> Self::EXTENDED_SHIFT) & Self::EXTENDED_MASK)
+            })
         } else {
             Id::Standard(unsafe {
-                StandardId::new_unchecked((self.0 >> Self::STANDARD_SHIFT) as u16)
+                StandardId::new_unchecked(
+                    ((self.0 >> Self::STANDARD_SHIFT) & Self::STANDARD_MASK) as u16,
+                )
             })
         }
     }
