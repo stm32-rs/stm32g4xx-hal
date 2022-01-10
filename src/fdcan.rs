@@ -352,8 +352,8 @@ where
     pub fn enable_interrupt_line(&mut self, line: InterruptLine, enabled: bool) {
         let can = self.registers();
         match line {
-            InterruptLine::_0 => can.ile.modify(|_, w| w.eint0().bit(enabled)),
-            InterruptLine::_1 => can.ile.modify(|_, w| w.eint1().bit(enabled)),
+            InterruptLine::_0 => can.ile.modify(|_, w| w.eint1().bit(enabled)),
+            InterruptLine::_1 => can.ile.modify(|_, w| w.eint0().bit(enabled)),
         }
     }
 
