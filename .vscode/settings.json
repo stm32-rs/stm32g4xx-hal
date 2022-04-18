@@ -1,9 +1,11 @@
 {
-  "rust.all_targets": false,
-  "rust.target": "thumbv7em-none-eabihf",
-  "rust.all_features": false,
-  "rust.features": [
-    "rt",
-    "stm32g431"
+  "rust-analyzer.check.allTargets": false,
+  "rust-analyzer.check.extraArgs": [
+    "--examples",
+  ],
+  "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
+  "rust-analyzer.cargo.features": [
+    "stm32g473",
+    "defmt-logging",
   ]
 }
