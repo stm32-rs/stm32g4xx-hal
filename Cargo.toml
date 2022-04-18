@@ -54,6 +54,10 @@ version = "1.1"
 version = "0.3.2"
 optional = true
 
+[dependencies.stm32-usbd]
+version = "0.6"
+optional = true
+
 [dev-dependencies]
 cortex-m-rt = "0.7.2"
 defmt-rtt = "0.4.0"
@@ -72,6 +76,8 @@ panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
 mpu6050 = "0.1.4"
 bme680 = "0.6.0"
 embedded-sdmmc = "0.3.0"
+usbd-serial = "0.1.1"
+usb-device = "0.2.8"
 
 #TODO: Separate feature sets
 [features]
@@ -90,6 +96,7 @@ log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
 defmt-logging = ["defmt"]
+usb = ["stm32-usbd"]
 
 [profile.dev]
 codegen-units = 1
@@ -102,3 +109,7 @@ debug = false
 codegen-units = 1
 incremental = false
 lto = true
+
+[[example]]
+name = "usb_serial"
+required-features = ["usb"]
