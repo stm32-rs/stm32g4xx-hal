@@ -12,6 +12,8 @@ use stm32_usbd::UsbPeripheral;
 
 pub use stm32_usbd::UsbBus;
 
+use crate::rcc::Rcc;
+
 pub struct Peripheral {
     pub usb: USB,
 }
@@ -42,6 +44,19 @@ unsafe impl UsbPeripheral for Peripheral {
         // There is a chip specific startup delay. It is not specified for the STM32G4 but the STM32F103 is 1 us to delay for 170 cycles minimum
         cortex_m::asm::delay(170);
     }
+}
+
+pub enum ClockSource {
+    Hsi48,
+    PllQ,
+}
+
+#[inline(always)]
+pub fn configure_usb_clock_source(cs: ClockSource, rcc: &Rcc) {
+    rcc.rb.ccipr.modify(|_, w| match cs {
+        ClockSource::Hsi48 => w.clk48sel().hsi48(),
+        ClockSource::PllQ => w.clk48sel().pllq(),
+    });
 }
 
 pub type UsbBusType = UsbBus<Peripheral>;

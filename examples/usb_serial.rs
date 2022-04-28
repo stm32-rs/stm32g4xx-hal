@@ -14,6 +14,8 @@ use hal::rcc::PllMDiv;
 use hal::rcc::PllNMul;
 use hal::rcc::PllQDiv;
 use hal::rcc::PllRDiv;
+use hal::usb::configure_usb_clock_source;
+use hal::usb::ClockSource;
 use panic_probe as _;
 
 use stm32g4 as _;
@@ -32,6 +34,8 @@ pub fn exit() -> ! {
 
 use hal::rcc::{Config, PLLSrc, Prescaler};
 
+use hal::rcc::clock_recovery_system::{CrsConfig, CrsExt};
+
 use stm32g4xx_hal as hal;
 
 use hal::prelude::*;
@@ -43,8 +47,6 @@ use usbd_serial::{SerialPort, USB_CLASS_CDC};
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
-    // utils::logger::init();
-
     let dp = stm32::Peripherals::take().unwrap();
 
     let rcc = dp.RCC.constrain();
@@ -70,12 +72,11 @@ fn main() -> ! {
             .apb2_psc(Prescaler::Div2),
     );
 
-    {
-        use crate::stm32::RCC;
-        let rcc = unsafe { &*RCC::ptr() };
-        // Set clock source for USB to PLL
-        rcc.ccipr.modify(|_, w| w.clk48sel().pllq());
-    }
+    // Example of setting up the HSI48 with the clock recovery system.
+    let crs = dp.CRS.constrain();
+    let crs_config = CrsConfig {};
+    crs.configure(crs_config, &rcc);
+    configure_usb_clock_source(ClockSource::Hsi48, &rcc);
 
     // Configure an LED
     let gpioa = dp.GPIOA.split(&mut rcc);
