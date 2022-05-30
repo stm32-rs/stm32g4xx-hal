@@ -1470,6 +1470,7 @@ tim_hal! {
     TIM15: (tim15, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
     TIM16: (tim16, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
     TIM17: (tim17, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
+    TIM20: (tim20, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
 }
 
 pub trait PwmPinEnable {
