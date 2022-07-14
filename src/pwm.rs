@@ -1472,6 +1472,17 @@ tim_hal! {
     TIM17: (tim17, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
 }
 
+#[cfg(any(
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1"
+))]
+tim_hal! {
+    TIM20: (tim20, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
+}
+
 pub trait PwmPinEnable {
     fn ccer_enable(&mut self);
     fn ccer_disable(&mut self);
