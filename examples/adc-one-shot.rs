@@ -33,7 +33,9 @@ fn main() -> ! {
 
     info!("Setup Adc1");
     let mut delay = cp.SYST.delay(&rcc.clocks);
-    let mut adc = dp.ADC1.claim(ClockSource::SystemClock, &rcc, &mut delay);
+    let mut adc = dp
+        .ADC1
+        .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
 
     info!("Setup Gpio");
 
