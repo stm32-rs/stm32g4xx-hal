@@ -115,6 +115,7 @@ pub enum Error {
     PECError,
     BusError,
     ArbitrationLost,
+    Timeout,
 }
 
 pub trait I2cExt<I2C> {
@@ -141,6 +142,7 @@ macro_rules! flush_txdr {
 
 macro_rules! busy_wait {
     ($i2c:expr, $flag:ident, $variant:ident) => {
+        let mut timeout_counter = u32::MAX / 10000;
         loop {
             let isr = $i2c.isr.read();
 
@@ -156,8 +158,11 @@ macro_rules! busy_wait {
                 $i2c.icr.write(|w| w.stopcf().set_bit().nackcf().set_bit());
                 flush_txdr!($i2c);
                 return Err(Error::Nack);
+            } else if timeout_counter == 0 {
+                return Err(Error::Timeout);
             } else {
-                // try again
+                timeout_counter -= 1;
+                // Try again..
             }
         }
     };
