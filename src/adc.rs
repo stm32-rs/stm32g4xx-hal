@@ -1007,8 +1007,13 @@ impl From<ClockSource> for u8 {
 /// used to create an ADC instance from the stm32::Adc
 pub trait AdcClaim<TYPE> {
     /// create a disabled ADC instance from the stm32::Adc
-    fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>)
-        -> Adc<TYPE, Disabled>;
+    fn claim(
+        self,
+        cs: ClockSource,
+        rcc: &Rcc,
+        delay: &mut impl DelayUs<u8>,
+        reset: bool,
+    ) -> Adc<TYPE, Disabled>;
 
     /// create an enabled ADC instance from the stm32::Adc
     fn claim_and_configure(
@@ -1017,6 +1022,7 @@ pub trait AdcClaim<TYPE> {
         rcc: &Rcc,
         config: config::AdcConfig,
         delay: &mut impl DelayUs<u8>,
+        reset: bool,
     ) -> Adc<TYPE, Configured>;
 }
 
@@ -1701,11 +1707,11 @@ macro_rules! adc {
                 /// * `reset` - should a reset be performed. This is provided because on some devices multiple ADCs share the same common reset
                 /// TODO: fix needing SYST
                 #[inline(always)]
-                fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>) -> Adc<stm32::$adc_type, Disabled> {
+                fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>, reset: bool) -> Adc<stm32::$adc_type, Disabled> {
                     unsafe {
                         let rcc_ptr = &(*stm32::RCC::ptr());
                         stm32::$adc_type::enable(rcc_ptr);
-                        stm32::$adc_type::reset(rcc_ptr);
+                        if reset {stm32::$adc_type::reset(rcc_ptr);}
                     }
                     Self::configure_clock_source(cs, rcc);
 
@@ -1725,8 +1731,8 @@ macro_rules! adc {
 
                 /// claims and configures the Adc
                 #[inline(always)]
-                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, config: config::AdcConfig, delay: &mut impl DelayUs<u8>) -> Adc<stm32::$adc_type, Configured> {
-                    let mut adc = self.claim(cs, rcc, delay);
+                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, config: config::AdcConfig, delay: &mut impl DelayUs<u8>, reset :bool) -> Adc<stm32::$adc_type, Configured> {
+                    let mut adc = self.claim(cs, rcc, delay, reset);
                     adc.adc.config = config;
 
                     // If the user specified a VDDA, use that over the internally determined value.
