@@ -195,8 +195,8 @@ mod tests {
         );
         assert_eq!(Interrupts::from(Interrupt::TxEmpty), Interrupts::TX_EMPTY);
 
-        let mut ints = Interrupts::RX_FIFO0_FULL;
+        let mut ints = Interrupts::RX_FIFO_0_FULL;
         ints |= Interrupt::RxFifo1Full;
-        assert_eq!(ints, Interrupts::RX_FIFO0_FULL | Interrupts::RX_FIFO1_FULL);
+        assert_eq!(ints, Interrupts::RX_FIFO_0_FULL | Interrupts::RX_FIFO_1_FULL);
     }
 }

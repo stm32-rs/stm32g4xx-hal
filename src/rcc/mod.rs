@@ -34,7 +34,7 @@ pub struct Clocks {
 #[derive(Clone, Copy, Debug)]
 pub struct PLLClocks {
     /// R frequency
-    pub r: Hertz,
+    pub r: Option<Hertz>,
     /// Q frequency
     pub q: Option<Hertz>,
     /// P frequency
@@ -51,7 +51,7 @@ impl Default for Clocks {
             apb_clk: freq,
             apb_tim_clk: freq,
             pll_clk: PLLClocks {
-                r: 32.mhz(),
+                r: None,
                 q: None,
                 p: None,
             },
@@ -80,7 +80,13 @@ impl Rcc {
                 self.enable_hse(false);
                 (freq, 0b10)
             }
-            SysClockSrc::PLL => (pll_clk.r, 0b11),
+            SysClockSrc::PLL => {
+                // If PLL is selected as sysclock then the r output should have been configured
+                if pll_clk.r.is_none() {
+                    panic!("PLL output selected as sysclock but PLL output R is not configured")
+                }
+                (pll_clk.r.unwrap(), 0b11)
+            }
         };
 
         let sys_freq = sys_clk.0;
@@ -150,14 +156,12 @@ impl Rcc {
     }
 
     fn config_pll(&self, pll_cfg: PllConfig) -> PLLClocks {
-        assert!(pll_cfg.m > 0 && pll_cfg.m <= 8);
-        assert!(pll_cfg.r > 1 && pll_cfg.r <= 8);
-
         // Disable PLL
-        self.rb.cr.write(|w| w.pllon().clear_bit());
+        self.rb.cr.modify(|_, w| w.pllon().clear_bit());
         while self.rb.cr.read().pllrdy().bit_is_set() {}
 
-        let (freq, pll_sw_bits) = match pll_cfg.mux {
+        // Enable the input clock feeding the PLL
+        let (pll_input_freq, pll_src_bits) = match pll_cfg.mux {
             PLLSrc::HSI => {
                 self.enable_hsi();
                 (HSI_FREQ, 0b10)
@@ -172,67 +176,92 @@ impl Rcc {
             }
         };
 
-        let pll_freq = freq / (pll_cfg.m as u32) * (pll_cfg.n as u32);
-        let r = (pll_freq / (pll_cfg.r as u32)).hz();
-        let q = match pll_cfg.q {
-            Some(div) if div > 1 && div <= 8 => {
-                self.rb.pllcfgr.write(move |w| w.pllq().bits(div - 1));
-                let req = freq / div as u32;
-                Some(req.hz())
-            }
-            _ => None,
-        };
+        // Calculate the frequency of the internal PLL VCO.
+        let pll_freq = pll_input_freq / pll_cfg.m.divisor() * pll_cfg.n.multiplier();
 
-        let p = match pll_cfg.p {
-            Some(div) if div > 1 && div <= 8 => {
-                self.rb.pllcfgr.write(move |w| w.pllp().bit(div == 17));
-                let req = freq / div as u32;
-                Some(req.hz())
-            }
-            _ => None,
-        };
+        // Calculate the output frequencies for the P, Q, and R outputs
+        let p = pll_cfg.p.map(|p| {
+            ((pll_freq / p.divisor()).hz(), p.register_setting())
+        });
 
-        self.rb.pllcfgr.write(move |w| unsafe {
-            w.pllsrc()
-                .bits(pll_sw_bits)
-                .pllm()
-                .bits(pll_cfg.m - 1)
+        let q = pll_cfg.q.map(|q| {
+            ((pll_freq / q.divisor()).hz(), q.register_setting())
+        });
+
+        let r = pll_cfg.r.map(|r| {
+            ((pll_freq / r.divisor()).hz(), r.register_setting())
+        });
+
+        // Set the M input divider, the N multiplier for the PLL, and the PLL source.
+        self.rb.pllcfgr.modify(|_, w| unsafe {
+            // Set N, M, and source
+            let w = w
                 .plln()
-                .bits(pll_cfg.n)
-                .pllr()
-                .bits((pll_cfg.r / 2) - 1)
-                .pllren()
-                .set_bit()
+                .bits(pll_cfg.n.register_setting())
+                .pllm()
+                .bits(pll_cfg.m.register_setting())
+                .pllsrc()
+                .bits(pll_src_bits);
+
+            // Set and enable P if requested
+            let w = match p {
+                Some((_, register_setting)) => {
+                    w.pllpdiv().bits(register_setting).pllpen().set_bit()
+                }
+                None => w,
+            };
+
+            // Set and enable Q if requested
+            let w = match q {
+                Some((_, register_setting)) => {
+                    w.pllq().bits(register_setting).pllqen().set_bit()
+                }
+                None => w,
+            };
+
+            // Set and enable R if requested
+            let w = match r {
+                Some((_, register_setting)) => {
+                    w.pllr().bits(register_setting).pllren().set_bit()
+                }
+                None => w,
+            };
+
+            w
         });
 
         // Enable PLL
         self.rb.cr.modify(|_, w| w.pllon().set_bit());
         while self.rb.cr.read().pllrdy().bit_is_clear() {}
 
-        PLLClocks { r, q, p }
+        PLLClocks {
+            r: r.map(|r| r.0),
+            q: q.map(|q| q.0),
+            p: p.map(|p| p.0),
+        }
     }
 
     pub(crate) fn enable_hsi(&self) {
-        self.rb.cr.write(|w| w.hsion().set_bit());
+        self.rb.cr.modify(|_, w| w.hsion().set_bit());
         while self.rb.cr.read().hsirdy().bit_is_clear() {}
     }
 
     pub(crate) fn enable_hse(&self, bypass: bool) {
         self.rb
             .cr
-            .write(|w| w.hseon().set_bit().hsebyp().bit(bypass));
+            .modify(|_, w| w.hseon().set_bit().hsebyp().bit(bypass));
         while self.rb.cr.read().hserdy().bit_is_clear() {}
     }
 
     pub(crate) fn enable_lse(&self, bypass: bool) {
         self.rb
             .bdcr
-            .write(|w| w.lseon().set_bit().lsebyp().bit(bypass));
+            .modify(|_, w| w.lseon().set_bit().lsebyp().bit(bypass));
         while self.rb.bdcr.read().lserdy().bit_is_clear() {}
     }
 
     pub(crate) fn enable_lsi(&self) {
-        self.rb.csr.write(|w| w.lsion().set_bit());
+        self.rb.csr.modify(|_, w| w.lsion().set_bit());
         while self.rb.csr.read().lsirdy().bit_is_clear() {}
     }
 }
