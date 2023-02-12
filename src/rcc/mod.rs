@@ -22,10 +22,14 @@ pub struct Clocks {
     pub core_clk: Hertz,
     /// AHB frequency
     pub ahb_clk: Hertz,
-    /// APB frequency
-    pub apb_clk: Hertz,
-    /// APB timers frequency
-    pub apb_tim_clk: Hertz,
+    /// APB 1 frequency
+    pub apb1_clk: Hertz,
+    /// APB 1 timers frequency (Timers 2-7)
+    pub apb1_tim_clk: Hertz,
+    /// APB 2 frequency
+    pub apb2_clk: Hertz,
+    /// APB 2 timers frequency (Timers 1, 8, 20, 15, 16, 17 and HRTIM1)
+    pub apb2_tim_clk: Hertz,
     /// PLL frequency
     pub pll_clk: PLLClocks,
 }
@@ -48,8 +52,10 @@ impl Default for Clocks {
             sys_clk: freq,
             ahb_clk: freq,
             core_clk: freq,
-            apb_clk: freq,
-            apb_tim_clk: freq,
+            apb1_clk: freq,
+            apb1_tim_clk: freq,
+            apb2_clk: freq,
+            apb2_tim_clk: freq,
             pll_clk: PLLClocks {
                 r: None,
                 q: None,
@@ -101,7 +107,14 @@ impl Rcc {
             Prescaler::Div512 => (sys_freq / 512, 0b1111),
             _ => (sys_clk.0, 0b0000),
         };
-        let (apb_freq, apb_psc_bits) = match rcc_cfg.apb_psc {
+        let (apb1_freq, apb1_psc_bits) = match rcc_cfg.apb1_psc {
+            Prescaler::Div2 => (sys_clk.0 / 2, 0b100),
+            Prescaler::Div4 => (sys_clk.0 / 4, 0b101),
+            Prescaler::Div8 => (sys_clk.0 / 8, 0b110),
+            Prescaler::Div16 => (sys_clk.0 / 16, 0b111),
+            _ => (sys_clk.0, 0b000),
+        };
+        let (apb2_freq, apb2_psc_bits) = match rcc_cfg.apb2_psc {
             Prescaler::Div2 => (sys_clk.0 / 2, 0b100),
             Prescaler::Div4 => (sys_clk.0 / 4, 0b101),
             Prescaler::Div8 => (sys_clk.0 / 8, 0b110),
@@ -127,14 +140,29 @@ impl Rcc {
             w.hpre()
                 .bits(ahb_psc_bits)
                 .ppre1()
-                .bits(apb_psc_bits)
+                .bits(apb1_psc_bits)
                 .ppre2()
-                .bits(apb_psc_bits)
+                .bits(apb2_psc_bits)
                 .sw()
                 .bits(sw_bits)
         });
 
         while self.rb.cfgr.read().sws().bits() != sw_bits {}
+
+        // From RM:
+        // The timer clock frequencies are automatically defined by hardware. There are two cases:
+        // 1. If the APB prescaler equals 1, the timer clock frequencies are set to the same
+        // frequency as that of the APB domain.
+        // 2. Otherwise, they are set to twice (×2) the frequency of the APB domain.
+        let apb1_tim_clk = match rcc_cfg.apb1_psc {
+            Prescaler::NotDivided => apb1_freq,
+            _ => apb1_freq * 2,
+        };
+
+        let apb2_tim_clk = match rcc_cfg.apb2_psc {
+            Prescaler::NotDivided => apb2_freq,
+            _ => apb2_freq * 2,
+        };
 
         Rcc {
             rb: self.rb,
@@ -143,8 +171,10 @@ impl Rcc {
                 sys_clk,
                 core_clk: ahb_freq.hz(),
                 ahb_clk: ahb_freq.hz(),
-                apb_clk: apb_freq.hz(),
-                apb_tim_clk: apb_freq.hz(),
+                apb1_clk: apb1_freq.hz(),
+                apb1_tim_clk: apb1_tim_clk.hz(),
+                apb2_clk: apb2_freq.hz(),
+                apb2_tim_clk: apb2_tim_clk.hz(),
             },
         }
     }
@@ -451,33 +481,27 @@ impl GetBusFreq for AHB3 {
 
 impl GetBusFreq for APB1_1 {
     fn get_frequency(clocks: &Clocks) -> Hertz {
-        clocks.apb_clk
+        clocks.apb1_clk
     }
     fn get_timer_frequency(clocks: &Clocks) -> Hertz {
-        // let pclk_mul = if clocks.ppre1 == 1 { 1 } else { 2 };
-        // Hertz(clocks.pclk1.0 * pclk_mul)
-        clocks.apb_tim_clk
+        clocks.apb1_tim_clk
     }
 }
 
 impl GetBusFreq for APB1_2 {
     fn get_frequency(clocks: &Clocks) -> Hertz {
-        clocks.apb_clk
+        clocks.apb1_clk
     }
     fn get_timer_frequency(clocks: &Clocks) -> Hertz {
-        // let pclk_mul = if clocks.ppre1 == 1 { 1 } else { 2 };
-        // Hertz(clocks.pclk1.0 * pclk_mul)
-        clocks.apb_tim_clk
+        clocks.apb1_tim_clk
     }
 }
 
 impl GetBusFreq for APB2 {
     fn get_frequency(clocks: &Clocks) -> Hertz {
-        clocks.apb_clk
+        clocks.apb2_clk
     }
     fn get_timer_frequency(clocks: &Clocks) -> Hertz {
-        // let pclk_mul = if clocks.ppre2 == 1 { 1 } else { 2 };
-        // Hertz(clocks.pclk2.0 * pclk_mul)
-        clocks.apb_tim_clk
+        clocks.apb2_tim_clk
     }
 }
