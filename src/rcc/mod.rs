@@ -180,17 +180,17 @@ impl Rcc {
         let pll_freq = pll_input_freq / pll_cfg.m.divisor() * pll_cfg.n.multiplier();
 
         // Calculate the output frequencies for the P, Q, and R outputs
-        let p = pll_cfg.p.map(|p| {
-            ((pll_freq / p.divisor()).hz(), p.register_setting())
-        });
+        let p = pll_cfg
+            .p
+            .map(|p| ((pll_freq / p.divisor()).hz(), p.register_setting()));
 
-        let q = pll_cfg.q.map(|q| {
-            ((pll_freq / q.divisor()).hz(), q.register_setting())
-        });
+        let q = pll_cfg
+            .q
+            .map(|q| ((pll_freq / q.divisor()).hz(), q.register_setting()));
 
-        let r = pll_cfg.r.map(|r| {
-            ((pll_freq / r.divisor()).hz(), r.register_setting())
-        });
+        let r = pll_cfg
+            .r
+            .map(|r| ((pll_freq / r.divisor()).hz(), r.register_setting()));
 
         // Set the M input divider, the N multiplier for the PLL, and the PLL source.
         self.rb.pllcfgr.modify(|_, w| unsafe {
@@ -213,17 +213,13 @@ impl Rcc {
 
             // Set and enable Q if requested
             let w = match q {
-                Some((_, register_setting)) => {
-                    w.pllq().bits(register_setting).pllqen().set_bit()
-                }
+                Some((_, register_setting)) => w.pllq().bits(register_setting).pllqen().set_bit(),
                 None => w,
             };
 
             // Set and enable R if requested
             let w = match r {
-                Some((_, register_setting)) => {
-                    w.pllr().bits(register_setting).pllren().set_bit()
-                }
+                Some((_, register_setting)) => w.pllr().bits(register_setting).pllren().set_bit(),
                 None => w,
             };
 
