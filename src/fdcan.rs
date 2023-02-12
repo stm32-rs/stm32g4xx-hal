@@ -1162,7 +1162,7 @@ where
     pub fn error_counters(&self) -> ErrorCounters {
         let can = self.registers();
         let cel: u8 = can.ecr.read().cel().bits();
-        let rp: bool = can.ecr.read().rp().bits();
+        let rp: bool = can.ecr.read().rp().bit();
         let rec: u8 = can.ecr.read().rec().bits();
         let tec: u8 = can.ecr.read().tec().bits();
 

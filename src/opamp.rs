@@ -256,8 +256,8 @@ macro_rules! opamps {
                                     .output()
                                     .opaintoen()
                                     .variant(match output {
-                                        Some(_) => OPAINTOEN_A::OUTPUTPIN,
-                                        None => OPAINTOEN_A::ADCCHANNEL,
+                                        Some(_) => OPAINTOEN_A::OutputPin,
+                                        None => OPAINTOEN_A::Adcchannel,
                                     })
                                     .opaen()
                                     .enabled()
@@ -324,8 +324,8 @@ macro_rules! opamps {
                                     .$inverting_mask()
                                     .opaintoen()
                                     .variant(match output {
-                                        Some(_) => OPAINTOEN_A::OUTPUTPIN,
-                                        None => OPAINTOEN_A::ADCCHANNEL,
+                                        Some(_) => OPAINTOEN_A::OutputPin,
+                                        None => OPAINTOEN_A::Adcchannel,
                                     })
                                     .opaen()
                                     .enabled()
