@@ -1526,7 +1526,7 @@ macro_rules! tim_pin_hal {
 
                     // Even though the field is 20 bits long for 16-bit counters, only 16 bits are
                     // valid, so we convert to the appropriate type.
-                    tim.$ccrx.read().ccr().bits() as $typ
+                    tim.$ccrx().read().ccr().bits() as $typ
                 }
 
                 fn get_max_duty(&self) -> Self::Duty {
@@ -1551,7 +1551,7 @@ macro_rules! tim_pin_hal {
                 fn set_duty(&mut self, duty: Self::Duty) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.$ccrx.write(|w| unsafe { w.ccr().bits(duty.into()) });
+                    tim.$ccrx().write(|w| unsafe { w.ccr().bits(duty.into()) });
                 }
             }
 
