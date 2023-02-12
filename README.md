@@ -29,8 +29,25 @@ If you are compiling the crate on its own for development or running examples,
 specify your microcontroller on the command line. For example:
 
 ```
-cargo build --example blinky
+cargo build --example blinky --features stm32g473
 ```
+
+## Running examples
+
+Examples can be built and run using `cargo run`. It is necessary to provide any
+required features followed by the name of the chip. 
+
+```
+cargo run --example usb_serial --features stm32g473 --features usb_fs --release -- --chip STM32G473RETx
+```
+
+A list of chips supported by probe-rs can be found by running
+
+```
+probe-run --list-chips
+```
+
+For furher information, see the documentation for [probe-run](https://github.com/knurling-rs/probe-run).
 
 ### Using as a Dependency
 
