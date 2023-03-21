@@ -129,7 +129,7 @@ mod fdcan1 {
         const REGISTERS: *mut fdcan::RegisterBlock = FDCAN1::ptr() as *mut _;
     }
     unsafe impl fdcan::message_ram::Instance for Can<FDCAN1> {
-        const MSG_RAM: *mut fdcan::message_ram::RegisterBlock = (0x4000_ac00 as *mut _);
+        const MSG_RAM: *mut fdcan::message_ram::RegisterBlock = (0x4000_a400 as *mut _);
     }
 }
 
