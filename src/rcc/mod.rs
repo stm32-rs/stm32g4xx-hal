@@ -1,6 +1,7 @@
 use crate::stm32::{rcc, FLASH, PWR, RCC};
 use crate::time::{Hertz, U32Ext};
 
+pub mod clock_recovery_system;
 mod clockout;
 mod config;
 mod enable;
@@ -289,6 +290,16 @@ impl Rcc {
     pub(crate) fn enable_lsi(&self) {
         self.rb.csr.modify(|_, w| w.lsion().set_bit());
         while self.rb.csr.read().lsirdy().bit_is_clear() {}
+    }
+
+    pub(crate) fn enable_hsi48(&self) {
+        self.rb.crrcr.modify(|_, w| w.hsi48on().set_bit());
+
+        loop {
+            if self.rb.crrcr.read().hsi48rdy().bit() {
+                break;
+            }
+        }
     }
 }
 
