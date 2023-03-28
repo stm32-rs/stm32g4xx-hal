@@ -122,6 +122,11 @@ mod fdcan1 {
     }
     impl CanExt for FDCAN1 {
         fn fdcan_unchecked(self) -> fdcan::FdCan<Can<Self>, fdcan::ConfigMode> {
+            unsafe {
+                hal::stm32::NVIC::unmask(hal::interrupt::FDCAN1_INTR0);
+                hal::stm32::NVIC::unmask(hal::interrupt::FDCAN1_INTR1);
+            }
+
             Can::fdcan1(self)
         }
     }
@@ -172,6 +177,11 @@ mod fdcan2 {
     }
     impl CanExt for FDCAN2 {
         fn fdcan_unchecked(self) -> fdcan::FdCan<Can<Self>, fdcan::ConfigMode> {
+            unsafe {
+                hal::stm32::NVIC::unmask(hal::interrupt::FDCAN2_INTR0);
+                hal::stm32::NVIC::unmask(hal::interrupt::FDCAN2_INTR1);
+            }
+
             Can::fdcan2(self)
         }
     }
@@ -220,6 +230,11 @@ mod fdcan3 {
     }
     impl CanExt for FDCAN3 {
         fn fdcan_unchecked(self) -> fdcan::FdCan<Can<Self>, fdcan::ConfigMode> {
+            unsafe {
+                hal::stm32::NVIC::unmask(hal::interrupt::FDCAN3_INTR0);
+                hal::stm32::NVIC::unmask(hal::interrupt::FDCAN3_INTR1);
+            }
+
             Can::fdcan3(self)
         }
     }
