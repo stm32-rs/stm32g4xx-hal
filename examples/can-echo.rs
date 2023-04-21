@@ -7,7 +7,7 @@ use crate::hal::{
     nb::block,
     rcc::{Config, RccExt, SysClockSrc},
     stm32::Peripherals,
-    time::U32Ext,
+    time::RateExtU32,
 };
 use fdcan::{
     config::NominalBitTiming,
@@ -47,7 +47,7 @@ fn main() -> ! {
     let dp = Peripherals::take().unwrap();
     let _cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::new(SysClockSrc::HSE(24.mhz())));
+    let mut rcc = rcc.freeze(Config::new(SysClockSrc::HSE(24.MHz())));
 
     info!("Split GPIO");
 

@@ -12,6 +12,7 @@ use hal::prelude::*;
 use hal::serial::*;
 use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
+use hal::time::ExtU32;
 
 use cortex_m_rt::entry;
 use log::info;
@@ -70,7 +71,7 @@ fn main() -> ! {
     loop {
         while !transfer.get_transfer_complete_flag() {}
 
-        delay_syst.delay(1000.ms());
+        delay_syst.delay(1000.millis());
         led.toggle().unwrap();
         transfer.restart(|_tx| {});
     }

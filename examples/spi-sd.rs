@@ -18,6 +18,7 @@ use hal::stm32;
 use hal::stm32::Peripherals;
 use hal::timer::Timer;
 use stm32g4xx_hal as hal;
+use hal::time::RateExtU32;
 
 use embedded_sdmmc::{
     Block, BlockCount, BlockDevice, BlockIdx, Controller, Error, Mode, TimeSource, Timestamp,
@@ -50,7 +51,7 @@ fn main() -> ! {
 
     let mut spi = dp
         .SPI2
-        .spi((sck, miso, mosi), spi::MODE_0, 400.khz(), &mut rcc);
+        .spi((sck, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
 
     struct Clock;
 

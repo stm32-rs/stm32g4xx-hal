@@ -8,6 +8,7 @@ use hal::prelude::*;
 use hal::rcc::Config;
 use hal::stm32;
 use hal::timer::Timer;
+use hal::time::ExtU32;
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
@@ -34,13 +35,13 @@ fn main() -> ! {
 
     info!("Init Timer2 delay");
     let timer2 = Timer::new(dp.TIM2, &rcc.clocks);
-    let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.ms()));
+    let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.millis()));
 
     loop {
         info!("Toggle");
         led.toggle().unwrap();
         info!("SYST delay");
-        delay_syst.delay(1000.ms());
+        delay_syst.delay(1000.millis());
         info!("Toggle");
         led.toggle().unwrap();
         info!("TIM2 delay");

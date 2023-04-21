@@ -75,16 +75,16 @@ impl Config {
             return bits;
         }
         let speed = self.speed.unwrap();
-        let (psc, scll, sclh, sdadel, scldel) = if speed.0 <= 100_000 {
+        let (psc, scll, sclh, sdadel, scldel) = if speed.raw() <= 100_000 {
             let psc = 3;
-            let scll = cmp::min((((i2c_clk.0 >> 1) / (psc + 1)) / speed.0) - 1, 255);
+            let scll = cmp::min((((i2c_clk.raw() >> 1) / (psc + 1)) / speed.raw()) - 1, 255);
             let sclh = scll - 4;
             let sdadel = 2;
             let scldel = 4;
             (psc, scll, sclh, sdadel, scldel)
         } else {
             let psc = 1;
-            let scll = cmp::min((((i2c_clk.0 >> 1) / (psc + 1)) / speed.0) - 1, 255);
+            let scll = cmp::min((((i2c_clk.raw() >> 1) / (psc + 1)) / speed.raw()) - 1, 255);
             let sclh = scll - 6;
             let sdadel = 1;
             let scldel = 3;
