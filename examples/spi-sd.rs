@@ -16,9 +16,9 @@ use hal::rcc::Config;
 use hal::spi;
 use hal::stm32;
 use hal::stm32::Peripherals;
+use hal::time::RateExtU32;
 use hal::timer::Timer;
 use stm32g4xx_hal as hal;
-use hal::time::RateExtU32;
 
 use embedded_sdmmc::{
     Block, BlockCount, BlockDevice, BlockIdx, Controller, Error, Mode, TimeSource, Timestamp,

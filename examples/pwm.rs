@@ -8,8 +8,8 @@ use hal::gpio::Alternate;
 use hal::gpio::AF6;
 use hal::prelude::*;
 use hal::stm32;
-use stm32g4xx_hal as hal;
 use hal::time::RateExtU32;
+use stm32g4xx_hal as hal;
 mod utils;
 extern crate cortex_m_rt as rt;
 

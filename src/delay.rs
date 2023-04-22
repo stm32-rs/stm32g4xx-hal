@@ -43,9 +43,7 @@ use cortex_m::peripheral::SYST;
 
 use crate::nb::block;
 use crate::time::ExtU32;
-use embedded_hal::{
-    blocking::delay::{DelayMs, DelayUs},
-};
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
 
 pub trait CountDown: embedded_hal::timer::CountDown {
     fn max_period(&self) -> MicroSecond;
@@ -120,7 +118,7 @@ macro_rules! impl_delay_from_count_down_timer  {
                     assert!(time_left_us <= max_sleep_us);
 
                     let time_left: MicroSecond = (time_left_us as u32).micros();
-                    
+
                     // Only sleep
                     if time_left.ticks() > 0 {
                         self.0.start(time_left);

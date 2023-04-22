@@ -6,8 +6,8 @@
 use hal::i2c::Config;
 use hal::prelude::*;
 use hal::stm32;
-use stm32g4xx_hal as hal;
 use hal::time::{ExtU32, RateExtU32};
+use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
 use log::info;

@@ -195,7 +195,7 @@ use crate::stm32::TIM5;
 use crate::stm32::{TIM1, TIM15, TIM16, TIM17, TIM2, TIM3, TIM4, TIM8};
 
 use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
-use crate::time::{Hertz, NanoSecond, ExtU32, RateExtU32};
+use crate::time::{ExtU32, Hertz, NanoSecond, RateExtU32};
 
 #[cfg(any(
     feature = "stm32g471",

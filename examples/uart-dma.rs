@@ -10,9 +10,9 @@ use core::fmt::Write;
 use hal::dma::{config::DmaConfig, stream::DMAExt, TransferExt};
 use hal::prelude::*;
 use hal::serial::*;
+use hal::time::ExtU32;
 use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
-use hal::time::ExtU32;
 
 use cortex_m_rt::entry;
 use log::info;

@@ -7,8 +7,8 @@ use hal::delay::DelayFromCountDownTimer;
 use hal::prelude::*;
 use hal::rcc::Config;
 use hal::stm32;
-use hal::timer::Timer;
 use hal::time::ExtU32;
+use hal::timer::Timer;
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;

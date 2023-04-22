@@ -6,8 +6,19 @@
 #![no_std]
 
 use crate::hal::{
-    block, delay::DelayFromCountDownTimer, gpio::gpioa::PA5, gpio::gpioa::PA6, gpio::gpioa::PA7,
-    gpio::Alternate, gpio::AF5, prelude::*, rcc::Config, spi, stm32::Peripherals, timer::Timer, time::{ExtU32, RateExtU32}
+    block,
+    delay::DelayFromCountDownTimer,
+    gpio::gpioa::PA5,
+    gpio::gpioa::PA6,
+    gpio::gpioa::PA7,
+    gpio::Alternate,
+    gpio::AF5,
+    prelude::*,
+    rcc::Config,
+    spi,
+    stm32::Peripherals,
+    time::{ExtU32, RateExtU32},
+    timer::Timer,
 };
 
 use cortex_m_rt::entry;
