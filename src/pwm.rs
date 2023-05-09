@@ -169,6 +169,12 @@
 //! This code has been taken from the stm32h7xx-hal project and modified slightly to support
 //! STM32G4xx MCUs. It has originally been licensed under the 0-clause BSD license.
 
+#[cfg(any(
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+pub mod hrtim;
+
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
@@ -1025,40 +1031,55 @@ pins! {
         ]
 }
 
-// Period and prescaler calculator for 32-bit timers
-// Returns (arr, psc)
-fn calculate_frequency_32bit(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
-    let divisor = if let Alignment::Center = alignment {
-        freq * 2
-    } else {
-        freq
-    };
-
-    // Round to the nearest period
-    let arr = (base_freq + (divisor / 2)) / divisor - 1;
-
-    (arr, 0)
+trait TimerType {
+    /// Returns (arr, psc) bits
+    fn calculate_frequency(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16);
 }
 
-// Period and prescaler calculator for 16-bit timers
-// Returns (arr, psc)
-// Returns as (u32, u16) to be compatible but arr will always be a valid u16
-fn calculate_frequency_16bit(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
-    let ideal_period = calculate_frequency_32bit(base_freq, freq, alignment).0 + 1;
+/// Any 32-bit timer
+struct Timer32Bit;
 
-    // Division factor is (PSC + 1)
-    let prescale = (ideal_period - 1) / (1 << 16);
+impl TimerType for Timer32Bit {
+    // Period and prescaler calculator for 32-bit timers
+    // Returns (arr, psc) bits
+    fn calculate_frequency(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
+        let divisor = if let Alignment::Center = alignment {
+            freq * 2
+        } else {
+            freq
+        };
 
-    // This will always fit in a 16-bit value because u32::MAX / (1 << 16) fits in a 16 bit
+        // Round to the nearest period
+        let arr = (base_freq + (divisor / 2)) / divisor - 1;
 
-    // Round to the nearest period
-    let period = (ideal_period + (prescale >> 1)) / (prescale + 1) - 1;
+        (arr, 0)
+    }
+}
 
-    // It should be impossible to fail these asserts
-    assert!(period <= 0xFFFF);
-    assert!(prescale <= 0xFFFF);
+/// Any 16-bit timer except for HrTim
+struct Timer16Bit;
 
-    (period, prescale as u16)
+impl TimerType for Timer16Bit {
+    // Period and prescaler calculator for 16-bit timers
+    // Returns (arr, psc)
+    // Returns as (u32, u16) to be compatible but arr will always be a valid u16
+    fn calculate_frequency(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
+        let ideal_period = Timer32Bit::calculate_frequency(base_freq, freq, alignment).0 + 1;
+
+        // Division factor is (PSC + 1)
+        let prescale = (ideal_period - 1) / (1 << 16);
+
+        // This will always fit in a 16-bit value because u32::MAX / (1 << 16) fits in a 16 bit
+
+        // Round to the nearest period
+        let period = (ideal_period + (prescale >> 1)) / (prescale + 1) - 1;
+
+        // It should be impossible to fail these asserts
+        assert!(period <= 0xFFFF);
+        assert!(prescale <= 0xFFFF);
+
+        (period, prescale as u16)
+    }
 }
 
 // Deadtime calculator helper function
@@ -1130,68 +1151,82 @@ pub trait PwmAdvExt<WIDTH>: Sized {
 
 // Implement PwmExt trait for timer
 macro_rules! pwm_ext_hal {
-    ($TIMX:ident: $timX:ident) => {
-        impl PwmExt for $TIMX {
+    ($TIMX:ident: $timX:ident $(, $HrTimPsc:tt)*) => {
+        impl $(<$HrTimPsc>)* PwmExt for $TIMX {
             fn pwm<PINS, T, U, V>(self, pins: PINS, frequency: T, rcc: &mut Rcc) -> PINS::Channel
             where
                 PINS: Pins<Self, U, V>,
                 T: Into<Hertz>,
             {
-                $timX(self, pins, frequency.into(), rcc)
+                $timX::<_, _, _ $(, $HrTimPsc )*>(self, pins, frequency.into(), rcc)
             }
+        }
+    };
+}
+
+macro_rules! simple_tim_hal {
+    ($TIMX:ident: (
+        $timX:ident,
+        $bits:ident,
+        $(, BDTR: $bdtr:ident, $moe_set:ident)*
+    )) => {
+        pwm_ext_hal!($TIMX: $timX);
+
+        /// Configures PWM
+        fn $timX<PINS, T, U>(
+            tim: $TIMX,
+            _pins: PINS,
+            freq: Hertz,
+            rcc: &mut Rcc,
+        ) -> PINS::Channel
+        where
+            PINS: Pins<$TIMX, T, U>,
+        {
+            unsafe {
+                let rcc_ptr = &(*RCC::ptr());
+                $TIMX::enable(rcc_ptr);
+                $TIMX::reset(rcc_ptr);
+            }
+
+            let clk = $TIMX::get_timer_frequency(&rcc.clocks);
+
+            let (period, prescale) = <$bits>::calculate_frequency(clk, freq, Alignment::Left);
+
+            // Write prescale
+            tim.psc().write(|w| { unsafe { w.psc().bits(prescale as u16) } });
+
+            // Write period
+            tim.arr().write(|w| { unsafe { w.arr().bits(period.into()) } });
+
+            // BDTR: Advanced-control timers
+            $(
+                // Set CCxP = OCxREF / CCxNP = !OCxREF
+                // Refer to RM0433 Rev 6 - Table 324.
+                tim.$bdtr().write(|w|
+                                w.moe().$moe_set()
+                );
+            )*
+
+            tim.cr1().write(|w| w.cen().set_bit());
+
+            unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
         }
     };
 }
 
 // Implement PWM configuration for timer
 macro_rules! tim_hal {
-    ($($TIMX:ident: ($timX:ident,
-                     $typ:ty, $bits:expr $(, DIR: $cms:ident)* $(, BDTR: $bdtr:ident, $moe_set:ident, $af1:ident, $bkinp_setting:ident $(, $bk2inp_setting:ident)*)*),)+) => {
+    ($($TIMX:ident: (
+        $timX:ident,
+        $typ:ty, $bits:ident $( <$HrTimPsc:tt> )* $(, DIR: $cms:ident)*
+        $(, BDTR: $bdtr:ident, $moe_set:ident, $af1:ident, $bkinp_setting:ident $(, $bk2inp_setting:ident)*)*
+    ),)+) => {
         $(
-            pwm_ext_hal!($TIMX: $timX);
-
-            /// Configures PWM
-            fn $timX<PINS, T, U>(
-                tim: $TIMX,
-                _pins: PINS,
-                freq: Hertz,
-                rcc: &mut Rcc,
-            ) -> PINS::Channel
-            where
-                PINS: Pins<$TIMX, T, U>,
-            {
-                unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $TIMX::enable(rcc_ptr);
-                    $TIMX::reset(rcc_ptr);
-                }
-
-                let clk = $TIMX::get_timer_frequency(&rcc.clocks);
-
-                let (period, prescale) = match $bits {
-                    16 => calculate_frequency_16bit(clk, freq, Alignment::Left),
-                    _ => calculate_frequency_32bit(clk, freq, Alignment::Left),
-                };
-
-                // Write prescale
-                tim.psc().write(|w| { unsafe { w.psc().bits(prescale as u16) } });
-
-                // Write period
-                tim.arr().write(|w| { unsafe { w.arr().bits(period.into()) } });
-
-                // BDTR: Advanced-control timers
-                $(
-                    // Set CCxP = OCxREF / CCxNP = !OCxREF
-                    // Refer to RM0433 Rev 6 - Table 324.
-                    tim.$bdtr().write(|w|
-                                   w.moe().$moe_set()
-                    );
-                )*
-
-                tim.cr1().write(|w| w.cen().set_bit());
-
-                unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
-            }
+            simple_tim_hal!($TIMX: (
+                $timX,
+                $bits,
+                $(, BDTR: $bdtr, $moe_set)*
+            ));
 
             impl PwmAdvExt<$typ> for $TIMX {
                 fn pwm_advanced<PINS, CHANNEL, COMP>(
@@ -1238,10 +1273,7 @@ macro_rules! tim_hal {
                     let (period, prescaler) = match self.count {
                         CountSettings::Explicit { period, prescaler } => (period as u32, prescaler),
                         CountSettings::Frequency( freq ) => {
-                            match $bits {
-                                16 => calculate_frequency_16bit(self.base_freq, freq, self.alignment),
-                                _ => calculate_frequency_32bit(self.base_freq, freq, self.alignment),
-                            }
+                            <$bits>::calculate_frequency(self.base_freq, freq, self.alignment)
                         },
                     };
 
@@ -1344,7 +1376,12 @@ macro_rules! tim_hal {
 
                     self.count = CountSettings::Explicit { period, prescaler };
 
-                    self
+                    self;
+
+                    todo!() // This needs function needs to be disabled for HrTim since HrTim's prescaler is different:
+                    // * is only on the form (1 << N) (N: 1..=7), thus no arbitrary 16-bit numbers.
+                    // * since HrTimers can only work with HrTimer's with the same prescaler(work as in control and sync to with other, this is yet to be exposed)
+                    // * This + the fact that "The prescaler can not be changed while the HrTimer is running" led me to implement the prescaler as a type parameter
                 }
 
                 /// Set the period; PWM count runs from 0 to period, repeating every (period+1) counts
@@ -1448,10 +1485,10 @@ macro_rules! tim_hal {
 }
 
 tim_hal! {
-    TIM1: (tim1, u16, 16, DIR: cms, BDTR: bdtr, set_bit, af1, clear_bit, clear_bit),
-    TIM2: (tim2, u32, 32, DIR: cms),
-    TIM3: (tim3, u16, 16, DIR: cms),
-    TIM4: (tim4, u16, 16, DIR: cms),
+    TIM1: (tim1, u16, Timer16Bit, DIR: cms, BDTR: bdtr, set_bit, af1, clear_bit, clear_bit),
+    TIM2: (tim2, u32, Timer32Bit, DIR: cms),
+    TIM3: (tim3, u16, Timer16Bit, DIR: cms),
+    TIM4: (tim4, u16, Timer16Bit, DIR: cms),
 }
 #[cfg(any(
     feature = "stm32g471",
@@ -1461,13 +1498,13 @@ tim_hal! {
     feature = "stm32g484"
 ))]
 tim_hal! {
-    TIM5: (tim5, u32, 32, DIR: cms),
+    TIM5: (tim5, u32, Timer32Bit, DIR: cms),
 }
 tim_hal! {
-    TIM8: (tim8, u16, 16, DIR: cms, BDTR: bdtr, set_bit, af1, clear_bit, clear_bit),
-    TIM15: (tim15, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
-    TIM16: (tim16, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
-    TIM17: (tim17, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
+    TIM8: (tim8, u16, Timer16Bit, DIR: cms, BDTR: bdtr, set_bit, af1, clear_bit, clear_bit),
+    TIM15: (tim15, u16, Timer16Bit, BDTR: bdtr, set_bit, af1, set_bit),
+    TIM16: (tim16, u16, Timer16Bit, BDTR: bdtr, set_bit, af1, set_bit),
+    TIM17: (tim17, u16, Timer16Bit, BDTR: bdtr, set_bit, af1, set_bit),
 }
 
 #[cfg(any(
@@ -1479,7 +1516,23 @@ tim_hal! {
     feature = "stm32g4a1"
 ))]
 tim_hal! {
-    TIM20: (tim20, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
+    TIM20: (tim20, u16, Timer16Bit, BDTR: bdtr, set_bit, af1, set_bit),
+}
+
+macro_rules! tim_hal_foreach_timer {
+    ($($TIMX:ident: $timX:ident,)+) => {$(
+        tim_hal!{
+            // TODO: HRTIM_MASTER
+            $TIMX: ($timX, u16, TimerHrTim<Pscl1>),
+            $TIMX: ($timX, u16, TimerHrTim<Pscl2>),
+            $TIMX: ($timX, u16, TimerHrTim<Pscl4>),
+            $TIMX: ($timX, u16, TimerHrTim<Pscl8>),
+            $TIMX: ($timX, u16, TimerHrTim<Pscl16>),
+            $TIMX: ($timX, u16, TimerHrTim<Pscl32>),
+            $TIMX: ($timX, u16, TimerHrTim<Pscl64>),
+            $TIMX: ($timX, u16, TimerHrTim<Pscl128>),
+        }
+    )+};
 }
 
 pub trait PwmPinEnable {
