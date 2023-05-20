@@ -2,10 +2,8 @@
 #![no_main]
 #![no_std]
 
-use cortex_m::delay;
 use cortex_m_rt::entry;
 use fugit::ExtU32;
-use fugit::RateExtU32;
 use hal::gpio::gpioa::PA8;
 use hal::gpio::gpioa::PA9;
 use hal::gpio::Alternate;
@@ -15,7 +13,6 @@ use hal::pwm::hrtim::EventSource;
 use hal::pwm::hrtim::HrCompareRegister;
 use hal::pwm::hrtim::HrOutput;
 use hal::pwm::hrtim::HrPwmAdvExt;
-use hal::pwm::hrtim::HrPwmExt;
 use hal::pwm::hrtim::HrTimer;
 use hal::pwm::hrtim::Pscl4;
 use hal::rcc;
@@ -41,7 +38,7 @@ fn main() -> ! {
 
     // ...with a prescaler of 4 this gives us a HrTimer with a tick rate of 1.2GHz
     // With max the max period set, this would be 1.2GHz/2^16 ~= 18kHz...
-    type Prescaler = Pscl4; // Prescaler of 4
+    let prescaler = Pscl4;
 
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
@@ -57,9 +54,10 @@ fn main() -> ! {
     //out2    .               |    |                          |    |
     //        .               |    |                          |    |
     // ------------------------    ----------------------------    ----
-    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1) = dp
+    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
         .HRTIM_TIMA
-        .pwm_advanced(pin_a, &mut rcc)
+        .pwm_advanced((pin_a, pin_b), &mut rcc)
+        .prescaler(prescaler)
         .period(0xFFFF)
         .push_pull_mode(true) // Set push pull mode, out1 and out2 are
         // alternated every period with one being
@@ -68,13 +66,10 @@ fn main() -> ! {
         .finalize();
 
     out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
-                                             //out2.rst_event(EventSource::Cr1);
+    out2.enable_rst_event(EventSource::Cr1);
 
     out1.enable_set_event(EventSource::Period); // Set high at new period
-                                                //out2.set_event(EventSource::Period);
-                                                // ^
-                                                // |
-                                                //  *---- Perhaps multiple EventSources could be Or:ed together?
+    out2.enable_set_event(EventSource::Period);
 
     loop {
         for i in 1..10 {
