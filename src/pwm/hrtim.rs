@@ -27,6 +27,7 @@ starta timer: MCEN or TxCEN oklart...
 */
 
 use core::marker::PhantomData;
+use core::mem::MaybeUninit;
 
 use crate::gpio::gpioa::{PA8, PA9};
 use crate::gpio::{Alternate, AF13};
@@ -73,24 +74,38 @@ pins! {
         ]
 }
 
-pub struct Hrtimer<PSCL, TIM> {
-    _prescaler: PhantomData<PSCL>,
-    _timer: PhantomData<TIM>,
-    period: u16,
+// automatically implement Pins trait for tuples of individual pins
+macro_rules! pins_tuples {
+    // Tuple of two pins
+    ($(($CHA:ident, $CHB:ident)),*) => {
+        $(
+            impl<TIM, PSCL, CHA, CHB, TA, TB> Pins<TIM, ($CHA<PSCL>, $CHB<PSCL>), (TA, TB)> for (CHA, CHB)
+            where
+                CHA: Pins<TIM, $CHA<PSCL>, TA>,
+                CHB: Pins<TIM, $CHB<PSCL>, TB>,
+            {
+                type Channel = (Pwm<TIM, $CHA<PSCL>, TA, ActiveHigh, ActiveHigh>, Pwm<TIM, $CHB<PSCL>, TB, ActiveHigh, ActiveHigh>);
+            }
 
-    cmp_value1: u16,
-    cmp_value2: u16,
-    cmp_value3: u16,
-    cmp_value4: u16,
+            impl<PSCL> HrtimChannel<PSCL> for ($CHA<PSCL>, $CHB<PSCL>) {}
+        )*
+    };
 }
 
-/*impl<PSCL> TimerType for PSCL
-where
-    PSCL: HrtimPrescaler,
-{
-    fn calculate_frequency(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
-        <PSCL>::calculate_frequency(base_freq, freq, alignment)
-    }
+pins_tuples! {
+    (CH1, CH2),
+    (CH2, CH1)
+}
+
+/*pub struct Hrtimer<PSCL, TIM> {
+    _prescaler: PhantomData<PSCL>,
+    _timer: PhantomData<TIM>,
+    period: u16, // $perXr.perx
+
+    cmp_value1: u16, // $cmpX1r.cmp1x
+    cmp_value2: u16, // $cmpX2r.cmp2x
+    cmp_value3: u16, // $cmpX3r.cmp3x
+    cmp_value4: u16, // $cmpX4r.cmp4x
 }*/
 
 // HrPwmExt trait
@@ -167,7 +182,7 @@ macro_rules! hrtim_hal {
                     master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
                 });
 
-                todo!()
+                unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
             }
         )+
     }
@@ -196,16 +211,12 @@ macro_rules! hrtim_pin_hal {
                 fn get_duty(&self) -> Self::Duty {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    // Even though the field is 20 bits long for 16-bit counters, only 16 bits are
-                    // valid, so we convert to the appropriate type.
                     tim.$cmpXYr.read().$cmpYx().bits()
                 }
 
                 fn get_max_duty(&self) -> Self::Duty {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    // Even though the field is 20 bits long for 16-bit counters, only 16 bits are
-                    // valid, so we convert to the appropriate type.
                     let arr = tim.$perXr.read().perx().bits();
 
                     // One PWM cycle is ARR+1 counts long
@@ -351,5 +362,5 @@ impl<PSC: HrtimPrescaler> super::TimerType for TimerHrTim<PSC> {
 
 pub trait HrtimChannel<PSCL> {}
 
-impl<PSCL> HrtimChannel<PSCL> for CH1<PSCL>{}
-impl<PSCL> HrtimChannel<PSCL> for CH2<PSCL>{}
+impl<PSCL> HrtimChannel<PSCL> for CH1<PSCL> {}
+impl<PSCL> HrtimChannel<PSCL> for CH2<PSCL> {}
