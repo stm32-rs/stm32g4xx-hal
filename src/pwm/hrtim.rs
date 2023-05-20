@@ -1,31 +1,3 @@
-/*
-period: HRTIM_PERAR
-enable output: HRTIM_OENR
-enable preload: PREEN,
-prescaler per timer: CKPSC[2:0] kan bara sättas en gång/när timern är disablad
-NOTE: Timrar som kommunicerar output set/clear, counter reset, update, external event filter eller capture triggers måste ha samma prescaler
-
-continous mode: CONT in TIMxCR
-
-crossbar config for SET events: HRTIM_SET<TIM><OUTPUT>R
-crossbar config for RST events: HRTIM_RST<TIM><OUTPUT>R
-att sätta ett event i båda register betyder "TOGGLE"-event
-
-tvinga 50% duty: HALF in HRTIM_TIMxCR smidigt vid variabel frekvens. Var gång HRTIM_PERxR(perioden) skrivs så kommer compare1-värdet bli halva perioden.
-För att detta ska fungera måste utgången vara konfigurerad för en övergång för "compare1" och en vid "period". Se sida 856
-
-Triggered-half mode: TRGHLF in HRTIM_TIMxCR2
-
-
-**** push-pull mode ****: PSHPLL in HRTIM_TIMxCR, detta verkar styra två utgångar på ett sätt som alternerande, varannan period skickar ut signal på ena utgången och håller andra utgången inaktiv och virse versa. se sida 864
-
-
-reset timers counters: TxRST in HRTIM_CR2 reset sker inte förens timrarna är enablade
-polaritet: POLx 0: pos, 1:neg
-
-starta timer: MCEN or TxCEN oklart...
-*/
-
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
@@ -170,18 +142,40 @@ pub struct HrTim<TIM, PSCL> {
 }
 
 pub trait HrTimer<TIM, PSCL> {
+    /// Get period of timer in number of ticks
+    ///
+    /// This is also the maximum duty usable for `HrCompareRegister::set_duty`
     fn get_period(&self) -> u16;
+
+    /// Set period of timer in number of ticks
+    ///
+    /// NOTE: This will affect the maximum duty usable for `HrCompareRegister::set_duty`
     fn set_period(&mut self, period: u16);
 }
 
 pub trait HrOutput {
+    /// Enable this output
     fn enable(&mut self);
+
+    /// Disable this output
     fn disable(&mut self);
 
+    /// Set this output to active every time the specified event occurs
+    ///
+    /// NOTE: Enabling the same event for both SET and RESET
+    /// will make that event TOGGLE the output
     fn enable_set_event(&mut self, set_event: EventSource);
+
+    /// Stop listening to the specified event
     fn disable_set_event(&mut self, set_event: EventSource);
 
+    /// Set this output to *not* active every time the specified event occurs
+    ///
+    /// NOTE: Enabling the same event for both SET and RESET
+    /// will make that event TOGGLE the output
     fn enable_rst_event(&mut self, reset_event: EventSource);
+
+    /// Stop listening to the specified event
     fn disable_rst_event(&mut self, reset_event: EventSource);
 }
 
