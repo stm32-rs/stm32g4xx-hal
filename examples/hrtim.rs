@@ -2,14 +2,21 @@
 #![no_main]
 #![no_std]
 
+use cortex_m::delay;
 use cortex_m_rt::entry;
+use fugit::ExtU32;
 use fugit::RateExtU32;
 use hal::gpio::gpioa::PA8;
 use hal::gpio::gpioa::PA9;
 use hal::gpio::Alternate;
 use hal::gpio::AF13;
 use hal::prelude::*;
+use hal::pwm::hrtim::EventSource;
+use hal::pwm::hrtim::HrCompareRegister;
+use hal::pwm::hrtim::HrOutput;
+use hal::pwm::hrtim::HrPwmAdvExt;
 use hal::pwm::hrtim::HrPwmExt;
+use hal::pwm::hrtim::HrTimer;
 use hal::pwm::hrtim::Pscl4;
 use hal::rcc;
 use hal::stm32;
@@ -20,8 +27,9 @@ extern crate cortex_m_rt as rt;
 #[entry]
 fn main() -> ! {
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-
-    //Set system frequency to 16MHz * 75/4/2 = 150MHz
+    let cp = stm32::CorePeripherals::take().expect("cannot take core");
+    // Set system frequency to 16MHz * 75/4/2 = 150MHz
+    // This would lead to HrTim running at 150MHz * 32 = 4.8GHz...
     let mut rcc = dp.RCC.freeze(rcc::Config::pll().pll_cfg(rcc::PllConfig {
         n: rcc::PllNMul::MUL_75,
         m: rcc::PllMDiv::DIV_4,
@@ -29,20 +37,15 @@ fn main() -> ! {
         ..Default::default()
     }));
 
+    let mut delay = cp.SYST.delay(&rcc.clocks);
+
+    // ...with a prescaler of 4 this gives us a HrTimer with a tick rate of 1.2GHz
+    // With max the max period set, this would be 1.2GHz/2^16 ~= 18kHz...
+    type Prescaler = Pscl4; // Prescaler of 4
+
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
     let pin_b: PA9<Alternate<AF13>> = gpioa.pa9.into_alternate();
-
-    type Prescaler = Pscl4; // Prescaler of 4
-
-    let (mut p1, mut p2) =
-        dp.HRTIM_TIMA
-            .pwm::<_, _, Prescaler, _, _>((pin_a, pin_b), 10_u32.kHz(), &mut rcc);
-    p1.set_duty(0x1FFF);
-    p2.set_duty(0xEFFF);
-
-    p1.enable();
-    p2.enable();
 
     //        .               .
     //        .  30%          .
@@ -54,27 +57,33 @@ fn main() -> ! {
     //out2    .               |    |                          |    |
     //        .               |    |                          |    |
     // ------------------------    ----------------------------    ----
-    /*let (timer, cr1, _cr2, _cr3, _cr4, (out1, out2)) = dp.HRTIM_TIMA.pwm_hrtim::<_, Prescaler>((pin_a, pin_b), 10_u32.kHz(), &mut rcc)
+    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1) = dp
+        .HRTIM_TIMA
+        .pwm_advanced(pin_a, &mut rcc)
         .period(0xFFFF)
-        .mode(Mode::PushPull)   // Set push pull mode, out1 and out2 are
-                                // alternated every period with one being
-                                // inactive and the other getting to output its wave form
-                                // as normal
+        .push_pull_mode(true) // Set push pull mode, out1 and out2 are
+        // alternated every period with one being
+        // inactive and the other getting to output its wave form
+        // as normal
         .finalize();
 
-    out1.rst_event(EventSource::Cr1); // Set low on compare match with cr1
-    out2.rst_event(EventSource::Cr1);
+    out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
+                                             //out2.rst_event(EventSource::Cr1);
 
-    out1.set_event(EventSource::Period); // Set high at new period
-    out2.set_event(EventSource::Period);
-                        // ^
-                        // |
-                        //  *---- Perhaps multiple EventSources could be Or:ed together?
-
-    cr1.set_duty(timer.get_period() / 3);
-    timer.set_period(foo);*/
+    out1.enable_set_event(EventSource::Period); // Set high at new period
+                                                //out2.set_event(EventSource::Period);
+                                                // ^
+                                                // |
+                                                //  *---- Perhaps multiple EventSources could be Or:ed together?
 
     loop {
-        cortex_m::asm::nop()
+        for i in 1..10 {
+            let new_period = u16::MAX / i;
+
+            cr1.set_duty(new_period / 3);
+            timer.set_period(new_period / i);
+
+            delay.delay(500_u32.millis());
+        }
     }
 }
