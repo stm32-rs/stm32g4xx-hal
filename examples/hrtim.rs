@@ -44,16 +44,18 @@ fn main() -> ! {
     let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
     let pin_b: PA9<Alternate<AF13>> = gpioa.pa9.into_alternate();
 
-    //        .               .
-    //        .  30%          .
-    //         ----           .                 ----
-    //out1    |    |          .                |    |
-    //        |    |          .                |    |
+    //        .               .               .               .
+    //        .  30%          .               .               .
+    //         ----           .               .----           .
+    //out1    |    |          .               |    |          .
+    //        |    |          .               |    |          .
     // --------    ----------------------------    --------------------
-    //        .                ----           .                ----
-    //out2    .               |    |                          |    |
-    //        .               |    |                          |    |
+    //        .               .----           .               .----
+    //out2    .               |    |          .               |    |
+    //        .               |    |          .               |    |
     // ------------------------    ----------------------------    ----
+    //        .               .               .               .
+    //        .               .               .               .
     let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
@@ -72,6 +74,7 @@ fn main() -> ! {
     out2.enable_set_event(EventSource::Period);
 
     loop {
+        // Step frequency from 18kHz to about 180kHz
         for i in 1..10 {
             let new_period = u16::MAX / i;
 
