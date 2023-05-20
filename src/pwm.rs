@@ -1379,12 +1379,7 @@ macro_rules! tim_hal {
 
                     self.count = CountSettings::Explicit { period, prescaler };
 
-                    self;
-
-                    todo!() // This needs function needs to be disabled for HrTim since HrTim's prescaler is different:
-                    // * is only on the form (1 << N) (N: 1..=7), thus no arbitrary 16-bit numbers.
-                    // * since HrTimers can only work with HrTimer's with the same prescaler(work as in control and sync to with other, this is yet to be exposed)
-                    // * This + the fact that "The prescaler can not be changed while the HrTimer is running" led me to implement the prescaler as a type parameter
+                    self
                 }
 
                 /// Set the period; PWM count runs from 0 to period, repeating every (period+1) counts
@@ -1520,22 +1515,6 @@ tim_hal! {
 ))]
 tim_hal! {
     TIM20: (tim20, u16, Timer16Bit, BDTR: bdtr, set_bit, af1, set_bit),
-}
-
-macro_rules! tim_hal_foreach_timer {
-    ($($TIMX:ident: $timX:ident,)+) => {$(
-        tim_hal!{
-            // TODO: HRTIM_MASTER
-            $TIMX: ($timX, u16, TimerHrTim<Pscl1>),
-            $TIMX: ($timX, u16, TimerHrTim<Pscl2>),
-            $TIMX: ($timX, u16, TimerHrTim<Pscl4>),
-            $TIMX: ($timX, u16, TimerHrTim<Pscl8>),
-            $TIMX: ($timX, u16, TimerHrTim<Pscl16>),
-            $TIMX: ($timX, u16, TimerHrTim<Pscl32>),
-            $TIMX: ($timX, u16, TimerHrTim<Pscl64>),
-            $TIMX: ($timX, u16, TimerHrTim<Pscl128>),
-        }
-    )+};
 }
 
 pub trait PwmPinEnable {

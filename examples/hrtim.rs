@@ -3,15 +3,16 @@
 #![no_std]
 
 use cortex_m_rt::entry;
+use fugit::RateExtU32;
 use hal::gpio::AF13;
 use hal::gpio::gpioa::PA8;
 use hal::gpio::Alternate;
-use hal::gpio::AF6;
 use hal::gpio::gpioa::PA9;
 use hal::prelude::*;
+use hal::pwm::hrtim::HrPwmExt;
+use hal::pwm::hrtim::Pscl4;
 use hal::rcc;
 use hal::stm32;
-use hal::time::RateExtU32;
 use stm32g4xx_hal as hal;
 mod utils;
 extern crate cortex_m_rt as rt;
@@ -44,7 +45,13 @@ fn main() -> ! {
     // ------------------------    ----------------------------    ----
 
     type Prescaler = Pscl4; // Prescaler of 4
-    let (timer, cr1, _cr2, _cr3, _cr4, (out1, out2)) = dp.HRTIM_TIMA.pwm_hrtim::<Prescaler>((pin_a, pin_b), rcc)
+
+    let mut p = dp.HRTIM_TIMA.pwm::<_, _, Prescaler, _, _>(pin_a, 10_u32.kHz(), &mut rcc);
+    p.set_duty(0xEFFF);
+    p.enable();
+
+
+    /*let (timer, cr1, _cr2, _cr3, _cr4, (out1, out2)) = dp.HRTIM_TIMA.pwm_hrtim::<_, Prescaler>((pin_a, pin_b), 10_u32.kHz(), &mut rcc)
         .period(0xFFFF)
         .mode(Mode::PushPull)   // Set push pull mode, out1 and out2 are 
                                 // alternated every period with one being
@@ -62,7 +69,7 @@ fn main() -> ! {
                         //  *---- Perhaps multiple EventSources could be Or:ed together?
 
     cr1.set_duty(timer.get_period() / 3);
-    timer.set_period(foo);
+    timer.set_period(foo);*/
 
     loop {
         cortex_m::asm::nop()
