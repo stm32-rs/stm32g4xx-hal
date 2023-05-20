@@ -73,6 +73,9 @@ fn main() -> ! {
     out1.enable_set_event(EventSource::Period); // Set high at new period
     out2.enable_set_event(EventSource::Period);
 
+    out1.enable();
+    out2.enable();
+
     loop {
         // Step frequency from 18kHz to about 180kHz
         for i in 1..10 {
