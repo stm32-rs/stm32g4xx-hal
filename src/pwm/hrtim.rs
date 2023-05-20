@@ -61,7 +61,7 @@ macro_rules! pins {
             impl<PSCL> Pins<$TIMX, CH1<PSCL>, ComplementaryImpossible> for $CH1 {
                 type Channel = Pwm<$TIMX, CH1<PSCL>, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
             }
-        
+
             impl<PSCL> Pins<$TIMX, CH2<PSCL>, ComplementaryImpossible> for $CH2 {
                 type Channel = Pwm<$TIMX, CH2<PSCL>, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
             }
@@ -128,22 +128,22 @@ pub trait HrPwmExt: Sized {
 }
 
 pub trait HrPwmAdvExt: Sized {
-    fn pwm_advanced<PINS, CHANNEL>(
+    fn pwm_advanced<PINS, CHANNEL, COMP>(
         self,
         _pins: PINS,
         rcc: &mut Rcc,
-    ) -> HrPwmBuilder<Self, Pscl128, PINS, CHANNEL, FaultDisabled>
+    ) -> HrPwmBuilder<Self, Pscl128, FaultDisabled, PINS::Out>
     where
-        PINS: Pins<Self, CHANNEL, ComplementaryImpossible>;
+        PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
+        CHANNEL: HrtimChannel<Pscl128>;
 }
 
 /// HrPwmBuilder is used to configure advanced HrTim PWM features
-pub struct HrPwmBuilder<TIM, PSCL, PINS, CHANNEL, FAULT> {
+pub struct HrPwmBuilder<TIM, PSCL, FAULT, OUT> {
     _tim: PhantomData<TIM>,
-    _pins: PhantomData<PINS>,
-    _channel: PhantomData<CHANNEL>,
     _fault: PhantomData<FAULT>,
     _prescaler: PhantomData<PSCL>,
+    _out: PhantomData<OUT>,
     alignment: Alignment,
     base_freq: HertzU64,
     count: CountSettings,
@@ -154,7 +154,7 @@ pub struct HrPwmBuilder<TIM, PSCL, PINS, CHANNEL, FAULT> {
     //deadtime: NanoSecond,
 }
 
-pub trait HrCompareRegister{
+pub trait HrCompareRegister {
     fn get_duty(&self) -> u16;
     fn set_duty(&mut self, duty: u16);
 }
@@ -164,7 +164,7 @@ pub struct HrCr2<TIM>(PhantomData<TIM>);
 pub struct HrCr3<TIM>(PhantomData<TIM>);
 pub struct HrCr4<TIM>(PhantomData<TIM>);
 
-pub struct HrTim<TIM, PSCL>{
+pub struct HrTim<TIM, PSCL> {
     _timer: PhantomData<TIM>,
     _prescaler: PhantomData<PSCL>,
 }
@@ -174,7 +174,7 @@ pub trait HrTimer<TIM, PSCL> {
     fn set_period(&mut self, period: u16);
 }
 
-pub trait HrOutput{
+pub trait HrOutput {
     fn enable(&mut self);
     fn disable(&mut self);
 
@@ -199,7 +199,6 @@ pub enum EventSource {
     Cr4,
 
     Period,
-
     /*
     /// Compare match with compare register 1 of master timer
     MasterCr1,
@@ -214,32 +213,19 @@ pub enum EventSource {
     MasterCr4,
 
     MasterPeriod,*/
-
     // TODO: These are unique for every timer output
     //Extra(E)
 }
 pub trait ToHrOut {
-    type Out: HrOutput;
+    type Out;
 }
 
-/*impl<TIM, PSCL> ToHrOut for (TIM, CH1<PSCL>) 
-    where HrOut1<TIM>: HrOutput
-{
-    type Out = HrOut1<TIM>;
-}
-
-impl<TIM, PSCL> ToHrOut for (TIM, CH2<PSCL>)
-where HrOut2<TIM>: HrOutput{
-    type Out = HrOut2<TIM>;
-}*/
-
-impl<CHA, CHB> ToHrOut for (CHA, CHB) 
+impl<PA, PB> ToHrOut for (PA, PB)
 where
-    CHA: ToHrOut,
-    CHB: ToHrOut,
-    (CHA::Out, CHA::Out): HrOutput
+    PA: ToHrOut,
+    PB: ToHrOut,
 {
-    type Out = (CHA::Out, CHA::Out);
+    type Out = (PA::Out, PB::Out);
 }
 
 pub struct HrOut1<TIM>(PhantomData<TIM>);
@@ -314,13 +300,14 @@ macro_rules! hrtim_hal {
             }
 
             impl HrPwmAdvExt for $TIMX {
-                fn pwm_advanced<PINS, CHANNEL>(
+                fn pwm_advanced<PINS, CHANNEL, COMP>(
                     self,
                     _pins: PINS,
                     rcc: &mut Rcc,
-                ) -> HrPwmBuilder<Self, Pscl128, PINS, CHANNEL, FaultDisabled>
+                ) -> HrPwmBuilder<Self, Pscl128, FaultDisabled, PINS::Out>
                 where
-                    PINS: Pins<Self, CHANNEL, ComplementaryImpossible>
+                    PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
+                    CHANNEL: HrtimChannel<Pscl128>
                 {
                     unsafe {
                         let rcc_ptr = &(*RCC::ptr());
@@ -335,13 +322,12 @@ macro_rules! hrtim_hal {
 
                     HrPwmBuilder {
                         _tim: PhantomData,
-                        _pins: PhantomData,
-                        _channel: PhantomData,
                         _fault: PhantomData,
                         _prescaler: PhantomData,
+                        _out: PhantomData,
                         alignment: Alignment::Left,
                         base_freq: clk,
-                        count: CountSettings::Period(65535),
+                        count: CountSettings::Period(u16::MAX),
                         enable_push_pull: false,
                         //bkin_enabled: false,
                         //bkin2_enabled: false,
@@ -351,13 +337,12 @@ macro_rules! hrtim_hal {
                 }
             }
 
-            impl<PINS, PSCL, CHANNEL, FAULT>
-                HrPwmBuilder<$TIMX, PSCL, PINS, CHANNEL, FAULT>
+            impl<PSCL, FAULT, OUT>
+                HrPwmBuilder<$TIMX, PSCL, FAULT, OUT>
             where
                 PSCL: HrtimPrescaler,
-                PINS: Pins<$TIMX, CHANNEL, ComplementaryImpossible> + ToHrOut,
             {
-                pub fn finalize(self) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>), <PINS as ToHrOut>::Out) {
+                pub fn finalize(self) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>), OUT) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     let (period, prescaler_bits) = match self.count {
@@ -368,7 +353,7 @@ macro_rules! hrtim_hal {
                     };
 
                     // Write prescaler and any special modes
-                    tim.$timXcr.write(|w| unsafe { 
+                    tim.$timXcr.write(|w| unsafe {
                         w
                             // Enable Continous mode
                             .cont().set_bit()
@@ -405,14 +390,15 @@ macro_rules! hrtim_hal {
                 }
 
                 /// Set the prescaler; PWM count runs at base_frequency/(prescaler+1)
-                pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, PINS, CHANNEL, FAULT> 
-                where P: HrtimPrescaler {
+                pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, FAULT, OUT>
+                where
+                    P: HrtimPrescaler,
+                {
                     let HrPwmBuilder {
                         _tim,
-                        _pins,
-                        _channel,
                         _fault,
                         _prescaler: _,
+                        _out,
                         enable_push_pull,
                         alignment,
                         base_freq,
@@ -428,10 +414,9 @@ macro_rules! hrtim_hal {
 
                     HrPwmBuilder {
                         _tim,
-                        _pins,
-                        _channel,
                         _fault,
                         _prescaler: PhantomData,
+                        _out,
                         enable_push_pull,
                         alignment,
                         base_freq,
@@ -451,12 +436,12 @@ macro_rules! hrtim_hal {
                 }
 
                 /// Enable or disable Push-Pull mode
-                /// 
+                ///
                 /// Enabling Push-Pull mode will make output 1 and 2
                 /// alternate every period with one being
                 /// inactive and the other getting to output its wave form
                 /// as normal
-                /// 
+                ///
                 ///         ----           .                ----
                 ///out1    |    |          .               |    |
                 ///        |    |          .               |    |
@@ -465,7 +450,7 @@ macro_rules! hrtim_hal {
                 ///out2    .               |      |        .               |      |
                 ///        .               |      |        .               |      |
                 /// ------------------------    ----------------------------      --
-                /// 
+                ///
                 /// NOTE: setting this will overide any 'Swap Mode' set
                 pub fn push_pull_mode(mut self, enable: bool) -> Self {
                     self.enable_push_pull = enable;
@@ -575,11 +560,11 @@ macro_rules! hrtim_out_common {
         let tim = unsafe { &*$TIMX::ptr() };
 
         match $set_event {
-            EventSource::Cr1 => tim.$register.modify(|_r, w| { w.cmp1().$action() } ),
-            EventSource::Cr2 => tim.$register.modify(|_r, w| { w.cmp2().$action() } ),
-            EventSource::Cr3 => tim.$register.modify(|_r, w| { w.cmp3().$action() } ),
-            EventSource::Cr4 => tim.$register.modify(|_r, w| { w.cmp4().$action() } ),
-            EventSource::Period => tim.$register.modify(|_r, w| { w.per().$action() } ),
+            EventSource::Cr1 => tim.$register.modify(|_r, w| w.cmp1().$action()),
+            EventSource::Cr2 => tim.$register.modify(|_r, w| w.cmp2().$action()),
+            EventSource::Cr3 => tim.$register.modify(|_r, w| w.cmp3().$action()),
+            EventSource::Cr4 => tim.$register.modify(|_r, w| w.cmp4().$action()),
+            EventSource::Period => tim.$register.modify(|_r, w| w.per().$action()),
         }
     }};
 }
@@ -618,7 +603,7 @@ macro_rules! hrtim_out {
     )+};
 }
 
-hrtim_out!{
+hrtim_out! {
     HRTIM_TIMA: HrOut1: ta1oen, seta1r, rsta1r,
     HRTIM_TIMA: HrOut2: ta2oen, seta2r, rsta2r,
 
@@ -684,7 +669,7 @@ macro_rules! hrtim_timer {
     )+};
 }
 
-hrtim_timer!{
+hrtim_timer! {
     HRTIM_TIMA: perar,
     HRTIM_TIMB: perbr,
     HRTIM_TIMC: percr,
@@ -693,7 +678,7 @@ hrtim_timer!{
     HRTIM_TIMF: perfr,
 }
 
-hrtim_cr!{
+hrtim_cr! {
     HRTIM_TIMA: [cmp1ar, cmp2ar, cmp3ar, cmp4ar],
     HRTIM_TIMB: [cmp1br, cmp2br, cmp3br, cmp4br],
     HRTIM_TIMC: [cmp1cr, cmp2cr, cmp3cr, cmp4cr],
