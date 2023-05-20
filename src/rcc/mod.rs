@@ -231,7 +231,7 @@ impl Rcc {
         }
     }
 
-    pub fn unlock_rtc(&mut self) {
+    pub fn unlock_rtc_old(&mut self) {
         self.rb.apb1enr1.modify(|_, w| w.pwren().set_bit());
         let pwr = unsafe { &(*PWR::ptr()) };
         pwr.cr1.modify(|_, w| w.dbp().set_bit());
@@ -456,6 +456,46 @@ impl Rcc {
 
     pub fn clear_reset_reason(&mut self) {
         self.rb.csr.modify(|_, w| w.rmvf().set_bit());
+    }
+
+    pub(crate) fn unlock_rtc(&self) {
+        self.rb.apb1enr1.modify(|_, w| w.pwren().set_bit());
+        let pwr = unsafe { &(*PWR::ptr()) };
+        pwr.cr1.modify(|_, w| w.dbp().set_bit());
+        while pwr.cr1.read().dbp().bit_is_clear() {}
+    }
+
+    pub(crate) fn enable_rtc(&self, src: RTCSrc) {
+        self.unlock_rtc();
+        self.rb
+            .apb1enr1
+            .modify(|_, w| w.rtcapben().set_bit().pwren().set_bit());
+        self.rb.apb1smenr1.modify(|_, w| w.rtcapbsmen().set_bit());
+        self.rb.bdcr.modify(|_, w| w.bdrst().set_bit());
+
+        let rtc_sel = match src {
+            RTCSrc::LSE | RTCSrc::LSE_BYPASS => 0b01,
+            RTCSrc::LSI => 0b10,
+            RTCSrc::HSE | RTCSrc::HSE_BYPASS => 0b11,
+        };
+
+        self.rb.bdcr.modify(|_, w| {
+            w.rtcsel()
+                .bits(rtc_sel)
+                .rtcen()
+                .set_bit()
+                .bdrst()
+                .clear_bit()
+        });
+
+        self.unlock_rtc();
+        match src {
+            RTCSrc::LSE => self.enable_lse(false),
+            RTCSrc::LSE_BYPASS => self.enable_lse(true),
+            RTCSrc::LSI => self.enable_lsi(),
+            RTCSrc::HSE => self.enable_hse(false),
+            RTCSrc::HSE_BYPASS => self.enable_hse(true),
+        };
     }
 }
 

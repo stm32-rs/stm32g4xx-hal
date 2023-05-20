@@ -46,6 +46,16 @@ pub enum PLLSrc {
     HSE_BYPASS(Hertz),
 }
 
+/// RTC clock input source
+#[derive(Clone, Copy)]
+pub enum RTCSrc {
+    LSE,
+    LSE_BYPASS,
+    LSI,
+    HSE,
+    HSE_BYPASS,
+}
+
 /// Divider for the PLL clock input (M)
 /// This must be set based on the input clock to keep the PLL input frequency within the limits
 /// specified in the datasheet.
