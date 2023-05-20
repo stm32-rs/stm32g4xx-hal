@@ -169,10 +169,7 @@
 //! This code has been taken from the stm32h7xx-hal project and modified slightly to support
 //! STM32G4xx MCUs. It has originally been licensed under the 0-clause BSD license.
 
-#[cfg(any(
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
 pub mod hrtim;
 
 use core::marker::PhantomData;
