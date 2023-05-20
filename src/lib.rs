@@ -76,6 +76,7 @@ pub mod prelude;
 pub mod pwm;
 // pub mod qei;
 pub mod rcc;
+pub mod rtc;
 // pub mod rng;
 pub mod serial;
 pub mod signature;
