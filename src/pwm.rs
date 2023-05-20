@@ -175,6 +175,8 @@ pub mod hrtim;
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
+use fugit::HertzU64;
+
 use crate::hal;
 use crate::stm32::LPTIMER1;
 use crate::stm32::RCC;
@@ -1030,7 +1032,7 @@ pins! {
 
 trait TimerType {
     /// Returns (arr, psc) bits
-    fn calculate_frequency(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16);
+    fn calculate_frequency(base_freq: HertzU64, freq: Hertz, alignment: Alignment) -> (u32, u16);
 }
 
 /// Any 32-bit timer
@@ -1039,7 +1041,8 @@ struct Timer32Bit;
 impl TimerType for Timer32Bit {
     // Period and prescaler calculator for 32-bit timers
     // Returns (arr, psc) bits
-    fn calculate_frequency(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
+    fn calculate_frequency(base_freq: HertzU64, freq: Hertz, alignment: Alignment) -> (u32, u16) {
+        let freq = HertzU64::from(freq);
         let divisor = if let Alignment::Center = alignment {
             freq * 2
         } else {
@@ -1049,7 +1052,9 @@ impl TimerType for Timer32Bit {
         // Round to the nearest period
         let arr = (base_freq + (divisor / 2)) / divisor - 1;
 
-        (arr, 0)
+        assert!(arr <= u32::MAX as u64);
+
+        (arr as u32, 0)
     }
 }
 
@@ -1060,7 +1065,7 @@ impl TimerType for Timer16Bit {
     // Period and prescaler calculator for 16-bit timers
     // Returns (arr, psc)
     // Returns as (u32, u16) to be compatible but arr will always be a valid u16
-    fn calculate_frequency(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
+    fn calculate_frequency(base_freq: HertzU64, freq: Hertz, alignment: Alignment) -> (u32, u16) {
         let ideal_period = Timer32Bit::calculate_frequency(base_freq, freq, alignment).0 + 1;
 
         // Division factor is (PSC + 1)
@@ -1187,7 +1192,7 @@ macro_rules! simple_tim_hal {
 
             let clk = $TIMX::get_timer_frequency(&rcc.clocks);
 
-            let (period, prescale) = <$bits>::calculate_frequency(clk, freq, Alignment::Left);
+            let (period, prescale) = <$bits>::calculate_frequency(clk.into(), freq, Alignment::Left);
 
             // Write prescale
             tim.psc.write(|w| { unsafe { w.psc().bits(prescale as u16) } });
@@ -1270,7 +1275,7 @@ macro_rules! tim_hal {
                     let (period, prescaler) = match self.count {
                         CountSettings::Explicit { period, prescaler } => (period as u32, prescaler),
                         CountSettings::Frequency( freq ) => {
-                            <$bits>::calculate_frequency(self.base_freq, freq, self.alignment)
+                            <$bits>::calculate_frequency(self.base_freq.into(), freq, self.alignment)
                         },
                     };
 
