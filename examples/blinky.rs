@@ -8,10 +8,11 @@ use hal::stm32;
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use log::info;
 
 #[macro_use]
 mod utils;
+
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -27,11 +28,12 @@ fn main() -> ! {
 
     loop {
         info!("Set Led low");
-        for _ in 0..100_000 {
+        for _ in 0..10_000_000 {
             led.set_low().unwrap();
         }
+
         info!("Set Led High");
-        for _ in 0..100_000 {
+        for _ in 0..10_000_000 {
             led.set_high().unwrap();
         }
     }

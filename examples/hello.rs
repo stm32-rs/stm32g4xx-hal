@@ -11,6 +11,8 @@ extern crate stm32g4xx_hal as hal;
 use cortex_m_semihosting::hprintln;
 use rt::entry;
 
+use defmt_rtt as _;
+
 #[entry]
 fn main() -> ! {
     hprintln!("Hello, STM32G4!").unwrap();
