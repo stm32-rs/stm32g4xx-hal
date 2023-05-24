@@ -38,6 +38,7 @@ cfg_if::cfg_if! {
             };
         }
 
+        #[allow(dead_code)]
         pub fn init() {
             cortex_m_log::log::init(&LOGGER).unwrap();
         }
@@ -48,6 +49,7 @@ cfg_if::cfg_if! {
         use panic_probe as _;
         pub use defmt::Logger;
 
+        #[allow(dead_code)]
         pub fn init() {}
     }
     else if #[cfg(all(feature = "log-rtt", not(feature = "defmt")))] {
@@ -72,12 +74,15 @@ cfg_if::cfg_if! {
             };
         }
 
+        #[allow(dead_code)]
         pub fn init() {
             cortex_m_log::log::init(&LOGGER).unwrap();
         }
     }
     else {
         use panic_halt as _;
+
+        #[allow(dead_code)]
         pub fn init() {}
     }
 }

@@ -1,14 +1,14 @@
 #![no_main]
 #![no_std]
 
-use defmt_rtt as _;
-
-use panic_probe as _;
-
 use stm32g4 as _;
 
-use defmt::Format;
+#[macro_use]
+mod utils;
 
+use utils::logger;
+
+#[cfg(feature = "defmt")]
 #[defmt::panic_handler]
 fn panic() -> ! {
     cortex_m::asm::udf()
@@ -22,8 +22,7 @@ pub fn exit() -> ! {
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
-    defmt::info!("main");
+    logger::info!("main");
 
     panic!("Something bad");
-    // defmt::panic!()
 }
