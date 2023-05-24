@@ -68,8 +68,6 @@ lazy_static = { version = "1.4", features = ["spin_no_std"] }
 log = "0.4.11"
 cortex-m-log = { version = "0.7", features = ["log-integration"] }
 cfg-if = "0.1.10"
-rtt-target = { version = "0.3.0", features = ["cortex-m"] }
-panic-rtt-target = { version = "0.1.1", features = ["cortex-m"] }
 mpu6050 = "0.1.4"
 bme680 = "0.6.0"
 embedded-sdmmc = "0.3.0"

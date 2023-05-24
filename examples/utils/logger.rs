@@ -1,5 +1,15 @@
 #![allow(unsafe_code)]
 cfg_if::cfg_if! {
+    if #[cfg(all(feature = "log-rtt", feature = "defmt"))] {
+        pub use defmt::{info, trace, warn, debug, error};
+        pub use defmt::println as println;
+    } else {
+        pub use log::{info, trace, warn, debug, error};
+        pub use cortex_m_semihosting::hprintln as println;
+    }
+}
+
+cfg_if::cfg_if! {
     if #[cfg(any(feature = "log-itm"))] {
         use panic_itm as _;
 
@@ -33,37 +43,15 @@ cfg_if::cfg_if! {
         }
 
     }
-    else if #[cfg(any(feature = "log-rtt"))] {
-        use panic_rtt_target as _;
+    else if #[cfg(all(feature = "log-rtt", feature = "defmt"))] {
+        use defmt_rtt as _; // global logger
+        use panic_probe as _;
+        pub use defmt::Logger;
 
-        use log::{Level, Metadata, Record, LevelFilter};
-        use rtt_target::{rprintln, rtt_init_print};
-
-        pub struct Logger {
-            level: Level,
-        }
-
-        static LOGGER: Logger = Logger {
-            level: Level::Info,
-        };
-
-        pub fn init() {
-            rtt_init_print!();
-            log::set_logger(&LOGGER).map(|()| log::set_max_level(LevelFilter::Info)).unwrap();
-        }
-
-        impl log::Log for Logger {
-            fn enabled(&self, metadata: &Metadata) -> bool {
-                metadata.level() <= self.level
-
-            }
-
-            fn log(&self, record: &Record) {
-                rprintln!("{} - {}", record.level(), record.args());
-            }
-
-            fn flush(&self) {}
-        }
+        pub fn init() {}
+    }
+    else if #[cfg(all(feature = "log-rtt", not(feature = "defmt")))] {
+        // TODO
     }
     else if #[cfg(any(feature = "log-semihost"))] {
         use panic_semihosting as _;
