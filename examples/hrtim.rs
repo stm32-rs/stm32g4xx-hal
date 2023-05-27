@@ -21,6 +21,8 @@ use stm32g4xx_hal as hal;
 mod utils;
 extern crate cortex_m_rt as rt;
 
+use defmt_rtt as _; // global logger
+
 #[entry]
 fn main() -> ! {
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
@@ -28,6 +30,7 @@ fn main() -> ! {
     // Set system frequency to 16MHz * 75/4/2 = 150MHz
     // This would lead to HrTim running at 150MHz * 32 = 4.8GHz...
     let mut rcc = dp.RCC.freeze(rcc::Config::pll().pll_cfg(rcc::PllConfig {
+        mux: rcc::PLLSrc::HSI,
         n: rcc::PllNMul::MUL_75,
         m: rcc::PllMDiv::DIV_4,
         r: Some(rcc::PllRDiv::DIV_2),
