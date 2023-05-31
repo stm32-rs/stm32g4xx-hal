@@ -119,6 +119,17 @@ macro_rules! opamps {
                         output: Option<$output>,
                     }
 
+                    pub enum NonInvertingGain {
+                        Gain2 = 0,
+                        Gain4 = 1,
+                        Gain8 = 2,
+                        Gain16 = 3,
+                        Gain32 = 4,
+                        Gain64 = 5
+                    }
+
+                    // TODO: Inverting gain
+
                     pub struct Config<MODE> {
                         mode: MODE,
                         pga_gain: crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A,
@@ -242,7 +253,7 @@ macro_rules! opamps {
 
                     opamps!{ @follower $opamp, $output, $($non_inverting_mask, $non_inverting),* }
                     opamps!{ @open_loop_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
-                    opamps!{ @pga_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask),*) }
+                    opamps!{ @pga_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting),*) }
                 }
             )*
 
@@ -417,11 +428,11 @@ macro_rules! opamps {
         ,
         $non_inverting:ty
         ,
-        ($($inverting_mask:tt,),*)
+        ($($invertings:ty),*)
     } => {
         paste::paste!{
-            $(impl <IntoNonInverting, MODE, IntoOutput> IntoPga
-                <IntoNonInverting, Config<MODE>, IntoOutput, $non_inverting> for Disabled
+            $(impl <IntoNonInverting, $mode, IntoOutput> IntoPga
+                <IntoNonInverting, Config<$mode>, IntoOutput, $non_inverting> for Disabled
                 where
                     IntoNonInverting: Into<$non_inverting>,
                     IntoOutput: Into<$output>,
@@ -429,7 +440,7 @@ macro_rules! opamps {
                 fn pga(
                     self,
                     non_inverting: IntoNonInverting,
-                    config: Config<MODE>,
+                    config: Config<$mode>,
                     output: Option<IntoOutput>,
                 ) -> Pga<$non_inverting, $config> {
                     let non_inverting = non_inverting.into();
