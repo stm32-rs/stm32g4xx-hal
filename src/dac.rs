@@ -64,7 +64,7 @@ impl ED for Disabled {}
 
 macro_rules! impl_dac {
     ($DACxCHy:ident) => {
-        pub struct $DACxCHy<ED> {
+        pub struct $DACxCHy<const MODE_BITS: u8, ED> {
             _enabled: PhantomData<ED>,
         }
     };
@@ -83,21 +83,63 @@ pub trait Pins<DAC> {
     type Output;
 }
 
+const M_EXT_PIN: u8 = 0b000;
+const M_MIX_SIG: u8 = 0b001;
+const M_INT_SIG: u8 = 0b011;
+
+pub struct Dac1IntSig1;
+pub struct Dac1IntSig2;
+pub struct Dac2IntSig1;
+pub struct Dac3IntSig1;
+pub struct Dac3IntSig2;
+pub struct Dac4IntSig1;
+pub struct Dac4IntSig2;
+
 macro_rules! impl_pin_for_dac {
     ($DAC:ident: $pin:ty, $output:ty) => {
+        #[allow(unused_parens)]
         impl Pins<$DAC> for $pin {
+            #[allow(unused_parens)]
             type Output = $output;
         }
     };
 }
 
-impl_pin_for_dac!(DAC1: PA4<DefaultMode>, Dac1Ch1<Disabled>);
-impl_pin_for_dac!(DAC1: PA5<DefaultMode>, Dac1Ch2<Disabled>);
-impl_pin_for_dac!(
-    DAC1: (PA4<DefaultMode>, PA5<DefaultMode>),
-    (Dac1Ch1<Disabled>, Dac1Ch2<Disabled>)
-);
-impl_pin_for_dac!(DAC2: PA6<DefaultMode>, Dac2Ch1<Disabled>);
+// Implement all combinations of ch2 for the specified ch1 on DAC1
+macro_rules! impl_dac1_ch2_combos {
+    ($($pin_ch1:ty, $output_ch1:ty)*) => {
+        $(impl_pin_for_dac!(DAC1: $pin_ch1,                                   // ch2: Not used
+            $output_ch1
+        );)*
+        impl_pin_for_dac!(DAC1: ($($pin_ch1,)* PA5<DefaultMode>),             // ch2: Ext pin
+            ($($output_ch1,)* Dac1Ch2<M_EXT_PIN, Disabled>)
+        );
+        impl_pin_for_dac!(DAC1: ($($pin_ch1,)* Dac1IntSig2),                    // ch2: Internal
+            ($($output_ch1,)* Dac1Ch2<M_INT_SIG, Disabled>)
+        );
+        impl_pin_for_dac!(DAC1: ($($pin_ch1,)* (PA5<DefaultMode>, Dac1IntSig2)),// ch2: Mixed
+            ($($output_ch1,)* Dac1Ch2<M_MIX_SIG, Disabled>)
+        );
+    };
+}
+
+impl_dac1_ch2_combos!(); // ch1: Not used
+impl_dac1_ch2_combos!(PA4<DefaultMode>, Dac1Ch1<M_EXT_PIN, Disabled>); // ch1: Ext pin
+impl_dac1_ch2_combos!(Dac1IntSig1, Dac1Ch1<M_INT_SIG, Disabled>); // ch1: Internal
+impl_dac1_ch2_combos!((PA4<DefaultMode>, Dac1IntSig1), Dac1Ch1<M_MIX_SIG, Disabled>); // ch1: Mixed
+
+// DAC2
+impl_pin_for_dac!(DAC2: PA6<DefaultMode>, Dac2Ch1<M_EXT_PIN, Disabled>); // ch1: Ext pin
+impl_pin_for_dac!(DAC2: Dac2IntSig1, Dac2Ch1<M_INT_SIG, Disabled>); // ch1: Internal
+impl_pin_for_dac!(DAC2: (PA6<DefaultMode>, Dac2IntSig1), Dac2Ch1<M_MIX_SIG, Disabled>); // ch1: Mixed
+
+// DAC3 int
+impl_pin_for_dac!(DAC3: Dac3IntSig1, Dac3Ch1<M_INT_SIG, Disabled>);
+impl_pin_for_dac!(DAC3: Dac3IntSig2, Dac3Ch2<M_INT_SIG, Disabled>);
+
+// DAC4 int
+impl_pin_for_dac!(DAC4: Dac4IntSig1, Dac4Ch1<M_INT_SIG, Disabled>);
+impl_pin_for_dac!(DAC4: Dac4IntSig2, Dac4Ch2<M_INT_SIG, Disabled>);
 
 pub fn dac<DAC, PINS>(_dac: DAC, _pins: PINS, _rcc: &mut Rcc) -> PINS::Output
 where
@@ -132,11 +174,11 @@ macro_rules! dac_helper {
         $swtrig:ident
     ),)+) => {
         $(
-            impl $CX<Disabled> {
-                pub fn enable(self) -> $CX<Enabled> {
+            impl<const MODE_BITS: u8> $CX<MODE_BITS, Disabled> {
+                pub fn enable(self) -> $CX<MODE_BITS, Enabled> {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
 
-                    dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(1) });
+                    dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(MODE_BITS) });
                     dac.dac_cr.modify(|_, w| w.$en().set_bit());
 
                     $CX {
@@ -144,7 +186,7 @@ macro_rules! dac_helper {
                     }
                 }
 
-                pub fn enable_unbuffered(self) -> $CX<EnabledUnbuffered> {
+                /*pub fn enable_unbuffered(self) -> $CX<MODE_BITS, EnabledUnbuffered> {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
 
                     dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(2) });
@@ -153,12 +195,12 @@ macro_rules! dac_helper {
                     $CX {
                         _enabled: PhantomData,
                     }
-                }
+                }*/
 
-                pub fn enable_generator(self, config: GeneratorConfig) -> $CX<WaveGenerator> {
+                pub fn enable_generator(self, config: GeneratorConfig) -> $CX<MODE_BITS, WaveGenerator> {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
 
-                    dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(1) });
+                    dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(MODE_BITS) });
                     dac.dac_cr.modify(|_, w| unsafe {
                         w.$wave().bits(config.mode);
                         w.$ten().set_bit();
@@ -172,7 +214,7 @@ macro_rules! dac_helper {
                 }
             }
 
-            impl<ED> $CX<ED> {
+            impl<const MODE_BITS: u8, ED> $CX<MODE_BITS, ED> {
                 /// Calibrate the DAC output buffer by performing a "User
                 /// trimming" operation. It is useful when the VDDA/VREF+
                 /// voltage or temperature differ from the factory trimming
@@ -184,7 +226,7 @@ macro_rules! dac_helper {
                 ///
                 /// After the calibration operation, the DAC channel is
                 /// disabled.
-                pub fn calibrate_buffer<T>(self, delay: &mut T) -> $CX<Disabled>
+                pub fn calibrate_buffer<T>(self, delay: &mut T) -> $CX<MODE_BITS, Disabled>
                 where
                     T: DelayUs<u32>,
                 {
@@ -209,7 +251,7 @@ macro_rules! dac_helper {
                 }
 
                 /// Disable the DAC channel
-                pub fn disable(self) -> $CX<Disabled> {
+                pub fn disable(self) -> $CX<MODE_BITS, Disabled> {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.dac_cr.modify(|_, w| unsafe {
                         w.$en().clear_bit().$wave().bits(0).$ten().clear_bit()
@@ -223,7 +265,7 @@ macro_rules! dac_helper {
 
             /// DacOut implementation available in any Enabled/Disabled
             /// state
-            impl<ED> DacOut<u16> for $CX<ED> {
+            impl<const MODE_BITS: u8, ED> DacOut<u16> for $CX<MODE_BITS, ED> {
                 fn set_value(&mut self, val: u16) {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.$dhrx.write(|w| unsafe { w.bits(val as u32) });
@@ -236,7 +278,7 @@ macro_rules! dac_helper {
             }
 
             /// Wave generator state implementation
-            impl $CX<WaveGenerator> {
+            impl<const MODE_BITS: u8> $CX<MODE_BITS, WaveGenerator> {
                 pub fn trigger(&mut self) {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.dac_swtrgr.write(|w| { w.$swtrig().set_bit() });

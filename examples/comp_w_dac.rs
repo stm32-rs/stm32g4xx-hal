@@ -4,7 +4,8 @@
 #![no_std]
 
 use embedded_hal::Direction;
-use hal::dac::{DacExt, DacOut, GeneratorConfig};
+use hal::comparator::{self, ComparatorExt, ComparatorSplit};
+use hal::dac::{Dac1IntSig1, DacExt, DacOut};
 use hal::delay::SYSTDelayExt;
 use hal::gpio::GpioExt;
 use hal::rcc::RccExt;
@@ -24,17 +25,30 @@ fn main() -> ! {
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let (dac1ch1, dac1ch2) = dp.DAC1.constrain((gpioa.pa4, gpioa.pa5), &mut rcc);
+    let dac1ch1 = dp.DAC1.constrain((gpioa.pa4, Dac1IntSig1), &mut rcc);
 
-    let mut dac_manual = dac1ch1.calibrate_buffer(&mut delay).enable();
-    let mut dac_generator = dac1ch2.enable_generator(GeneratorConfig::noise(11));
+    let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable();
+
+    let (comp1, _comp2, ..) = dp.COMP.split(&mut rcc);
+    let pa1 = gpioa.pa1.into_analog();
+    let comp = comp1.comparator(
+        pa1,
+        &dac,
+        comparator::Config::default().hysteresis(comparator::Hysteresis::None),
+        &rcc.clocks,
+    );
+
+    let led2 = gpioa.pa0.into_push_pull_output();
+    // Configure PA12 to the comparator's alternate function so it gets
+    // changed directly by the comparator.
+    comp.output_pin(led2);
+    let _comp1 = comp.enable().lock();
 
     let mut dir = Direction::Upcounting;
     let mut val = 0;
 
     loop {
-        dac_generator.trigger();
-        dac_manual.set_value(val);
+        dac.set_value(val);
         match val {
             0 => dir = Direction::Upcounting,
             4095 => dir = Direction::Downcounting,

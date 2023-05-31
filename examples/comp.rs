@@ -3,10 +3,7 @@
 #![no_main]
 #![no_std]
 
-use hal::adc::config::SampleTime;
-use hal::adc::{AdcClaim, ClockSource};
 use hal::comparator::{ComparatorExt, ComparatorSplit, Config, Hysteresis, RefintInput};
-use hal::delay::SYSTDelayExt;
 use hal::gpio::GpioExt;
 use hal::prelude::OutputPin;
 use hal::rcc::RccExt;
