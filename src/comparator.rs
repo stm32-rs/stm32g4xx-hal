@@ -1,18 +1,62 @@
 //! Comparator
+//!
+//! ## Origin
+//!
+//! This code has been taken from the stm32g0xx-hal project and modified slightly to support
+//! STM32G4xx MCUs.
 
 use core::marker::PhantomData;
 
 use crate::dac;
 use crate::exti::{Event as ExtiEvent, ExtiExt};
+use crate::gpio::gpioa::{PA0, PA1, PA11, PA12, PA2, PA3, PA4, PA5, PA6, PA7};
+use crate::gpio::gpiob::{PB0, PB1, PB14, PB2, PB6, PB7, PB8, PB9};
 use crate::gpio::*;
-use crate::gpio::gpiob::PB14;
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+use crate::gpio::gpioa::{PA10, PA8, PA9};
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+use crate::gpio::gpiob::{PB10, PB11, PB12, PB13, PB15};
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+use crate::gpio::gpioc::{PC6, PC7, PC8};
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+use crate::gpio::gpiod::{PD10, PD11, PD12, PD13, PD15};
+
+use crate::gpio::gpioc::{PC0, PC1, PC2};
 use crate::gpio::gpiod::PD14;
+use crate::gpio::gpioe::{PE7, PE8};
+use crate::gpio::gpiof::{PF1, PF4};
 use crate::rcc::{Clocks, Rcc};
-use crate::stm32::comp::{C1CSR, C2CSR};
 use crate::stm32::{COMP, EXTI};
 
 /// Enabled Comparator (type state)
 pub struct Enabled;
+
+/// Enabled and locked (config is read only)
+pub struct Locked;
 
 /// Disabled Comparator (type state)
 pub struct Disabled;
@@ -21,12 +65,16 @@ pub trait ED {}
 impl ED for Enabled {}
 impl ED for Disabled {}
 
+pub trait EnabledState {}
+impl EnabledState for Enabled {}
+impl EnabledState for Locked {}
+
 macro_rules! impl_comp {
     ($($t:ident: $reg_t:ident, $reg:ident,)+) => {$(
         pub struct $t {
             _rb: PhantomData<()>,
         }
-        
+
         impl $t {
             pub fn csr(&self) -> &$crate::stm32::comp::$reg_t {
                 // SAFETY: The COMP1 type is only constructed with logical ownership of
@@ -37,14 +85,19 @@ macro_rules! impl_comp {
     )+};
 }
 
-impl_comp!{
+impl_comp! {
     COMP1: C1CSR, c1csr,
     COMP2: C2CSR, c2csr,
     COMP3: C3CSR, c3csr,
     COMP4: C4CSR, c4csr,
 }
-#[cfg(any(feature = "stm32g473", feature = "stm32g483", feature = "stm32g474", feature = "stm32g484"))]
-impl_comp!{
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+impl_comp! {
     COMP5: C5CSR, c5csr,
     COMP6: C6CSR, c6csr,
     COMP7: C7CSR, c7csr,
@@ -54,10 +107,10 @@ impl_comp!{
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub struct Config {
-    power_mode: PowerMode,
+    //power_mode: PowerMode,
     hysteresis: Hysteresis,
     inverted: bool,
-    output_xor: bool,
+    //output_xor: bool,
 }
 
 impl Default for Config {
@@ -65,8 +118,8 @@ impl Default for Config {
         Self {
             hysteresis: Hysteresis::None,
             inverted: false,
-            power_mode: PowerMode::HighSpeed,
-            output_xor: false,
+            //power_mode: PowerMode::HighSpeed,
+            //output_xor: false,
         }
     }
 }
@@ -87,25 +140,31 @@ impl Config {
         self
     }
 
+    /*
     pub fn power_mode(mut self, power_mode: PowerMode) -> Self {
         self.power_mode = power_mode;
         self
-    }
+    }*/
 
+    /*
     /// Sets the output to be Comparator 1 XOR Comparator 2.
     /// Used to implement window comparator mode.
     pub fn output_xor(mut self) -> Self {
         self.output_xor = true;
         self
-    }
+    }*/
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Hysteresis {
-    None = 0b00,
-    Low = 0b01,
-    Medium = 0b10,
-    High = 0b11,
+    None = 0b000,
+    H10mV = 0b001,
+    H20mV = 0b010,
+    H30mV = 0b011,
+    H40mV = 0b100,
+    H50mV = 0b101,
+    H60mV = 0b110,
+    H70mV = 0b111,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -121,24 +180,18 @@ pub trait PositiveInput<C> {
 
 /// Comparator negative input
 pub trait NegativeInput<C> {
+    /// Does this input use the internal reference Vrefint
+    ///
+    /// This only true for RefintInput
+    const USE_VREFINT: bool;
+
+    /// Does this input rely on dividing Vrefint using an internal resistor divider
+    ///
+    /// This is only relevant for `RefintInput` other than `RefintInput::VRefint`
+    fn use_resistor_divider(&self) -> bool;
+
     fn setup(&self, comp: &C);
 }
-
-/// 1/4 Vref
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Vref1div4;
-
-/// 1/2 Vref
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Vref1div2;
-
-/// 3/4 Vref
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Vref3div4;
-
-/// Vref
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Vref;
 
 /*
 /// Comparator 1 positive input used as positive input for Comparator 2.
@@ -167,38 +220,59 @@ window_input_pin!(COMP2, Comp1InP);
 */
 
 macro_rules! positive_input_pin {
-    ($COMP:ident, $pin_0:ty, $pin_1:ty) => {
-        impl PositiveInput<$COMP> for $pin_0 {
+    ($COMP:ident, $pin_0:ident, $pin_1:ident) => {
+        impl PositiveInput<$COMP> for $pin_0<Analog> {
             fn setup(&self, comp: &$COMP) {
-                comp.csr().modify(|_, w| unsafe { w.inpsel().bit(0) })
+                comp.csr().modify(|_, w| w.inpsel().bit(false))
             }
         }
 
-        impl PositiveInput<$COMP> for $pin_1 {
+        impl PositiveInput<$COMP> for $pin_1<Analog> {
             fn setup(&self, comp: &$COMP) {
-                comp.csr().modify(|_, w| unsafe { w.inpsel().bit(1) })
+                comp.csr().modify(|_, w| w.inpsel().bit(true))
             }
         }
     };
 }
 
-positive_input_pin!(COMP1, PA1<Analog>, PB1<Analog>);
-positive_input_pin!(COMP2, PA7<Analog>, PA3<Analog>);
-positive_input_pin!(COMP3, PA0<Analog>, PC1<Analog>);
-positive_input_pin!(COMP4, PB0<Analog>, PE7<Analog>);
+positive_input_pin!(COMP1, PA1, PB1);
+positive_input_pin!(COMP2, PA7, PA3);
+positive_input_pin!(COMP3, PA0, PC1);
+positive_input_pin!(COMP4, PB0, PE7);
 
-#[cfg(any(feature = "stm32g473", feature = "stm32g483", feature = "stm32g474", feature = "stm32g484"))]
-positive_input_pin!(COMP5, PB13<Analog>, PD12<Analog>);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+positive_input_pin!(COMP5, PB13, PD12);
 
-#[cfg(any(feature = "stm32g473", feature = "stm32g483", feature = "stm32g474", feature = "stm32g484"))]
-positive_input_pin!(COMP6, PB11<Analog>, PD11<Analog>);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+positive_input_pin!(COMP6, PB11, PD11);
 
-#[cfg(any(feature = "stm32g473", feature = "stm32g483", feature = "stm32g474", feature = "stm32g484"))]
-positive_input_pin!(COMP7, PB14<Analog>, PD14<Analog>);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+positive_input_pin!(COMP7, PB14, PD14);
 
 macro_rules! negative_input_pin_helper {
     ($COMP:ident, $input:ty, $bits:expr) => {
         impl NegativeInput<$COMP> for $input {
+            const USE_VREFINT: bool = false;
+
+            fn use_resistor_divider(&self) -> bool {
+                false
+            }
+
             fn setup(&self, comp: &$COMP) {
                 comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) })
             }
@@ -207,53 +281,79 @@ macro_rules! negative_input_pin_helper {
 }
 
 macro_rules! negative_input_pin {
-    ($($COMP:ident: $dac_0:ty, $dac_1:ty, $pin_0:ty, $pin_1:ty,)+) => {$(
-        negative_input_pin_helper($COMP, Vref1div4, 0b000);
-        negative_input_pin_helper($COMP, Vref1div2, 0b001);
-        negative_input_pin_helper($COMP, Vref3div4, 0b010);
-        negative_input_pin_helper($COMP, Vref,      0b011);
-
-        //negative_input_pin_helper($COMP, $dac_0,    0b100);
-        //negative_input_pin_helper($COMP, $dac_1,    0b101);
-
-        negative_input_pin_helper($COMP, $pin_0,    0b110);
-        negative_input_pin_helper($COMP, $pin_1,    0b111);
+    ($($COMP:ident: $pin_0:ty, $pin_1:ty,)+) => {$(
+        negative_input_pin_helper!($COMP, $pin_0, 0b110);
+        negative_input_pin_helper!($COMP, $pin_1, 0b111);
     )+};
 }
 
-/// TODO: Add DAC support
-struct TodoAddDac;
-
-negative_input_pin!{
-    COMP1: TodoAddDac, TodoAddDac, PA4<Analog>, PA0<Analog>,
-    COMP2: TodoAddDac, TodoAddDac, PA5<Analog>, PA2<Analog>,
-    COMP3: TodoAddDac, TodoAddDac, PF1<Analog>, PC0<Analog>,
-    COMP4: TodoAddDac, TodoAddDac, PE8<Analog>, PB2<Analog>,
+negative_input_pin! {
+    COMP1: PA4<Analog>, PA0<Analog>,
+    COMP2: PA5<Analog>, PA2<Analog>,
+    COMP3: PF1<Analog>, PC0<Analog>,
+    COMP4: PE8<Analog>, PB2<Analog>,
 }
 
-#[cfg(any(feature = "stm32g473", feature = "stm32g483", feature = "stm32g474", feature = "stm32g484"))]
-negative_input_pin!{
-    COMP5: TodoAddDac, TodoAddDac, PB10<Analog>, PD13<Analog>,
-    COMP6: TodoAddDac, TodoAddDac, PD10<Analog>, PB15<Analog>,
-    COMP7: TodoAddDac, TodoAddDac, PD15<Analog>, PB12<Analog>,
-};
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+negative_input_pin! {
+    COMP5: PB10<Analog>, PD13<Analog>,
+    COMP6: PD10<Analog>, PB15<Analog>,
+    COMP7: PD15<Analog>, PB12<Analog>,
+}
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum RefintInput {
     /// VRefint * 1/4
-    VRefintM14 = 0b0000,
+    VRefintM14 = 0b000,
     /// VRefint * 1/2
-    VRefintM12 = 0b0001,
+    VRefintM12 = 0b001,
     /// VRefint * 3/4
-    VRefintM34 = 0b0010,
+    VRefintM34 = 0b010,
     /// VRefint
-    VRefint = 0b0011,
+    VRefint = 0b011,
 }
 
-/*
+macro_rules! refint_input {
+    ($($COMP:ident, )+) => {$(
+        impl NegativeInput<$COMP> for RefintInput {
+            const USE_VREFINT: bool = true;
+
+            fn use_resistor_divider(&self) -> bool {
+                *self != RefintInput::VRefint
+            }
+
+            fn setup(&self, comp: &$COMP) {
+                comp.csr()
+                    .modify(|_, w| unsafe { w.inmsel().bits(*self as u8) })
+            }
+        }
+    )+};
+}
+
+refint_input!(COMP1, COMP2, COMP3, COMP4,);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+refint_input!(COMP5, COMP6, COMP7,);
+
 macro_rules! dac_input {
-    ($COMP:ident, $channel:ty, $bits:expr) => {
+    ($COMP:ident: $channel:ty, $bits:expr) => {
         impl<ED> NegativeInput<$COMP> for &$channel {
+            const USE_VREFINT: bool = false;
+
+            fn use_resistor_divider(&self) -> bool {
+                false
+            }
+
             fn setup(&self, comp: &$COMP) {
                 comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) })
             }
@@ -261,15 +361,62 @@ macro_rules! dac_input {
     };
 }
 
-#[cfg(any(feature = "stm32g071", feature = "stm32g081"))]
-dac_input!(COMP1, dac::Channel1<ED>, 0b0100);
-#[cfg(any(feature = "stm32g071", feature = "stm32g081"))]
-dac_input!(COMP1, dac::Channel2<ED>, 0b0101);
+dac_input!(COMP1: dac::Dac3Ch1<ED>, 0b100);
+dac_input!(COMP1: dac::Dac1Ch1<ED>, 0b101);
 
-#[cfg(any(feature = "stm32g071", feature = "stm32g081"))]
-dac_input!(COMP2, dac::Channel1<ED>, 0b0100);
-#[cfg(any(feature = "stm32g071", feature = "stm32g081"))]
-dac_input!(COMP2, dac::Channel2<ED>, 0b0101);*/
+dac_input!(COMP2: dac::Dac3Ch2<ED>, 0b100);
+dac_input!(COMP2: dac::Dac1Ch2<ED>, 0b101);
+
+dac_input!(COMP3: dac::Dac3Ch1<ED>, 0b100);
+dac_input!(COMP3: dac::Dac1Ch1<ED>, 0b101);
+
+dac_input!(COMP4: dac::Dac3Ch2<ED>, 0b100);
+dac_input!(COMP4: dac::Dac1Ch1<ED>, 0b101);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP5: dac::Dac4Ch1<ED>, 0b100);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP5: dac::Dac1Ch2<ED>, 0b101);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP6: dac::Dac4Ch2<ED>, 0b100);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP6: dac::Dac2Ch1<ED>, 0b101);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP7: dac::Dac4Ch1<ED>, 0b100);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP7: dac::Dac2Ch1<ED>, 0b101);
 
 pub struct Comparator<C, ED> {
     regs: C,
@@ -300,13 +447,15 @@ macro_rules! impl_comparator {
                 positive_input.setup(&self);
                 negative_input.setup(&self);
                 // Delay for scaler voltage bridge initialization for certain negative inputs
-                let voltage_scaler_delay = clocks.sys_clk.raw() / (1_000_000 / 200); // 200us
+                let voltage_scaler_delay = clocks.sys_clk.0 / (1_000_000 / 200); // 200us
                 cortex_m::asm::delay(voltage_scaler_delay);
                 self.csr().modify(|_, w| unsafe {
                     w.hyst()
                         .bits(config.hysteresis as u8)
-                        //.brgen()
-                        //.set_bit()
+                        .scalen()
+                        .bit(N::USE_VREFINT)
+                        .brgen()
+                        .bit(negative_input.use_resistor_divider())
                         .pol()
                         .bit(config.inverted)
                 });
@@ -345,10 +494,21 @@ macro_rules! impl_comparator {
             }
         }
 
-        impl Comparator<$COMP, Enabled> {
+        impl<ED: EnabledState> Comparator<$COMP, ED> {
             /// Returns the value of the output of the comparator
             pub fn output(&self) -> bool {
                 self.regs.csr().read().value().bit_is_set()
+            }
+        }
+
+        impl Comparator<$COMP, Enabled> {
+            pub fn lock(self) -> Comparator<$COMP, Locked> {
+                // Setting this bit turns all other bits into read only until restart
+                self.regs.csr().modify(|_, w| w.lock().set_bit());
+                Comparator {
+                    regs: self.regs,
+                    _enabled: PhantomData,
+                }
             }
 
             /// Disables the comparator
@@ -368,8 +528,8 @@ macro_rules! impl_comparator {
             }
 
             /// Returns `true` if the output signal interrupt is pending for the `edge`
-            pub fn is_pending(&self, edge: SignalEdge, exti: &EXTI) -> bool {
-                exti.is_pending($Event, edge)
+            pub fn is_pending(&self, exti: &EXTI) -> bool {
+                exti.is_pending($Event)
             }
 
             /// Unpends the output signal interrupt
@@ -390,6 +550,7 @@ macro_rules! impl_comparator {
 impl_comparator!(COMP1, comp1, ExtiEvent::COMP1);
 impl_comparator!(COMP2, comp2, ExtiEvent::COMP2);
 
+/*
 /// Uses two comparators to implement a window comparator.
 /// See Figure 69 in RM0444 Rev 5.
 pub struct WindowComparator<U, L, ED> {
@@ -534,82 +695,125 @@ pub fn window_comparator21<
 ) -> WindowComparator<COMP2, COMP1, Disabled> {
     let (comp1, comp2) = comp.split(rcc);
     (comp2, comp1).window_comparator(input, lower_threshold, upper_threshold, config, &rcc.clocks)
-}
+}*/
+
+#[cfg(not(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+)))]
+type Comparators = (COMP1, COMP2, COMP3, COMP4);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+type Comparators = (COMP1, COMP2, COMP3, COMP4, COMP5, COMP6, COMP7);
 
 /// Enables the comparator peripheral, and splits the [`COMP`] into independent [`COMP1`] and [`COMP2`]
-pub fn split(_comp: COMP, rcc: &mut Rcc) -> (COMP1, COMP2) {
+pub fn split(_comp: COMP, rcc: &mut Rcc) -> Comparators {
     // Enable COMP, SYSCFG, VREFBUF clocks
-    rcc.rb.apbenr2.modify(|_, w| w.syscfgen().set_bit());
+    rcc.rb.apb2enr.modify(|_, w| w.syscfgen().set_bit());
 
     // Reset COMP, SYSCFG, VREFBUF
-    rcc.rb.apbrstr2.modify(|_, w| w.syscfgrst().set_bit());
-    rcc.rb.apbrstr2.modify(|_, w| w.syscfgrst().clear_bit());
+    rcc.rb.apb2rstr.modify(|_, w| w.syscfgrst().set_bit());
+    rcc.rb.apb2rstr.modify(|_, w| w.syscfgrst().clear_bit());
 
-    (COMP1 { _rb: PhantomData }, COMP2 { _rb: PhantomData })
+    (
+        COMP1 { _rb: PhantomData },
+        COMP2 { _rb: PhantomData },
+        COMP3 { _rb: PhantomData },
+        COMP4 { _rb: PhantomData },
+        #[cfg(any(
+            feature = "stm32g473",
+            feature = "stm32g483",
+            feature = "stm32g474",
+            feature = "stm32g484"
+        ))]
+        COMP5 { _rb: PhantomData },
+        #[cfg(any(
+            feature = "stm32g473",
+            feature = "stm32g483",
+            feature = "stm32g474",
+            feature = "stm32g484"
+        ))]
+        COMP6 { _rb: PhantomData },
+        #[cfg(any(
+            feature = "stm32g473",
+            feature = "stm32g483",
+            feature = "stm32g474",
+            feature = "stm32g484"
+        ))]
+        COMP7 { _rb: PhantomData },
+    )
 }
 
 pub trait ComparatorSplit {
     /// Enables the comparator peripheral, and splits the [`COMP`] into independent [`COMP1`] and [`COMP2`]
-    fn split(self, rcc: &mut Rcc) -> (COMP1, COMP2);
+    fn split(self, rcc: &mut Rcc) -> Comparators;
 }
 
 impl ComparatorSplit for COMP {
-    fn split(self, rcc: &mut Rcc) -> (COMP1, COMP2) {
+    fn split(self, rcc: &mut Rcc) -> Comparators {
         split(self, rcc)
     }
 }
 
 pub trait OutputPin<COMP> {
-    fn setup(&self);
-    fn release(self) -> Self;
+    fn setup(self);
 }
 
-macro_rules! output_pin_push_pull {
-    ($COMP:ident, $pin:ty) => {
-        impl OutputPin<$COMP> for $pin {
-            fn setup(&self) {
-                self.set_alt_mode(AltFunction::AF7)
-            }
-
-            fn release(self) -> Self {
-                self.into_push_pull_output()
+macro_rules! output_pin {
+    ($COMP:ident, $pin:ident, $AF:ident, $mode_t:ident, $into:ident) => {
+        impl OutputPin<$COMP> for $pin<Output<$mode_t>> {
+            fn setup(self) {
+                self.$into::<$AF>();
             }
         }
     };
+    ($($COMP:ident: $pin:ident, $AF:ident,)+) => {$(
+        output_pin!($COMP, $pin, $AF, PushPull, into_alternate);
+        output_pin!($COMP, $pin, $AF, OpenDrain, into_alternate_open_drain);
+    )+};
 }
 
-macro_rules! output_pin_open_drain {
-    ($COMP:ident, $pin:ty) => {
-        impl OutputPin<$COMP> for $pin {
-            fn setup(&self) {
-                self.set_alt_mode(AltFunction::AF7)
-            }
+output_pin! {
+    COMP1: PA0,  AF8,
+    COMP1: PA6,  AF8,
+    COMP1: PA11, AF8,
+    COMP1: PB8,  AF8,
+    COMP1: PF4,  AF2,
 
-            fn release(self) -> Self {
-                self.into_open_drain_output()
-            }
-        }
-    };
+    COMP2: PA2,  AF8,
+    COMP2: PA7,  AF8,
+    COMP2: PA12, AF8,
+    COMP2: PB9,  AF8,
+
+    COMP3: PB7,  AF8,
+    COMP3: PB15, AF3,
+    COMP3: PC2,  AF3,
+
+    COMP4: PB1,  AF8,
+    COMP4: PB6,  AF8,
+    COMP4: PB14, AF8,
 }
 
-output_pin_push_pull!(COMP1, PA0<Output<PushPull>>);
-output_pin_open_drain!(COMP1, PA0<Output<OpenDrain>>);
-output_pin_push_pull!(COMP1, PA6<Output<PushPull>>);
-output_pin_open_drain!(COMP1, PA6<Output<OpenDrain>>);
-output_pin_push_pull!(COMP1, PA11<Output<PushPull>>);
-output_pin_open_drain!(COMP1, PA11<Output<OpenDrain>>);
-output_pin_push_pull!(COMP1, PB0<Output<PushPull>>);
-output_pin_open_drain!(COMP1, PB0<Output<OpenDrain>>);
-output_pin_push_pull!(COMP1, PB10<Output<PushPull>>);
-output_pin_open_drain!(COMP1, PB10<Output<OpenDrain>>);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+output_pin! {
+    COMP5: PA9,  AF8,
+    COMP5: PC7,  AF7,
 
-output_pin_push_pull!(COMP2, PA2<Output<PushPull>>);
-output_pin_open_drain!(COMP2, PA2<Output<OpenDrain>>);
-output_pin_push_pull!(COMP2, PA7<Output<PushPull>>);
-output_pin_open_drain!(COMP2, PA7<Output<OpenDrain>>);
-output_pin_push_pull!(COMP2, PA12<Output<PushPull>>);
-output_pin_open_drain!(COMP2, PA12<Output<OpenDrain>>);
-output_pin_push_pull!(COMP2, PB5<Output<PushPull>>);
-output_pin_open_drain!(COMP2, PB5<Output<OpenDrain>>);
-output_pin_push_pull!(COMP2, PB11<Output<PushPull>>);
-output_pin_open_drain!(COMP2, PB11<Output<OpenDrain>>);
+    COMP6: PA10, AF8,
+    COMP6: PC6,  AF7,
+
+    COMP7: PA8, AF8,
+    COMP7: PC8, AF7,
+}

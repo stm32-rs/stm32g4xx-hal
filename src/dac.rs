@@ -1,11 +1,17 @@
 //! DAC
+//!
+//! ## Origin
+//!
+//! This code has been taken from the stm32g0xx-hal project and modified slightly to support
+//! STM32G4xx MCUs.
 
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
-use crate::gpio::{DefaultMode, PA4, PA5};
-use crate::rcc::*;
-use crate::stm32::DAC;
+use crate::gpio::gpioa::{PA4, PA5, PA6};
+use crate::gpio::DefaultMode;
+use crate::rcc::{self, *};
+use crate::stm32::{DAC1, DAC2, DAC3, DAC4, RCC};
 use hal::blocking::delay::DelayUs;
 
 pub trait DacOut<V> {
@@ -22,6 +28,13 @@ impl GeneratorConfig {
     pub fn triangle(amplitude: u8) -> Self {
         Self {
             mode: 0b10,
+            amp: amplitude,
+        }
+    }
+
+    pub fn sawtooth(amplitude: u8) -> Self {
+        Self {
+            mode: 0b11,
             amp: amplitude,
         }
     }
@@ -49,36 +62,53 @@ impl ED for EnabledUnbuffered {}
 impl ED for WaveGenerator {}
 impl ED for Disabled {}
 
-pub struct Channel1<ED> {
-    _enabled: PhantomData<ED>,
+macro_rules! impl_dac {
+    ($DACxCHy:ident) => {
+        pub struct $DACxCHy<ED> {
+            _enabled: PhantomData<ED>,
+        }
+    };
 }
-pub struct Channel2<ED> {
-    _enabled: PhantomData<ED>,
-}
+
+impl_dac!(Dac1Ch1);
+impl_dac!(Dac1Ch2);
+impl_dac!(Dac2Ch1); // DAC2 only has 1 channel
+impl_dac!(Dac3Ch1);
+impl_dac!(Dac3Ch2);
+impl_dac!(Dac4Ch1);
+impl_dac!(Dac4Ch2);
 
 /// Trait for GPIO pins that can be converted to DAC output pins
 pub trait Pins<DAC> {
     type Output;
 }
 
-impl Pins<DAC> for PA4<DefaultMode> {
-    type Output = Channel1<Disabled>;
+macro_rules! impl_pin_for_dac {
+    ($DAC:ident: $pin:ty, $output:ty) => {
+        impl Pins<$DAC> for $pin {
+            type Output = $output;
+        }
+    };
 }
 
-impl Pins<DAC> for PA5<DefaultMode> {
-    type Output = Channel2<Disabled>;
-}
+impl_pin_for_dac!(DAC1: PA4<DefaultMode>, Dac1Ch1<Disabled>);
+impl_pin_for_dac!(DAC1: PA5<DefaultMode>, Dac1Ch2<Disabled>);
+impl_pin_for_dac!(
+    DAC1: (PA4<DefaultMode>, PA5<DefaultMode>),
+    (Dac1Ch1<Disabled>, Dac1Ch2<Disabled>)
+);
+impl_pin_for_dac!(DAC2: PA6<DefaultMode>, Dac2Ch1<Disabled>);
 
-impl Pins<DAC> for (PA4<DefaultMode>, PA5<DefaultMode>) {
-    type Output = (Channel1<Disabled>, Channel2<Disabled>);
-}
-
-pub fn dac<PINS>(_dac: DAC, _pins: PINS, rcc: &mut Rcc) -> PINS::Output
+pub fn dac<DAC, PINS>(_dac: DAC, _pins: PINS, _rcc: &mut Rcc) -> PINS::Output
 where
+    DAC: rcc::Enable + rcc::Reset,
     PINS: Pins<DAC>,
 {
-    DAC::enable(rcc);
-    DAC::reset(rcc);
+    unsafe {
+        let rcc_ptr = &(*RCC::ptr());
+        DAC::enable(rcc_ptr);
+        DAC::reset(rcc_ptr);
+    }
 
     #[allow(clippy::uninit_assumed_init)]
     unsafe {
@@ -86,8 +116,8 @@ where
     }
 }
 
-macro_rules! dac {
-    ($($CX:ident: (
+macro_rules! dac_helper {
+    ($($CX:ident: $DAC:ty: (
         $en:ident,
         $cen:ident,
         $cal_flag:ident,
@@ -104,7 +134,7 @@ macro_rules! dac {
         $(
             impl $CX<Disabled> {
                 pub fn enable(self) -> $CX<Enabled> {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
 
                     dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(1) });
                     dac.dac_cr.modify(|_, w| w.$en().set_bit());
@@ -115,7 +145,7 @@ macro_rules! dac {
                 }
 
                 pub fn enable_unbuffered(self) -> $CX<EnabledUnbuffered> {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
 
                     dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(2) });
                     dac.dac_cr.modify(|_, w| w.$en().set_bit());
@@ -126,7 +156,7 @@ macro_rules! dac {
                 }
 
                 pub fn enable_generator(self, config: GeneratorConfig) -> $CX<WaveGenerator> {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
 
                     dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(1) });
                     dac.dac_cr.modify(|_, w| unsafe {
@@ -158,7 +188,7 @@ macro_rules! dac {
                 where
                     T: DelayUs<u32>,
                 {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.dac_cr.modify(|_, w| w.$en().clear_bit());
                     dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(0) });
                     dac.dac_cr.modify(|_, w| w.$cen().set_bit());
@@ -180,7 +210,7 @@ macro_rules! dac {
 
                 /// Disable the DAC channel
                 pub fn disable(self) -> $CX<Disabled> {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.dac_cr.modify(|_, w| unsafe {
                         w.$en().clear_bit().$wave().bits(0).$ten().clear_bit()
                     });
@@ -195,12 +225,12 @@ macro_rules! dac {
             /// state
             impl<ED> DacOut<u16> for $CX<ED> {
                 fn set_value(&mut self, val: u16) {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.$dhrx.write(|w| unsafe { w.bits(val as u32) });
                 }
 
                 fn get_value(&mut self) -> u16 {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.$dac_dor.read().bits() as u16
                 }
             }
@@ -208,7 +238,7 @@ macro_rules! dac {
             /// Wave generator state implementation
             impl $CX<WaveGenerator> {
                 pub fn trigger(&mut self) {
-                    let dac = unsafe { &(*DAC::ptr()) };
+                    let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.dac_swtrgr.write(|w| { w.$swtrig().set_bit() });
                 }
             }
@@ -216,24 +246,9 @@ macro_rules! dac {
     };
 }
 
-pub trait DacExt {
-    fn constrain<PINS>(self, pins: PINS, rcc: &mut Rcc) -> PINS::Output
-    where
-        PINS: Pins<DAC>;
-}
-
-impl DacExt for DAC {
-    fn constrain<PINS>(self, pins: PINS, rcc: &mut Rcc) -> PINS::Output
-    where
-        PINS: Pins<DAC>,
-    {
-        dac(self, pins, rcc)
-    }
-}
-
-dac!(
-    Channel1:
-        (
+macro_rules! dac {
+    ($($DAC:ident ch1: $DACxCH1:ident $(, ch2: $DACxCH2:ident)*)+) => {$(
+        dac_helper!{$DACxCH1: $DAC: (
             en1,
             cen1,
             cal_flag1,
@@ -247,8 +262,7 @@ dac!(
             ten1,
             swtrig1
         ),
-    Channel2:
-        (
+        $($DACxCH2: $DAC: (
             en2,
             cen2,
             cal_flag2,
@@ -261,5 +275,34 @@ dac!(
             mamp2,
             ten2,
             swtrig2
-        ),
+        ),)*}
+    )+};
+}
+
+pub trait DacExt: Sized {
+    fn constrain<PINS>(self, pins: PINS, rcc: &mut Rcc) -> PINS::Output
+    where
+        PINS: Pins<Self>;
+}
+
+macro_rules! impl_dac_ext {
+    ($($DAC:ty, )+) => {$(
+        impl DacExt for $DAC {
+            fn constrain<PINS>(self, pins: PINS, rcc: &mut Rcc) -> PINS::Output
+            where
+                PINS: Pins<$DAC>,
+            {
+                dac(self, pins, rcc)
+            }
+        }
+    )+};
+}
+
+impl_dac_ext!(DAC1, DAC2, DAC3, DAC4,);
+
+dac!(
+    DAC1 ch1: Dac1Ch1, ch2: Dac1Ch2
+    DAC2 ch1: Dac2Ch1
+    DAC3 ch1: Dac3Ch1, ch2: Dac3Ch2
+    DAC4 ch1: Dac4Ch1, ch2: Dac4Ch2
 );
