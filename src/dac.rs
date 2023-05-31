@@ -2,7 +2,7 @@
 //!
 //! ## Origin
 //!
-//! This code has been taken from the stm32g0xx-hal project and modified slightly to support
+//! This code has been taken from the stm32g0xx-hal project and modified to support
 //! STM32G4xx MCUs.
 
 use core::marker::PhantomData;

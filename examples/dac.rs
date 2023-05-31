@@ -1,3 +1,8 @@
+//! ## Origin
+//!
+//! This code has been taken from the stm32g0xx-hal project and modified to support
+//! STM32G4xx MCUs.
+
 // #![deny(warnings)]
 #![deny(unsafe_code)]
 #![no_main]

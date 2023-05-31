@@ -347,7 +347,7 @@ refint_input!(COMP5, COMP6, COMP7,);
 
 macro_rules! dac_input_helper {
     ($COMP:ident: $channel:ident, $MODE:ident, $bits:expr) => {
-        impl<ED> NegativeInput<$COMP> for &dac::$channel<{dac::$MODE}, ED> {
+        impl<ED> NegativeInput<$COMP> for &dac::$channel<{ dac::$MODE }, ED> {
             const USE_VREFINT: bool = false;
 
             fn use_resistor_divider(&self) -> bool {
