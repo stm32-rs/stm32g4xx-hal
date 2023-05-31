@@ -345,9 +345,9 @@ refint_input!(COMP1, COMP2, COMP3, COMP4,);
 ))]
 refint_input!(COMP5, COMP6, COMP7,);
 
-macro_rules! dac_input {
-    ($COMP:ident: $channel:ty, $bits:expr) => {
-        impl<const MODE: u8, ED> NegativeInput<$COMP> for &$channel {
+macro_rules! dac_input_helper {
+    ($COMP:ident: $channel:ident, $MODE:ident, $bits:expr) => {
+        impl<ED> NegativeInput<$COMP> for &dac::$channel<{dac::$MODE}, ED> {
             const USE_VREFINT: bool = false;
 
             fn use_resistor_divider(&self) -> bool {
@@ -361,32 +361,24 @@ macro_rules! dac_input {
     };
 }
 
-dac_input!(COMP1: dac::Dac3Ch1<MODE, ED>, 0b100);
-dac_input!(COMP1: dac::Dac1Ch1<MODE, ED>, 0b101);
+macro_rules! dac_input {
+    ($COMP:ident: $channel:ident, $bits:expr) => {
+        dac_input_helper!($COMP: $channel, M_MIX_SIG, $bits);
+        dac_input_helper!($COMP: $channel, M_INT_SIG, $bits);
+    };
+}
 
-dac_input!(COMP2: dac::Dac3Ch2<MODE, ED>, 0b100);
-dac_input!(COMP2: dac::Dac1Ch2<MODE, ED>, 0b101);
+dac_input!(COMP1: Dac3Ch1, 0b100);
+dac_input!(COMP1: Dac1Ch1, 0b101);
 
-dac_input!(COMP3: dac::Dac3Ch1<MODE, ED>, 0b100);
-dac_input!(COMP3: dac::Dac1Ch1<MODE, ED>, 0b101);
+dac_input!(COMP2: Dac3Ch2, 0b100);
+dac_input!(COMP2: Dac1Ch2, 0b101);
 
-dac_input!(COMP4: dac::Dac3Ch2<MODE, ED>, 0b100);
-dac_input!(COMP4: dac::Dac1Ch1<MODE, ED>, 0b101);
+dac_input!(COMP3: Dac3Ch1, 0b100);
+dac_input!(COMP3: Dac1Ch1, 0b101);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
-dac_input!(COMP5: dac::Dac4Ch1<MODE, ED>, 0b100);
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
-dac_input!(COMP5: dac::Dac1Ch2<MODE, ED>, 0b101);
+dac_input!(COMP4: Dac3Ch2, 0b100);
+dac_input!(COMP4: Dac1Ch1, 0b101);
 
 #[cfg(any(
     feature = "stm32g473",
@@ -394,14 +386,14 @@ dac_input!(COMP5: dac::Dac1Ch2<MODE, ED>, 0b101);
     feature = "stm32g474",
     feature = "stm32g484"
 ))]
-dac_input!(COMP6: dac::Dac4Ch2<MODE, ED>, 0b100);
+dac_input!(COMP5: Dac4Ch1, 0b100);
 #[cfg(any(
     feature = "stm32g473",
     feature = "stm32g483",
     feature = "stm32g474",
     feature = "stm32g484"
 ))]
-dac_input!(COMP6: dac::Dac2Ch1<MODE, ED>, 0b101);
+dac_input!(COMP5: Dac1Ch2, 0b101);
 
 #[cfg(any(
     feature = "stm32g473",
@@ -409,14 +401,29 @@ dac_input!(COMP6: dac::Dac2Ch1<MODE, ED>, 0b101);
     feature = "stm32g474",
     feature = "stm32g484"
 ))]
-dac_input!(COMP7: dac::Dac4Ch1<MODE, ED>, 0b100);
+dac_input!(COMP6: Dac4Ch2, 0b100);
 #[cfg(any(
     feature = "stm32g473",
     feature = "stm32g483",
     feature = "stm32g474",
     feature = "stm32g484"
 ))]
-dac_input!(COMP7: dac::Dac2Ch1<MODE, ED>, 0b101);
+dac_input!(COMP6: Dac2Ch1, 0b101);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP7: Dac4Ch1, 0b100);
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+dac_input!(COMP7: Dac2Ch1, 0b101);
 
 pub struct Comparator<C, ED> {
     regs: C,

@@ -83,9 +83,14 @@ pub trait Pins<DAC> {
     type Output;
 }
 
-const M_EXT_PIN: u8 = 0b000;
-const M_MIX_SIG: u8 = 0b001;
-const M_INT_SIG: u8 = 0b011;
+/// Dac output mode: external pin only
+pub const M_EXT_PIN: u8 = 0b000;
+
+/// Dac output mode: internal signal and external pin
+pub const M_MIX_SIG: u8 = 0b001;
+
+/// Dac output mode: internal signal only
+pub const M_INT_SIG: u8 = 0b011;
 
 pub struct Dac1IntSig1;
 pub struct Dac1IntSig2;
