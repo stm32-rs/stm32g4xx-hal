@@ -15,7 +15,7 @@ use crate::{
     gpio::*,
     rcc::{Enable, Rcc, Reset},
     signature::{VtempCal110, VtempCal30, VDDA_CALIB},
-    stm32,
+    stm32, opamp,
 };
 use core::fmt;
 use core::marker::PhantomData;
@@ -59,6 +59,17 @@ macro_rules! adc_pins {
     ($($pin:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
         $(
             impl Channel<stm32::$adc> for $pin {
+                type ID = u8;
+                fn channel() -> u8 { $chan }
+            }
+        )+
+    };
+}
+
+macro_rules! adc_op {
+    ($($opamp:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
+        $(
+            impl<A, B> Channel<stm32::$adc> for $opamp {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
@@ -2336,6 +2347,29 @@ adc_pins!(
     Vref => (ADC3, 18),
     Vref => (ADC4, 18),
     Vref => (ADC5, 18),
+);
+
+// See https://www.st.com/resource/en/reference_manual/rm0440-stm32g4-series-advanced-armbased-32bit-mcus-stmicroelectronics.pdf#page=782
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+))]
+adc_op!(
+    opamp::opamp1::Pga<A, B> => (ADC1, 3),
+
+    opamp::opamp2::Pga<A, B> => (ADC2, 3),
+
+    opamp::opamp3::Pga<A, B> => (ADC1, 12),
+
+    opamp::opamp4::Pga<A, B> => (ADC4, 3),
+    opamp::opamp4::Pga<A, B> => (ADC1, 11),
+
+    opamp::opamp5::Pga<A, B> => (ADC5, 1),
+
+    opamp::opamp6::Pga<A, B> => (ADC1, 14),
+    opamp::opamp6::Pga<A, B> => (ADC2, 14),
 );
 
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
