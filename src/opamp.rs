@@ -45,6 +45,10 @@
 //! }
 //! ```
 
+// TODO: Add support for locking using the `LOCK` bit in `OPAMPx_CSR`
+// TODO: Add support for calibration
+// TODO: Add support for PGA mode
+
 macro_rules! opamps {
     {
         $(
@@ -108,6 +112,18 @@ macro_rules! opamps {
                         output: Option<$output>,
                     }
 
+                    /// State type for opamp running in programmable-gain mode.
+                    pub struct Pga<NonInverting, MODE> {
+                        non_inverting: NonInverting,
+                        config: Config<MODE>,
+                        output: Option<$output>,
+                    }
+
+                    pub struct Config<MODE> {
+                        mode: MODE,
+                        pga_gain: crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A,
+                    }
+
                     /// Trait for opamps that can be run in follower mode.
                     pub trait IntoFollower <IntoInput, IntoOutput, Input>
                         where
@@ -125,6 +141,16 @@ macro_rules! opamps {
                         /// Configures the opamp for open-loop operation.
                         fn open_loop(self, non_inverting: IntoNonInverting, inverting: IntoInverting, output: Option<IntoOutput>)
                             -> OpenLoop<NonInverting, Inverting>;
+                    }
+
+                    /// Trait for opamps that can be run in programmable gain mode.
+                    pub trait IntoPga <IntoNonInverting, MODE, IntoOutput, NonInverting>
+                        where
+                            IntoOutput: Into<$output>,
+                    {
+                        /// Configures the opamp for programmable gain operation.
+                        fn pga(self, non_inverting: IntoNonInverting, config: Config<MODE>, output: Option<IntoOutput>)
+                            -> Pga<NonInverting, MODE>;
                     }
 
                     impl<Input> Follower<Input> {
@@ -185,9 +211,38 @@ macro_rules! opamps {
                         }
                     }
 
+                    impl<NonInverting, MODE> Pga<NonInverting, MODE> {
+
+                        /// Disables the opamp and returns the resources it held.
+                        pub fn disable(self) -> (Disabled, NonInverting, Config<MODE>, Option<$output>) {
+                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
+                            (Disabled, self.non_inverting, self.config, self.output)
+                        }
+
+                        /// Enables the external output pin.
+                        pub fn enable_output(&mut self, output: $output) {
+                            self.output = Some(output);
+                            unsafe {
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                    w.opaintoen().output_pin());
+                            }
+                        }
+
+                        /// Disables the external output.
+                        /// This will connect the opamp output to the internal ADC.
+                        /// If the output was enabled, the output pin is returned.
+                        pub fn disable_output(&mut self) -> Option<$output> {
+                            unsafe {
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                    w.opaintoen().adcchannel());
+                            }
+                            self.output.take()
+                        }
+                    }
+
                     opamps!{ @follower $opamp, $output, $($non_inverting_mask, $non_inverting),* }
                     opamps!{ @open_loop_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
-
+                    opamps!{ @pga_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask),*) }
                 }
             )*
 
@@ -332,6 +387,74 @@ macro_rules! opamps {
                             );
                     }
                     OpenLoop {non_inverting, inverting, output}
+                }
+            })*
+        }
+    };
+
+    {
+        @pga_tt
+        $opamp:ident
+        ,
+        $output:ty
+        ,
+        $($non_inverting_mask:tt, $non_inverting:ty),*
+        :
+        $invertings:tt
+    } => {
+        $(
+            opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, $invertings }
+        )*
+    };
+
+    {
+        @pga
+        $opamp:ident
+        ,
+        $output:ty
+        ,
+        $non_inverting_mask:tt
+        ,
+        $non_inverting:ty
+        ,
+        ($($inverting_mask:tt,),*)
+    } => {
+        paste::paste!{
+            $(impl <IntoNonInverting, MODE, IntoOutput> IntoPga
+                <IntoNonInverting, Config<MODE>, IntoOutput, $non_inverting> for Disabled
+                where
+                    IntoNonInverting: Into<$non_inverting>,
+                    IntoOutput: Into<$output>,
+            {
+                fn pga(
+                    self,
+                    non_inverting: IntoNonInverting,
+                    config: Config<MODE>,
+                    output: Option<IntoOutput>,
+                ) -> Pga<$non_inverting, $config> {
+                    let non_inverting = non_inverting.into();
+                    let output = output.map(|output| output.into());
+                    unsafe {
+                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
+                        (*crate::stm32::OPAMP::ptr())
+                            .[<$opamp _csr>]
+                            .write(|csr_w|
+                                csr_w.vp_sel()
+                                    .$non_inverting_mask()
+                                    .vm_sel()
+                                    .pga()
+                                    .pga_gain()
+                                    .variant(config.pga_gain)
+                                    .opaintoen()
+                                    .variant(match output {
+                                        Some(_) => OPAINTOEN_A::OutputPin,
+                                        None => OPAINTOEN_A::Adcchannel,
+                                    })
+                                    .opaen()
+                                    .enabled()
+                            );
+                    }
+                    Pga {non_inverting, config, output}
                 }
             })*
         }
