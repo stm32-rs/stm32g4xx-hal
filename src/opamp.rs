@@ -35,11 +35,17 @@
 //!     let opamp4 = opamp4.open_loop(gpiob.pb11, gpiob.pb10, Option::<PB12<Analog>>::None);
 //!
 //!     // disable opamps
-//!     let (_opamp1, _pa1, _some_pa2) = opamp1.disable();
-//!     let (_opamp2, _pa7, _none) = opamp2.disable();
+//!     let (opamp1, pa1, some_pa2) = opamp1.disable();
+//!     let (opamp2, pa7, _none) = opamp2.disable();
 //!
 //!     let (_opamp3, _pb0, _pb2, _some_pb1) = opamp3.disable();
 //!     let (_opamp4, _pb11, _pb10, _none) = opamp4.disable();
+//!
+//!     let opamp1 = opamp1.pga(pa1, some_pa2);
+//!     let opamp2 = opamp2.pga(pa7, Option::<PA6<Analog>>::None);
+//!
+//!     let (_opamp1, _pa1, _some_pa2) = opamp1.disable();
+//!     let (_opamp2, _pa7, _none) = opamp2.disable();
 //!
 //!     loop {}
 //! }
@@ -47,7 +53,48 @@
 
 // TODO: Add support for locking using the `LOCK` bit in `OPAMPx_CSR`
 // TODO: Add support for calibration
-// TODO: Add support for PGA mode
+// TODO: The output can not be a Option<PIN> if we want to handle "route to pin vs adc"
+//       in a compile time way. See OPAINTOEN in OPAMPx_CSR
+
+/// Pga mode internal
+///
+/// This mode does not expose the inverting signal on any pin,
+/// only connecting it to the programmable gain divider
+pub struct PgaModeInternal(NonInvertingGain);
+impl PgaModeInternal {
+    /// Create new instance with the given gain setting
+    pub fn gain(gain: NonInvertingGain) -> Self {
+        PgaModeInternal(gain)
+    }
+}
+
+/// Same as PgaModeInternal but the inverted signal is routed to pin
+/// to allow external filter
+pub struct PgaModeInvertedInputFiltered<PIN> {
+    gain: NonInvertingGain,
+    pin: core::marker::PhantomData<PIN>,
+}
+
+/// PGA Gain for non inverted modes
+pub enum NonInvertingGain {
+    /// 2x Gain
+    Gain2 = 0,
+
+    /// 4x Gain
+    Gain4 = 1,
+
+    /// 8x Gain
+    Gain8 = 2,
+
+    /// 16x Gain
+    Gain16 = 3,
+
+    /// 32x Gain
+    Gain32 = 4,
+
+    /// 64x Gain
+    Gain64 = 5,
+}
 
 macro_rules! opamps {
     {
@@ -95,10 +142,38 @@ macro_rules! opamps {
             }
 
             $(
+                impl From<&PgaModeInternal> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
+                    fn from(x: &PgaModeInternal) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
+                        use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
+
+                        match x.0 {
+                            NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2,
+                            NonInvertingGain::Gain4 => PGA_GAIN_A::Gain4,
+                            NonInvertingGain::Gain8 => PGA_GAIN_A::Gain8,
+                            NonInvertingGain::Gain16 => PGA_GAIN_A::Gain16,
+                            NonInvertingGain::Gain32 => PGA_GAIN_A::Gain32,
+                            NonInvertingGain::Gain64 => PGA_GAIN_A::Gain64,
+                        }
+                    }
+                }
+
+                impl<PIN> From<&PgaModeInvertedInputFiltered<PIN>> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
+                    fn from(x: &PgaModeInvertedInputFiltered<PIN>) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
+                        use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
+
+                        match x.gain {
+                            NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2FilteringVinm0,
+                            NonInvertingGain::Gain4 => PGA_GAIN_A::Gain4FilteringVinm0,
+                            NonInvertingGain::Gain8 => PGA_GAIN_A::Gain8FilteringVinm0,
+                            NonInvertingGain::Gain16 => PGA_GAIN_A::Gain16FilteringVinm0,
+                            NonInvertingGain::Gain32 => PGA_GAIN_A::Gain32FilteringVinm0,
+                            NonInvertingGain::Gain64 => PGA_GAIN_A::Gain64FilteringVinm0,
+                        }
+                    }
+                }
+
                 /// States for opampX.
                 pub mod $opamp {
-                    use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
-
                     #[allow(unused_imports)]
                     use crate::gpio::gpioa::*;
 
@@ -121,70 +196,6 @@ macro_rules! opamps {
                         output: Option<$output>,
                     }
 
-                    /// State type for opamp running in programmable-gain mode.
-                    pub struct Pga<NonInverting, MODE> {
-                        non_inverting: NonInverting,
-                        config: MODE,
-                        output: Option<$output>,
-                    }
-
-                    trait PgaMode{
-                        fn pga_gain_bits(&self) -> PGA_GAIN_A;
-                    }
-
-                    struct PgaModeInternal(NonInvertingGain);
-                    impl PgaMode for PgaModeInternal {
-                        fn pga_gain_bits(&self) -> PGA_GAIN_A {
-                            match self.0 {
-                                NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2,
-                                NonInvertingGain::Gain4 => PGA_GAIN_A::Gain4,
-                                NonInvertingGain::Gain8 => PGA_GAIN_A::Gain8,
-                                NonInvertingGain::Gain16 => PGA_GAIN_A::Gain16,
-                                NonInvertingGain::Gain32 => PGA_GAIN_A::Gain32,
-                                NonInvertingGain::Gain64 => PGA_GAIN_A::Gain64,
-                            }
-                        }
-                    }
-
-                    /// Same as PgaModeInternal but the inverted signal is routed to pin to allow external filter
-                    struct PgaModeInvertedInputFiltered<PIN> {
-                        gain: NonInvertingGain,
-                        pin: core::marker::PhantomData<PIN>
-                    }
-                    impl<PIN> PgaMode for PgaModeInvertedInputFiltered<PIN> {
-                        fn pga_gain_bits(&self) -> PGA_GAIN_A {
-                            match self.gain {
-                                NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2FilteringVinm0,
-                                NonInvertingGain::Gain4 => PGA_GAIN_A::Gain4FilteringVinm0,
-                                NonInvertingGain::Gain8 => PGA_GAIN_A::Gain8FilteringVinm0,
-                                NonInvertingGain::Gain16 => PGA_GAIN_A::Gain16FilteringVinm0,
-                                NonInvertingGain::Gain32 => PGA_GAIN_A::Gain32FilteringVinm0,
-                                NonInvertingGain::Gain64 => PGA_GAIN_A::Gain64FilteringVinm0,
-                            }
-                        }
-                    }
-
-                    /// PGA Gain for non inverted modes
-                    pub enum NonInvertingGain {
-                        /// 2x Gain
-                        Gain2 = 0,
-
-                        /// 4x Gain
-                        Gain4 = 1,
-
-                        /// 8x Gain
-                        Gain8 = 2,
-
-                        /// 16x Gain
-                        Gain16 = 3,
-
-                        /// 32x Gain
-                        Gain32 = 4,
-
-                        /// 64x Gain
-                        Gain64 = 5
-                    }
-
                     // TODO: Inverting gain
 
                     /// Trait for opamps that can be run in follower mode.
@@ -204,6 +215,13 @@ macro_rules! opamps {
                         /// Configures the opamp for open-loop operation.
                         fn open_loop(self, non_inverting: IntoNonInverting, inverting: IntoInverting, output: Option<IntoOutput>)
                             -> OpenLoop<NonInverting, Inverting>;
+                    }
+
+                    /// State type for opamp running in programmable-gain mode.
+                    pub struct Pga<NonInverting, MODE> {
+                        non_inverting: NonInverting,
+                        config: MODE,
+                        output: Option<$output>,
                     }
 
                     /// Trait for opamps that can be run in programmable gain mode.
@@ -466,8 +484,8 @@ macro_rules! opamps {
         $vinm0:ident
     } => {
         $(
-            opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, PgaModeInternal }
-            opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, PgaModeInvertedInputFiltered<$vinm0<crate::gpio::Analog>> }
+            opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, crate::opamp::PgaModeInternal }
+            opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, crate::opamp::PgaModeInvertedInputFiltered<$vinm0<crate::gpio::Analog>> }
             // TODO: Add `PGA mode, non-inverting gain setting (x2/x4/x8/x16/x32/x64) or inverting gain setting (x-1/x-3/x-7/x-15/x-31/x-63)`
             // TODO: Add `PGA mode, non-inverting gain setting (x2/x4/x8/x16/x32/x64) or inverting gain setting (x-1/x-3/x-7/x-15/x-31/x-63) with filtering`
         )*
@@ -511,7 +529,7 @@ macro_rules! opamps {
                                     .vm_sel()
                                     .pga()
                                     .pga_gain()
-                                    .variant(config.pga_gain_bits())
+                                    .variant((&config).into())
                                     .opaintoen()
                                     .variant(match output {
                                         Some(_) => OPAINTOEN_A::OutputPin,
