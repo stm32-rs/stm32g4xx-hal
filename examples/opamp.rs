@@ -36,7 +36,7 @@ fn main() -> ! {
     let gpiob = dp.GPIOB.split(&mut rcc);
 
     // setup opamps
-    let (opamp1, opamp2, opamp3, opamp4, _opamp5, _opamp6) = dp.OPAMP.split(&mut rcc);
+    let (opamp1, opamp2, opamp3, opamp4, ..) = dp.OPAMP.split(&mut rcc);
 
     let opamp1 = opamp1.follower(gpioa.pa1, Some(gpioa.pa2));
     let opamp2 = opamp2.follower(gpioa.pa7, Option::<PA6<Analog>>::None);
@@ -51,11 +51,11 @@ fn main() -> ! {
     let (_opamp3, _pb0, _pb2, _some_pb1) = opamp3.disable();
     let (_opamp4, _pb11, _pb10, _none) = opamp4.disable();
 
-    /*let _opamp1 = opamp1.pga(
+    let _opamp1 = opamp1.pga(
         pa1,
         PgaModeInternal::gain(NonInvertingGain::Gain2),
         some_pa2,
-    );*/
+    );
     let mut opamp2 = opamp2.pga(
         pa7,
         PgaModeInternal::gain(NonInvertingGain::Gain4),
@@ -69,12 +69,13 @@ fn main() -> ! {
         .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
 
     loop {
+        // Here we can sample the output of opamp2 as if it was a regular AD pin
         let sample = adc.convert(&mut opamp2, stm32g4xx_hal::adc::config::SampleTime::Cycles_640_5);
 
-        delay.delay_ms(100);
-
         let millivolts = adc.sample_to_millivolts(sample);
-        info!("opamp2 thus 2x pa7: {}mV", millivolts);
+        info!("opamp2 thus 4x pa7: {}mV", millivolts);
+
+        delay.delay_ms(100);
     }
 
     #[allow(unreachable_code)]
