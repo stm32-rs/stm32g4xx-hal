@@ -167,11 +167,11 @@ pub enum Hysteresis {
     H70mV = 0b111,
 }
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+/*#[derive(Copy, Clone, Eq, PartialEq)]
 pub enum PowerMode {
     HighSpeed = 0b00,
     MediumSpeed = 0b01,
-}
+}*/
 
 /// Comparator positive input
 pub trait PositiveInput<C> {
