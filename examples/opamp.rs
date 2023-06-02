@@ -38,9 +38,11 @@ fn main() -> ! {
     // setup opamps
     let (opamp1, opamp2, opamp3, opamp4, ..) = dp.OPAMP.split(&mut rcc);
 
+    // Set up opamp1 and opamp2 in follower mode
     let opamp1 = opamp1.follower(gpioa.pa1, Some(gpioa.pa2));
     let opamp2 = opamp2.follower(gpioa.pa7, Option::<PA6<Analog>>::None);
 
+    // Set up opamp1 and opamp2 in open loop mode
     let opamp3 = opamp3.open_loop(gpiob.pb0, gpiob.pb2, Some(gpiob.pb1));
     let opamp4 = opamp4.open_loop(gpiob.pb11, gpiob.pb10, Option::<PB12<Analog>>::None);
 
@@ -51,16 +53,19 @@ fn main() -> ! {
     let (_opamp3, _pb0, _pb2, _some_pb1) = opamp3.disable();
     let (_opamp4, _pb11, _pb10, _none) = opamp4.disable();
 
+    // Configure opamp1 with pa1 as non-inverting input and set gain to x2
     let _opamp1 = opamp1.pga(
         pa1,
         PgaModeInternal::gain(NonInvertingGain::Gain2),
-        some_pa2,
+        some_pa2, // Route output to pin pa2
     );
+
+    // Configure op with pa7 as non-inverting input and set gain to x4
     let mut opamp2 = opamp2.pga(
         pa7,
         PgaModeInternal::gain(NonInvertingGain::Gain4),
         //Some(gpioa.pa6),
-        Option::<PA6<Analog>>::None,
+        Option::<PA6<Analog>>::None, // Do not route output to any external pin, use internal AD instead
     );
 
     let mut delay = cp.SYST.delay(&rcc.clocks);
@@ -80,7 +85,7 @@ fn main() -> ! {
 
     #[allow(unreachable_code)]
     {
-        //let (_opamp1, _pa1, _mode, _some_pa2) = _opamp1.disable();
+        let (_opamp1, _pa1, _mode, _some_pa2) = _opamp1.disable();
         let (_opamp2, _pa7, _mode, _none) = opamp2.disable();
 
         loop {}
