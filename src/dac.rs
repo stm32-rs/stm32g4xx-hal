@@ -58,7 +58,7 @@ pub struct Disabled;
 
 pub trait ED {}
 impl ED for Enabled {}
-impl ED for EnabledUnbuffered {}
+//impl ED for EnabledUnbuffered {}
 impl ED for WaveGenerator {}
 impl ED for Disabled {}
 
