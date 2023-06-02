@@ -31,14 +31,20 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let (dac1ch1, dac1ch2) = dp.DAC1.constrain((gpioa.pa4, gpioa.pa5), &mut rcc);
 
+    // dac_manual will have its value set manually
     let mut dac_manual = dac1ch1.calibrate_buffer(&mut delay).enable();
+
+    // dac_generator will have its value set automatically from its internal noise generator
     let mut dac_generator = dac1ch2.enable_generator(GeneratorConfig::noise(11));
 
     let mut dir = Direction::Upcounting;
     let mut val = 0;
 
     loop {
+        // This will pull out a new value from the noise generator and apply it to the DAC
         dac_generator.trigger();
+
+        // This will manually set the DAC's value
         dac_manual.set_value(val);
         match val {
             0 => dir = Direction::Upcounting,
@@ -46,6 +52,7 @@ fn main() -> ! {
             _ => (),
         };
 
+        // Step manually set value as a triangle wave
         match dir {
             Direction::Upcounting => val += 1,
             Direction::Downcounting => val -= 1,

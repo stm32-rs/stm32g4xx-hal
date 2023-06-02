@@ -32,6 +32,8 @@ fn main() -> ! {
     let pa0 = gpioa.pa0.into_analog();
     let comp1 = comp1.comparator(pa1, pa0, Config::default(), &rcc.clocks);
     let comp1 = comp1.enable();
+
+    // led1 pa1 will be updated manually when to match comp1 value
     let mut led1 = gpioa.pa5.into_push_pull_output();
 
     let pa7 = gpioa.pa7.into_analog();
@@ -50,6 +52,7 @@ fn main() -> ! {
     let _comp2 = comp2.enable().lock();
 
     loop {
+        // Read comp1 output and update led1 accordingly
         match comp1.output() {
             true => led1.set_high().unwrap(),
             false => led1.set_low().unwrap(),
