@@ -13,9 +13,10 @@ pub use crate::time::U32Ext as _;
 use crate::{
     dma::{mux::DmaMuxResources, traits::TargetAddress, PeripheralToMemory},
     gpio::*,
+    opamp,
     rcc::{Enable, Rcc, Reset},
     signature::{VtempCal110, VtempCal30, VDDA_CALIB},
-    stm32, opamp,
+    stm32,
 };
 use core::fmt;
 use core::marker::PhantomData;

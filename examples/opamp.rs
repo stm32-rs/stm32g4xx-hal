@@ -64,7 +64,6 @@ fn main() -> ! {
     let mut opamp2 = opamp2.pga(
         pa7,
         PgaModeInternal::gain(NonInvertingGain::Gain4),
-        //Some(gpioa.pa6),
         Option::<PA6<Analog>>::None, // Do not route output to any external pin, use internal AD instead
     );
 
@@ -75,7 +74,10 @@ fn main() -> ! {
 
     loop {
         // Here we can sample the output of opamp2 as if it was a regular AD pin
-        let sample = adc.convert(&mut opamp2, stm32g4xx_hal::adc::config::SampleTime::Cycles_640_5);
+        let sample = adc.convert(
+            &mut opamp2,
+            stm32g4xx_hal::adc::config::SampleTime::Cycles_640_5,
+        );
 
         let millivolts = adc.sample_to_millivolts(sample);
         info!("opamp2 thus 4x pa7: {}mV", millivolts);
