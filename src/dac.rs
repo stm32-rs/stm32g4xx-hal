@@ -49,8 +49,8 @@ impl GeneratorConfig {
 
 /// Enabled DAC (type state)
 pub struct Enabled;
-/// Enabled DAC without output buffer (type state)
-pub struct EnabledUnbuffered;
+// / Enabled DAC without output buffer (type state)
+//pub struct EnabledUnbuffered;
 /// Enabled DAC wave generator (type state)
 pub struct WaveGenerator;
 /// Disabled DAC (type state)
