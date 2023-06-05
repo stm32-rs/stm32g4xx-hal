@@ -52,6 +52,18 @@ impl Time {
     }
 }
 
+#[cfg(feature = "defmt")]
+impl defmt::Format for Time {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+           f,
+           "{:02}:{:02}:{:02}",
+           self.hours, self.minutes, self.seconds
+        )
+    }
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Date {
     pub day: u32,
@@ -66,6 +78,18 @@ impl Date {
             month: month.0,
             year: year.0,
         }
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for Date {
+    fn format(&self, f: defmt::Formatter) {
+        // format the bitfields of the register as struct fields
+        defmt::write!(
+           f,
+           "{:04}-{:02}-{:02}",
+           self.year, self.month, self.day
+        )
     }
 }
 
