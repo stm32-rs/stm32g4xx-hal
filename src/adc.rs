@@ -571,7 +571,7 @@ pub mod config {
     }
 
     /// Sets the input type per channel
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, Default)]
     pub struct DifferentialSelection(pub(crate) u32);
     impl DifferentialSelection {
         /// Set pin to Single-Ended or Differential
@@ -611,12 +611,6 @@ pub mod config {
         /// Sets all channels to SingleEnded
         pub fn clear_all(&mut self) {
             self.0 = 0;
-        }
-    }
-
-    impl Default for DifferentialSelection {
-        fn default() -> Self {
-            DifferentialSelection(0)
         }
     }
 

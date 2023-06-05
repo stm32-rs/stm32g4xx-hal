@@ -328,6 +328,7 @@ impl AHB1 {
     fn rstr(rcc: &RccRB) -> &rcc::AHB1RSTR {
         &rcc.ahb1rstr
     }
+    #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB1SMENR {
         &rcc.ahb1smenr
@@ -346,6 +347,7 @@ impl AHB2 {
     fn rstr(rcc: &RccRB) -> &rcc::AHB2RSTR {
         &rcc.ahb2rstr
     }
+    #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB2SMENR {
         &rcc.ahb2smenr
@@ -364,6 +366,7 @@ impl AHB3 {
     fn rstr(rcc: &RccRB) -> &rcc::AHB3RSTR {
         &rcc.ahb3rstr
     }
+    #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB3SMENR {
         &rcc.ahb3smenr
@@ -382,6 +385,7 @@ impl APB1_1 {
     fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR1 {
         &rcc.apb1rstr1
     }
+    #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR1 {
         &rcc.apb1smenr1
@@ -400,6 +404,7 @@ impl APB1_2 {
     fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR2 {
         &rcc.apb1rstr2
     }
+    #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR2 {
         &rcc.apb1smenr2
@@ -418,6 +423,7 @@ impl APB2 {
     fn rstr(rcc: &RccRB) -> &rcc::APB2RSTR {
         &rcc.apb2rstr
     }
+    #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB2SMENR {
         &rcc.apb2smenr

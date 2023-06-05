@@ -142,7 +142,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         if offset
             .checked_add(length as u32)
             .ok_or(Error::LengthTooLong)?
-            > self.flash_sz.kbytes() as u32
+            > self.flash_sz.kbytes()
         {
             return Err(Error::LengthTooLong);
         }
@@ -164,7 +164,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         // Set Page Erase
         self.flash.cr.cr().modify(|_, w| w.per().set_bit());
 
-        let page = start_offset / (SECTOR_SZ_KB as u32);
+        let page = start_offset / SECTOR_SZ_KB;
 
         // Write address bits
         // NOTE(unsafe) This sets the page address in the Address Register.
@@ -206,7 +206,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
                 let size = SECTOR_SZ_KB;
                 let start = start_offset & !(size - 1);
                 for idx in (start..start + size).step_by(2) {
-                    let write_address = (FLASH_START + idx as u32) as *const u16;
+                    let write_address = (FLASH_START + idx) as *const u16;
                     let verify: u16 = unsafe { core::ptr::read_volatile(write_address) };
                     if verify != 0xFFFF {
                         return Err(Error::VerifyError);
@@ -237,7 +237,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
     pub fn read(&self, offset: u32, length: usize) -> Result<&[u8]> {
         self.valid_address(offset)?;
 
-        if offset + length as u32 > self.flash_sz.kbytes() as u32 {
+        if offset + length as u32 > self.flash_sz.kbytes() {
             return Err(Error::LengthTooLong);
         }
 
@@ -392,6 +392,7 @@ pub struct Parts {
     pub(crate) cr: CR,
 
     /// Opaque ECCR register
+    #[allow(unused)]
     pub(crate) eccr: ECCR,
 
     /// Opaque KEYR register
@@ -410,9 +411,11 @@ pub struct Parts {
     pub(crate) _pcrop1er: PCROP1ER,
 
     /// Opaque PDKEYR register
+    #[allow(unused)]
     pub(crate) pdkeyr: PDKEYR,
 
     /// Opaque SEC1R register
+    #[allow(unused)]
     pub(crate) sec1r: SEC1R,
 
     /// Opaque SR register

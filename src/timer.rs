@@ -150,6 +150,7 @@ impl MonoTimer {
         dwt.enable_cycle_counter();
 
         // now the CYCCNT counter can't be stopped or reset
+        #[allow(clippy::drop_non_drop)]
         drop(dwt);
 
         MonoTimer {
