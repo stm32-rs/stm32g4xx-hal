@@ -4,8 +4,6 @@
 
 /// Configuration of an FdCAN instance
 pub mod config;
-#[cfg(feature = "embedded-can-03")]
-mod embedded_can;
 /// Filtering of CAN Messages
 pub mod filter;
 /// Header and info of transmitted and receiving frames
