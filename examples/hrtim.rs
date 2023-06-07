@@ -80,12 +80,12 @@ fn main() -> ! {
     out2.enable();
 
     loop {
-        // Step frequency from 18kHz to about 180kHz
+        // Step frequency from 18kHz to about 180kHz(half of that when only looking at one pin)
         for i in 1..10 {
             let new_period = u16::MAX / i;
 
             cr1.set_duty(new_period / 3);
-            timer.set_period(new_period / i);
+            timer.set_period(new_period);
 
             delay.delay(500_u32.millis());
         }
