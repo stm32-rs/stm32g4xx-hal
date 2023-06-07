@@ -17,6 +17,8 @@ use stm32g4xx_hal as hal;
 mod utils;
 extern crate cortex_m_rt as rt;
 
+use defmt_rtt as _; // global logger
+
 #[entry]
 fn main() -> ! {
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
