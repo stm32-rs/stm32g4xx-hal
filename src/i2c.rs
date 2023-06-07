@@ -1,8 +1,16 @@
 //! I2C
 use hal::blocking::i2c::{Read, Write, WriteRead};
 
-use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, gpiog::*};
-use crate::gpio::{AlternateOD, AF2, AF3, AF4, AF8};
+use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*};
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484"
+))]
+use crate::gpio::{gpiog::*, AF3};
+use crate::gpio::{AlternateOD, AF2, AF4, AF8};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 #[cfg(any(
     feature = "stm32g471",
