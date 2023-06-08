@@ -11,19 +11,19 @@ use rt::entry;
 #[cfg(not(feature = "stm32g474"))]
 #[entry]
 fn main() -> ! {
-    loop{} // TODO: add support for more devices
+    loop {} // TODO: add support for more devices
 }
 
 #[cfg(feature = "stm32g474")]
 #[entry]
 fn main() -> ! {
-    use hal::stm32;
     use embedded_hal::Direction;
     use hal::comparator::{self, ComparatorExt, ComparatorSplit};
     use hal::dac::{Dac1IntSig1, DacExt, DacOut};
     use hal::delay::SYSTDelayExt;
     use hal::gpio::GpioExt;
     use hal::rcc::RccExt;
+    use hal::stm32;
     use stm32g4xx_hal as hal;
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");

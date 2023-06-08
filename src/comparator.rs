@@ -15,10 +15,10 @@ use crate::gpio::*;
 
 #[cfg(any(feature = "stm32g474"))]
 use crate::gpio::{
+    gpioa::{PA11, PA12, PA6},
     gpiob::{PB6, PB7, PB8, PB9},
     gpioc::PC2,
     gpiof::PF4,
-    gpioa::{PA11, PA12, PA6},
 };
 
 #[cfg(any(
