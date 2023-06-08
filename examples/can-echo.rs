@@ -1,33 +1,50 @@
 #![no_main]
 #![no_std]
 
-use crate::hal::{
-    can::CanExt,
-    gpio::{GpioExt as _, Speed},
-    nb::block,
-    rcc::{Config, RccExt, SysClockSrc},
-    stm32::Peripherals,
-    time::U32Ext,
-};
-use fdcan::{
-    config::NominalBitTiming,
-    filter::{StandardFilter, StandardFilterSlot},
-    frame::{FrameFormat, TxFrameHeader},
-    id::StandardId,
-};
-use stm32g4xx_hal as hal;
-
-use core::num::{NonZeroU16, NonZeroU8};
-
-use cortex_m_rt::entry;
-
-use log::info;
-
+#[cfg(not(any(
+    feature = "stm32g491", // TODO: Make this work for these device too
+    feature = "stm32g4a1",
+)))]
 #[macro_use]
 mod utils;
 
+#[cfg(not(any(
+    feature = "stm32g491", // TODO: Make this work for these device too
+    feature = "stm32g4a1",
+)))]
 #[entry]
 fn main() -> ! {
+    loop {}
+}
+
+#[cfg(not(any(
+    feature = "stm32g491", // TODO: Make this work for these device too
+    feature = "stm32g4a1",
+)))]
+#[entry]
+fn main() -> ! {
+    use crate::hal::{
+        can::CanExt,
+        gpio::{GpioExt as _, Speed},
+        nb::block,
+        rcc::{Config, RccExt, SysClockSrc},
+        stm32::Peripherals,
+        time::U32Ext,
+    };
+    use fdcan::{
+        config::NominalBitTiming,
+        filter::{StandardFilter, StandardFilterSlot},
+        frame::{FrameFormat, TxFrameHeader},
+        id::StandardId,
+    };
+    use stm32g4xx_hal as hal;
+
+    use core::num::{NonZeroU16, NonZeroU8};
+
+    use cortex_m_rt::entry;
+
+    use log::info;
+
     utils::logger::init();
 
     info!("Start");

@@ -180,8 +180,8 @@ use crate::stm32::RCC;
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4A1"
+    //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    //feature = "stm32g4a1", // datasheet says it should be there
 ))]
 use crate::stm32::TIM20;
 #[cfg(any(
@@ -873,8 +873,8 @@ pins! {
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4A1"
+    //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    //feature = "stm32g4a1", // datasheet says it should be there
 ))]
 pins! {
     TIM20:
@@ -1477,8 +1477,8 @@ tim_hal! {
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4a1"
+    //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    //feature = "stm32g4a1", // datasheet says it should be there
 ))]
 tim_hal! {
     TIM20: (tim20, u16, 16, BDTR: bdtr, set_bit, af1, set_bit),
@@ -1754,8 +1754,8 @@ tim_pin_hal! {
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4A1"
+    //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    //feature = "stm32g4a1", // datasheet says it should be there
 ))]
 tim_pin_hal! {
     TIM20: (C1, cc1e, cc1p, ccmr1_output, oc1pe, oc1m, ccr1, u16, cc1ne, cc1np),

@@ -82,7 +82,9 @@ bus! {
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
-    feature = "stm32g484"
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
 ))]
 bus! {
     ADC3 => (AHB2, 14),
@@ -115,6 +117,14 @@ bus! {
     QUADSPI => (AHB3, 8),
 }
 
+#[cfg(not(any(
+    feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    feature = "stm32g4a1", // datasheet says it should be there
+)))]
+bus! {
+    USB => (APB1_1, 23),
+}
+
 bus! {
     TIM2 => (APB1_1, 0),
     TIM3 => (APB1_1, 1),
@@ -129,7 +139,6 @@ bus! {
     UART4 => (APB1_1, 19),
     I2C1 => (APB1_1, 21),
     I2C2 => (APB1_1, 22),
-    USB => (APB1_1, 23),
     FDCAN1 => (APB1_1, 25),
     PWR => (APB1_1, 28),
     I2C3 => (APB1_1, 30),
@@ -144,11 +153,24 @@ bus! {
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4A1"
+    //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    //feature = "stm32g4a1", // datasheet says it should be there
 ))]
 bus! {
     FDCAN2 => (APB1_1, 25),
+}
+
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
+))]
+bus! {
+    UART5 => (APB1_1, 20),
 }
 
 #[cfg(any(
@@ -160,7 +182,6 @@ bus! {
 ))]
 bus! {
     TIM5 => (APB1_1, 3),
-    UART5 => (APB1_1, 20),
     I2C4 => (APB1_2, 1),
 }
 

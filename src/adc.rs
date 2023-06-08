@@ -2180,8 +2180,8 @@ adc!(ADC2 => (configure_clock_source12, DmaMuxResources::ADC2, (ADC12_COMMON) ))
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4a1",
+    //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    //feature = "stm32g4a1", // datasheet says it should be there
 ))]
 adc!(ADC3 => (configure_clock_source345, DmaMuxResources::ADC3, (ADC345_COMMON) ));
 

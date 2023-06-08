@@ -37,6 +37,10 @@ impl<FDCAN> Can<FDCAN> {
 }
 
 /// Extension trait for CAN controller
+#[cfg(not(any(
+    feature = "stm32g491", // TODO: Seems like the result of rcc.rb.ccipr.read().fdcansel(),
+    feature = "stm32g4a1", // does not have the method `is_hse` for g491 and g4a1
+)))]
 pub trait CanExt: Sized
 where
     Self: rcc::Instance,
@@ -139,8 +143,8 @@ mod fdcan1 {
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4A1",
+    //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+    //feature = "stm32g4a1", // datasheet says it should be there
 ))]
 mod fdcan2 {
     use super::sealed;

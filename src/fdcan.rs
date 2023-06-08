@@ -1713,8 +1713,8 @@ mod impls {
         feature = "stm32g474",
         feature = "stm32g483",
         feature = "stm32g484",
-        feature = "stm32g491",
-        feature = "stm32g4A1",
+        //feature = "stm32g491", // TODO: Seems to be missing in pac and svd,
+        //feature = "stm32g4a1", // datasheet says it should be there
     ))]
     mod fdcan2 {
         use crate::fdcan;
