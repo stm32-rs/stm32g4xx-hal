@@ -9,9 +9,17 @@ use core::marker::PhantomData;
 
 use crate::dac;
 use crate::exti::{Event as ExtiEvent, ExtiExt};
-use crate::gpio::gpioa::{PA0, PA1, PA11, PA12, PA2, PA3, PA4, PA5, PA6, PA7};
-use crate::gpio::gpiob::{PB0, PB1, PB14, PB2, PB6, PB7, PB8, PB9};
+use crate::gpio::gpioa::{PA0, PA1, PA2, PA3, PA4, PA5, PA7};
+use crate::gpio::gpiob::{PB0, PB1, PB2};
 use crate::gpio::*;
+
+#[cfg(any(feature = "stm32g474"))]
+use crate::gpio::{
+    gpiob::{PB6, PB7, PB8, PB9},
+    gpioc::PC2,
+    gpiof::PF4,
+    gpioa::{PA11, PA12, PA6},
+};
 
 #[cfg(any(
     feature = "stm32g473",
@@ -27,7 +35,7 @@ use crate::gpio::gpioa::{PA10, PA8, PA9};
     feature = "stm32g474",
     feature = "stm32g484"
 ))]
-use crate::gpio::gpiob::{PB10, PB11, PB12, PB13, PB15};
+use crate::gpio::gpiob::{PB10, PB11, PB12, PB13, PB14, PB15};
 
 #[cfg(any(
     feature = "stm32g473",
@@ -43,12 +51,11 @@ use crate::gpio::gpioc::{PC6, PC7, PC8};
     feature = "stm32g474",
     feature = "stm32g484"
 ))]
-use crate::gpio::gpiod::{PD10, PD11, PD12, PD13, PD15};
+use crate::gpio::gpiod::{PD10, PD11, PD12, PD13, PD14, PD15};
 
-use crate::gpio::gpioc::{PC0, PC1, PC2};
-use crate::gpio::gpiod::PD14;
+use crate::gpio::gpioc::{PC0, PC1};
 use crate::gpio::gpioe::{PE7, PE8};
-use crate::gpio::gpiof::{PF1, PF4};
+use crate::gpio::gpiof::PF1;
 use crate::rcc::{Clocks, Rcc};
 use crate::stm32::{COMP, EXTI};
 
@@ -773,6 +780,7 @@ pub trait OutputPin<COMP> {
     fn setup(self);
 }
 
+#[allow(unused_macros)] // TODO: add support for more devices
 macro_rules! output_pin {
     ($COMP:ident, $pin:ident, $AF:ident, $mode_t:ident, $into:ident) => {
         impl OutputPin<$COMP> for $pin<Output<$mode_t>> {
@@ -787,6 +795,9 @@ macro_rules! output_pin {
     )+};
 }
 
+// TODO: look up alternate functions for more devices than g474
+// https://www.mouser.se/datasheet/2/389/stm32g474cb-1600828.pdf#page=73
+#[cfg(feature = "stm32g474")]
 output_pin! {
     COMP1: PA0,  AF8,
     COMP1: PA6,  AF8,
@@ -808,11 +819,13 @@ output_pin! {
     COMP4: PB14, AF8,
 }
 
+// TODO: look up alternate functions for more devices than g474
+// https://www.mouser.se/datasheet/2/389/stm32g474cb-1600828.pdf#page=73
 #[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
+    //feature = "stm32g473",
+    //feature = "stm32g483",
     feature = "stm32g474",
-    feature = "stm32g484"
+    //feature = "stm32g484"
 ))]
 output_pin! {
     COMP5: PA9,  AF8,
