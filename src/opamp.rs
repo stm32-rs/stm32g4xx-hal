@@ -338,7 +338,6 @@ macro_rules! opamps {
     };
 }
 
-#[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
 opamps! {
     opamp1: {
         inverting: {
@@ -386,43 +385,6 @@ opamps! {
     feature = "stm32g484",
 ))]
 opamps! {
-    opamp1: {
-        inverting: {
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
-        },
-        non_inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
-        },
-        output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
-    },
-    opamp2: {
-        inverting: {
-            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
-        },
-        non_inverting: {
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
-            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
-        },
-        output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
-    },
-    opamp3: {
-        inverting: {
-            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
-        },
-        non_inverting: {
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
-        },
-        output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
-    },
     opamp4: {
         inverting: {
             crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm0,
@@ -447,6 +409,9 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA8<crate::gpio::Analog>,
     },
+
+    // TODO: opamp 6 is available on all but g431/g441,
+    // see https://www.st.com/resource/en/reference_manual/rm0440-stm32g4-series-advanced-armbased-32bit-mcus-stmicroelectronics.pdf#page=75
     opamp6: {
         inverting: {
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
