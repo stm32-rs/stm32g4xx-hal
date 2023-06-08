@@ -2351,27 +2351,25 @@ adc_pins!(
 );
 
 // See https://www.st.com/resource/en/reference_manual/rm0440-stm32g4-series-advanced-armbased-32bit-mcus-stmicroelectronics.pdf#page=782
+adc_op!(
+    // TODO: Add all opamp types: Follower, OpenLoop
+    // TODO: Should we restrict type parameters A and B?
+    // TODO: Also allow AD-channels shared by pins
+    opamp::opamp1::Pga<A, B> => (ADC1, 13),
+    opamp::opamp2::Pga<A, B> => (ADC2, 16),
+    opamp::opamp3::Pga<A, B> => (ADC2, 18),
+);
+
 #[cfg(any(
+    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
 ))]
 adc_op!(
-    // TODO: Add all opamp types: Follower, OpenLoop
-    // TODO: Should we restrict type parameters A and B?
-    // TODO: Also allow AD-channels shared by pins
-
-    opamp::opamp1::Pga<A, B> => (ADC1, 13),
-
-    opamp::opamp2::Pga<A, B> => (ADC2, 16),
-
-    opamp::opamp3::Pga<A, B> => (ADC2, 18),
-
     opamp::opamp4::Pga<A, B> => (ADC5, 5),
-
     opamp::opamp5::Pga<A, B> => (ADC5, 3),
-
     opamp::opamp6::Pga<A, B> => (ADC4, 17),
 );
 

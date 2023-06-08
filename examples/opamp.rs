@@ -6,7 +6,6 @@
 use stm32g4xx_hal::adc::AdcClaim;
 use stm32g4xx_hal::adc::ClockSource;
 use stm32g4xx_hal::gpio::gpioa::*;
-use stm32g4xx_hal::gpio::gpiob::*;
 use stm32g4xx_hal::gpio::Analog;
 use stm32g4xx_hal::opamp::opamp1::IntoPga as _;
 use stm32g4xx_hal::opamp::opamp2::IntoPga as _;
@@ -36,7 +35,7 @@ fn main() -> ! {
     let gpiob = dp.GPIOB.split(&mut rcc);
 
     // setup opamps
-    let (opamp1, opamp2, opamp3, opamp4, ..) = dp.OPAMP.split(&mut rcc);
+    let (opamp1, opamp2, opamp3, ..) = dp.OPAMP.split(&mut rcc);
 
     // Set up opamp1 and opamp2 in follower mode
     let opamp1 = opamp1.follower(gpioa.pa1, Some(gpioa.pa2));
@@ -44,14 +43,12 @@ fn main() -> ! {
 
     // Set up opamp1 and opamp2 in open loop mode
     let opamp3 = opamp3.open_loop(gpiob.pb0, gpiob.pb2, Some(gpiob.pb1));
-    let opamp4 = opamp4.open_loop(gpiob.pb11, gpiob.pb10, Option::<PB12<Analog>>::None);
 
     // disable opamps
     let (opamp1, pa1, some_pa2) = opamp1.disable();
     let (opamp2, pa7, _none) = opamp2.disable();
 
     let (_opamp3, _pb0, _pb2, _some_pb1) = opamp3.disable();
-    let (_opamp4, _pb11, _pb10, _none) = opamp4.disable();
 
     // Configure opamp1 with pa1 as non-inverting input and set gain to x2
     let _opamp1 = opamp1.pga(
