@@ -3,8 +3,10 @@ use core::mem::MaybeUninit;
 
 use fugit::HertzU64;
 
-use crate::gpio::gpioa::{PA8, PA9};
-use crate::gpio::{Alternate, AF13};
+use crate::gpio::gpioa::{PA10, PA11, PA12, PA13, PA8, PA9};
+use crate::gpio::gpiob::{PB14, PB15};
+use crate::gpio::gpioc::{PC8, PC9};
+use crate::gpio::{Alternate, AF13, AF3};
 use crate::stm32::{
     HRTIM_COMMON, HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME,
     HRTIM_TIMF,
@@ -51,6 +53,13 @@ macro_rules! pins {
 
 pins! {
     HRTIM_TIMA: CH1: PA8<Alternate<AF13>>, CH2: PA9<Alternate<AF13>>
+
+    HRTIM_TIMB: CH1: PA10<Alternate<AF13>>, CH2: PA11<Alternate<AF13>>
+    HRTIM_TIMC: CH1: PA12<Alternate<AF13>>, CH2: PA13<Alternate<AF13>>
+    HRTIM_TIMD: CH1: PB14<Alternate<AF13>>, CH2: PB15<Alternate<AF13>>
+
+    HRTIM_TIME: CH1: PC8<Alternate<AF3>>, CH2: PC9<Alternate<AF3>>
+    //HRTIM_TIMF: CH1: PC6<Alternate<AF13>>, CH2: PC7<Alternate<AF13>>
 }
 
 // automatically implement Pins trait for tuples of individual pins
@@ -725,6 +734,7 @@ pub trait HrtimPrescaler {
 
 macro_rules! impl_pscl {
     ($($t:ident => $b:literal, $c:literal,)+) => {$(
+        #[derive(Copy, Clone)]
         pub struct $t;
         impl HrtimPrescaler for $t {
             const BITS: u8 = $b;

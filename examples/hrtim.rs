@@ -3,28 +3,38 @@
 #![no_std]
 
 use cortex_m_rt::entry;
-use fugit::ExtU32;
-use hal::gpio::gpioa::PA8;
-use hal::gpio::gpioa::PA9;
-use hal::gpio::Alternate;
-use hal::gpio::AF13;
-use hal::prelude::*;
-use hal::pwm::hrtim::EventSource;
-use hal::pwm::hrtim::HrCompareRegister;
-use hal::pwm::hrtim::HrOutput;
-use hal::pwm::hrtim::HrPwmAdvExt;
-use hal::pwm::hrtim::HrTimer;
-use hal::pwm::hrtim::Pscl4;
-use hal::rcc;
-use hal::stm32;
-use stm32g4xx_hal as hal;
+
 mod utils;
-extern crate cortex_m_rt as rt;
 
 use defmt_rtt as _; // global logger
 
+#[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
 #[entry]
 fn main() -> ! {
+    #[allow(clippy::empty_loop)]
+    loop {}
+}
+
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
+#[entry]
+fn main() -> ! {
+    use fugit::ExtU32;
+    use hal::gpio::gpioa::PA8;
+    use hal::gpio::gpioa::PA9;
+    use hal::gpio::Alternate;
+    use hal::gpio::AF13;
+    use hal::prelude::*;
+    use hal::pwm::hrtim::EventSource;
+    use hal::pwm::hrtim::HrCompareRegister;
+    use hal::pwm::hrtim::HrOutput;
+    use hal::pwm::hrtim::HrPwmAdvExt;
+    use hal::pwm::hrtim::HrTimer;
+    use hal::pwm::hrtim::Pscl4;
+    use hal::rcc;
+    use hal::stm32;
+    use stm32g4xx_hal as hal;
+    extern crate cortex_m_rt as rt;
+
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let cp = stm32::CorePeripherals::take().expect("cannot take core");
     // Set system frequency to 16MHz * 75/4/2 = 150MHz
