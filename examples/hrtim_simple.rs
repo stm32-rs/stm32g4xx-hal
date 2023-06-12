@@ -24,7 +24,7 @@ fn main() -> ! {
     use hal::gpio::Alternate;
     use hal::gpio::AF13;
     use hal::prelude::*;
-    use hal::pwm::hrtim::{HrPwmExt, HrControltExt};
+    use hal::pwm::hrtim::{HrControltExt, HrPwmExt};
     use hal::rcc;
     use hal::stm32;
     use hal::time::RateExtU32;
@@ -61,9 +61,9 @@ fn main() -> ! {
     //        .               .               .
 
     let (mut control, _) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
-    let (mut p1, mut p2) =
-        dp.HRTIM_TIMA
-            .pwm((pin_a, pin_b), 20_u32.kHz(), &mut control, &mut rcc);
+    let (mut p1, mut p2) = dp
+        .HRTIM_TIMA
+        .pwm((pin_a, pin_b), 20_u32.kHz(), &mut control, &mut rcc);
     let max_duty = p1.get_max_duty();
 
     p1.set_duty(max_duty / 3); // Set output 1 to about 33%
