@@ -3,17 +3,18 @@ use core::mem::MaybeUninit;
 
 use fugit::HertzU64;
 
-use crate::gpio::gpioa::{PA10, PA11, PA12, PA13, PA8, PA9};
-use crate::gpio::gpiob::{PB14, PB15};
-use crate::gpio::gpioc::{PC8, PC9};
-use crate::gpio::{Alternate, AF13, AF3};
+use crate::gpio::gpioa::{PA10, PA11, PA12, PA13, PA15, PA8, PA9};
+use crate::gpio::gpiob::{PB0, PB10, PB11, PB14, PB15};
+use crate::gpio::gpioc::{PC10, PC7, PC8, PC9};
+use crate::gpio::{self, AF3};
+use crate::gpio::{Alternate, AF13};
 use crate::stm32::{
     HRTIM_COMMON, HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME,
     HRTIM_TIMF,
 };
 
 use super::{
-    ActiveHigh, Alignment, ComplementaryImpossible, FaultDisabled, Pins, Pwm, PwmPinEnable,
+    ActiveHigh, Alignment, ComplementaryImpossible, FaultMonitor, Pins, Pwm, PwmPinEnable,
     TimerType,
 };
 use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
@@ -100,7 +101,13 @@ pins_tuples! {
 /// Allows the pwm() method to be added to the peripheral register structs from the device crate
 pub trait HrPwmExt: Sized {
     /// The requested frequency will be rounded to the nearest achievable frequency; the actual frequency may be higher or lower than requested.
-    fn pwm<PINS, T, U, V>(self, _pins: PINS, frequency: T, control: &mut HrPwmControl, rcc: &mut Rcc) -> PINS::Channel
+    fn pwm<PINS, T, U, V>(
+        self,
+        _pins: PINS,
+        frequency: T,
+        control: &mut HrPwmControl,
+        rcc: &mut Rcc,
+    ) -> PINS::Channel
     where
         PINS: Pins<Self, U, V> + ToHrOut,
         T: Into<Hertz>,
@@ -112,25 +119,24 @@ pub trait HrPwmAdvExt: Sized {
         self,
         _pins: PINS,
         rcc: &mut Rcc,
-    ) -> HrPwmBuilder<Self, Pscl128, FaultDisabled, PINS::Out>
+    ) -> HrPwmBuilder<Self, Pscl128, PINS::Out>
     where
         PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
         CHANNEL: HrtimChannel<Pscl128>;
 }
 
 /// HrPwmBuilder is used to configure advanced HrTim PWM features
-pub struct HrPwmBuilder<TIM, PSCL, FAULT, OUT> {
+pub struct HrPwmBuilder<TIM, PSCL, OUT> {
     _tim: PhantomData<TIM>,
-    _fault: PhantomData<FAULT>,
     _prescaler: PhantomData<PSCL>,
     _out: PhantomData<OUT>,
     alignment: Alignment,
     base_freq: HertzU64,
     count: CountSettings,
+    fault_enable_bits: u8,
+    fault1_bits: u8,
+    fault2_bits: u8,
     enable_push_pull: bool,
-    //bkin_enabled: bool, // If the FAULT type parameter is FaultEnabled, either bkin or bkin2 must be enabled
-    //bkin2_enabled: bool,
-    //fault_polarity: Polarity,
     //deadtime: NanoSecond,
 }
 
@@ -246,7 +252,7 @@ pub struct HrOut2<TIM>(PhantomData<TIM>);
 
 // Implement PWM configuration for timer
 macro_rules! hrtim_hal {
-    ($($TIMX:ident: ($timX:ident, $timXcr:ident, $perXr:ident, $tXcen:ident),)+) => {
+    ($($TIMX:ident: ($timX:ident, $timXcr:ident, $perXr:ident, $tXcen:ident, $fltXr:ident, $outXr:ident),)+) => {
         $(
 
             // Implement HrPwmExt trait for hrtimer
@@ -274,7 +280,7 @@ macro_rules! hrtim_hal {
                     self,
                     _pins: PINS,
                     rcc: &mut Rcc,
-                ) -> HrPwmBuilder<Self, Pscl128, FaultDisabled, PINS::Out>
+                ) -> HrPwmBuilder<Self, Pscl128, PINS::Out>
                 where
                     PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
                     CHANNEL: HrtimChannel<Pscl128>
@@ -286,23 +292,22 @@ macro_rules! hrtim_hal {
 
                     HrPwmBuilder {
                         _tim: PhantomData,
-                        _fault: PhantomData,
                         _prescaler: PhantomData,
                         _out: PhantomData,
+                        fault_enable_bits: 0b000000,
+                        fault1_bits: 0b00,
+                        fault2_bits: 0b00,
                         alignment: Alignment::Left,
                         base_freq: clk,
                         count: CountSettings::Period(u16::MAX),
                         enable_push_pull: false,
-                        //bkin_enabled: false,
-                        //bkin2_enabled: false,
-                        //fault_polarity: Polarity::ActiveLow,
                         //deadtime: 0.nanos(),
                     }
                 }
             }
 
-            impl<PSCL, FAULT, OUT>
-                HrPwmBuilder<$TIMX, PSCL, FAULT, OUT>
+            impl<PSCL, OUT>
+                HrPwmBuilder<$TIMX, PSCL, OUT>
             where
                 PSCL: HrtimPrescaler,
             {
@@ -334,6 +339,29 @@ macro_rules! hrtim_hal {
                     // Write period
                     tim.$perXr.write(|w| unsafe { w.perx().bits(period as u16) });
 
+                    // Enable fault sources and lock configuration
+                    unsafe {
+                        // Enable fault sources
+                        let fault_enable_bits = self.fault_enable_bits as u32;
+                        tim.$fltXr.write(|w| w
+                            .flt1en().bit(fault_enable_bits & (1 << 0) != 0)
+                            .flt2en().bit(fault_enable_bits & (1 << 1) != 0)
+                            .flt3en().bit(fault_enable_bits & (1 << 2) != 0)
+                            .flt4en().bit(fault_enable_bits & (1 << 3) != 0)
+                            .flt5en().bit(fault_enable_bits & (1 << 4) != 0)
+                            .flt6en().bit(fault_enable_bits & (1 << 5) != 0)
+                        );
+
+                        // ... and lock configuration
+                        tim.$fltXr.modify(|_r, w| w.fltlck().set_bit());
+
+                        // Set actions on fault for both outputs
+                        tim.$outXr.modify(|_r, w| w
+                            .fault1().bits(self.fault1_bits)
+                            .fault2().bits(self.fault2_bits)
+                        );
+                    }
+
                     // Start timer
                     cortex_m::interrupt::free(|_| {
                         let master = unsafe { &*HRTIM_MASTER::ptr() };
@@ -354,15 +382,17 @@ macro_rules! hrtim_hal {
                 }
 
                 /// Set the prescaler; PWM count runs at base_frequency/(prescaler+1)
-                pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, FAULT, OUT>
+                pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, OUT>
                 where
                     P: HrtimPrescaler,
                 {
                     let HrPwmBuilder {
                         _tim,
-                        _fault,
                         _prescaler: _,
                         _out,
+                        fault_enable_bits,
+                        fault1_bits,
+                        fault2_bits,
                         enable_push_pull,
                         alignment,
                         base_freq,
@@ -378,7 +408,40 @@ macro_rules! hrtim_hal {
 
                     HrPwmBuilder {
                         _tim,
-                        _fault,
+                        _prescaler: PhantomData,
+                        _out,
+                        fault_enable_bits,
+                        fault1_bits,
+                        fault2_bits,
+                        enable_push_pull,
+                        alignment,
+                        base_freq,
+                        count,
+                        //deadtime: 0.nanos(),
+                    }
+                }
+
+                pub fn with_fault_source<FS>(self, _fault_source: FS) -> HrPwmBuilder<$TIMX, PSCL, OUT>
+                    where FS: FaultSource
+                {
+                    let HrPwmBuilder {
+                        _tim,
+                        _prescaler: _,
+                        _out,
+                        fault_enable_bits,
+                        fault1_bits,
+                        fault2_bits,
+                        enable_push_pull,
+                        alignment,
+                        base_freq,
+                        count,
+                    } = self;
+
+                    HrPwmBuilder {
+                        _tim,
+                        fault_enable_bits: fault_enable_bits | FS::ENABLE_BITS,
+                        fault1_bits,
+                        fault2_bits,
                         _prescaler: PhantomData,
                         _out,
                         enable_push_pull,
@@ -386,6 +449,16 @@ macro_rules! hrtim_hal {
                         base_freq,
                         count,
                     }
+                }
+
+                pub fn fault_action1(mut self, fault_action1: FaultAction) -> Self {
+                    self.fault1_bits = fault_action1 as _;
+                    self
+                }
+
+                pub fn fault_action2(mut self, fault_action2: FaultAction) -> Self {
+                    self.fault2_bits = fault_action2 as _;
+                    self
                 }
 
                 /// Set the period; PWM count runs from 0 to period, repeating every (period+1) counts
@@ -661,15 +734,12 @@ hrtim_cr! {
 
 hrtim_hal! {
     // TODO: HRTIM_MASTER
-    HRTIM_TIMA: (hrtim_tima, timacr, perar, tacen),
-    HRTIM_TIMB: (hrtim_timb, timbcr, perbr, tbcen),
-    HRTIM_TIMC: (hrtim_timc, timccr, percr, tccen),
-    HRTIM_TIMD: (hrtim_timd, timdcr, perdr, tdcen),
-    HRTIM_TIME: (hrtim_time, timecr, perer, tecen),
-
-    // TODO: why is there no rstf1r?
-    //HRTIM_TIMF: (hrtim_timf1, timfcr, perfr, tfcen, setf1r, rstf1r, cmp1),
-    HRTIM_TIMF: (hrtim_timf, timfcr, perfr, tfcen),
+    HRTIM_TIMA: (hrtim_tima, timacr, perar, tacen, fltar, outar),
+    HRTIM_TIMB: (hrtim_timb, timbcr, perbr, tbcen, fltbr, outbr),
+    HRTIM_TIMC: (hrtim_timc, timccr, percr, tccen, fltcr, outcr),
+    HRTIM_TIMD: (hrtim_timd, timdcr, perdr, tdcen, fltdr, outdr),
+    HRTIM_TIME: (hrtim_time, timecr, perer, tecen, flter, outer),
+    HRTIM_TIMF: (hrtim_timf, timfcr, perfr, tfcen, fltfr, outfr),
 }
 
 hrtim_pin_hal! {
@@ -750,8 +820,153 @@ pub trait HrtimChannel<PSCL> {}
 impl<PSCL> HrtimChannel<PSCL> for CH1<PSCL> {}
 impl<PSCL> HrtimChannel<PSCL> for CH2<PSCL> {}
 
+pub enum FaultAction {
+    /// Output never enters fault mode
+    None = 0b00,
+
+    /// Output forced to `active` level on fault
+    ForceActive = 0b01,
+
+    /// Output forced to `inactive` level on fault
+    ForceInactive = 0b10,
+
+    /// The output is floating/tri stated on fault
+    Floating = 0b11,
+}
+
+pub trait FaultSource: Copy {
+    const ENABLE_BITS: u8;
+}
+
+pub struct SourceBuilder<I> {
+    _input: I,
+    src_bits: u8,
+    is_active_high: bool,
+    filter_bits: u8,
+}
+
+impl<I> SourceBuilder<I> {
+    unsafe fn new(input: I, src_bits: u8) -> Self {
+        SourceBuilder {
+            _input: input,
+            src_bits,
+            is_active_high: false,
+            filter_bits: 0b0000,
+        }
+    }
+}
+
+macro_rules! impl_faults {
+    ($(
+        $input:ident => $source:ident:
+            PINS=[($pin:ident, $af:ident), $(($pin_b:ident, $af_b:ident),)*],
+            COMP=$compX:ident, $enable_bits:literal,
+            $fltinrZ:ident, $fltWsrc_0:ident, $fltWsrc_1:ident, $fltWp:ident, $fltWf:ident, $fltWe:ident, $fltWlck:ident,
+    )+) => {$(
+
+        // This should NOT be Copy/Clone
+        pub struct $input {
+            _x: PhantomData<()>
+        }
+
+        #[derive(Copy, Clone)]
+        pub struct $source {
+            _x: PhantomData<()>
+        }
+
+        impl $input {
+            pub fn bind_pin<IM>(self, pin: $pin<gpio::Input<IM>>) -> SourceBuilder<$input> {
+                pin.into_alternate::<$af>();
+                unsafe { SourceBuilder::new(self, 0b00) }
+            }
+
+            $(
+                pub fn bind_pin_b<IM>(self, pin: $pin_b<gpio::Input<IM>>) -> SourceBuilder<$input> {
+                    pin.into_alternate::<$af_b>();
+                    unsafe { SourceBuilder::new(self, 0b00) }
+                }
+            )*
+
+            /*pub fn bind_comp(self, comp: $compX) -> SourceBuilder<$input> {
+                unsafe { SourceBuilder::new(self, 0b01) }
+            }*/
+
+            /*pub fn bind_external(?) {
+                SourceBuilder::new(self, 0b10);
+            }*/
+        }
+
+        impl SourceBuilder<$input> {
+            pub fn finalize(self, _control: &mut HrPwmControl) -> $source {
+                let SourceBuilder{ _input, src_bits, is_active_high, filter_bits } = self;
+
+                // Setup fault source
+                unsafe {
+                    let common = &*HRTIM_COMMON::ptr();
+
+                    common.fltinr2.modify(|_r, w| w.$fltWsrc_1().bit(src_bits & 0b10 != 0));
+                    common.$fltinrZ.modify(|_r, w| w
+                        .$fltWsrc_0().bit(src_bits & 0b01 != 0)
+                        .$fltWp().bit(is_active_high)
+                        .$fltWf().bits(filter_bits)
+                        .$fltWe().set_bit() // Enable
+                    );
+
+                    // ... and lock configuration
+                    common.$fltinrZ.modify(|_r, w| w.$fltWlck().set_bit());
+                }
+
+                $source {
+                    _x: PhantomData
+                }
+            }
+
+            pub fn polarity(mut self, polarity: super::Polarity) -> Self {
+                self.is_active_high = polarity == super::Polarity::ActiveHigh;
+                self
+            }
+
+            // TODO: add more settings
+            /* pub fn filter(?) -> Self */
+            /* pub fn blanking(?) -> Self */
+        }
+
+        impl FaultSource for $source {
+            const ENABLE_BITS: u8 = $enable_bits;
+        }
+    )+}
+}
+
+// TODO: Lookup to ensure the alternate function are the same for other devices than stm32g474
+#[cfg(feature = "stm32g474")]
+impl_faults!(
+    FaultInput1 => FaultSource1: PINS=[(PA12, AF13),], COMP=COMP2, 0b000001, fltinr1, flt1src, flt1src_1, flt1p, flt1f, flt1e, flt1lck,
+    FaultInput2 => FaultSource2: PINS=[(PA15, AF13),], COMP=COMP4, 0b000010, fltinr1, flt2src, flt2src_1, flt2p, flt2f, flt2e, flt2lck,
+    FaultInput3 => FaultSource3: PINS=[(PB10, AF13),], COMP=COMP6, 0b000100, fltinr1, flt3src, flt3src_1, flt3p, flt3f, flt3e, flt3lck,
+    FaultInput4 => FaultSource4: PINS=[(PB11, AF13),], COMP=COMP1, 0b001000, fltinr1, flt4src, flt4src_1, flt4p, flt4f, flt4e, flt4lck,
+    FaultInput5 => FaultSource5: PINS=[(PB0, AF13), (PC7, AF3),], COMP=COMP3, 0b010000, fltinr2, flt5src, flt5src_1, flt5p, flt5f, flt5e, flt5lck,
+    FaultInput6 => FaultSource6: PINS=[(PC10, AF13),], COMP=COMP5, 0b100000, fltinr2, flt6src_0, flt6src_1, flt6p, flt6f, flt6e, flt6lck,
+);
+
+pub struct FaultInputs {
+    pub fault_input1: FaultInput1,
+    pub fault_input2: FaultInput2,
+    pub fault_input3: FaultInput3,
+    pub fault_input4: FaultInput4,
+    pub fault_input5: FaultInput5,
+    pub fault_input6: FaultInput6,
+}
+
 pub struct HrPwmControl {
     _x: PhantomData<()>,
+
+    pub fault_sys: FltMonitorSys,
+    pub fault_1: FltMonitor1,
+    pub fault_2: FltMonitor2,
+    pub fault_3: FltMonitor3,
+    pub fault_4: FltMonitor4,
+    pub fault_5: FltMonitor5,
+    pub fault_6: FltMonitor6,
 }
 
 /// The divsion ratio between f_hrtim and the fault signal sampling clock for digital filters
@@ -775,10 +990,6 @@ pub enum FaultSamplingClkDiv {
     ///
     /// fault signal sampling clock = f_hrtim / 8
     Eight = 0b11,
-}
-
-pub struct FaultInputs {
-    _x: (),
 }
 
 pub trait HrControltExt {
@@ -826,7 +1037,26 @@ impl HrTimOngoingCalibration {
             common.fltinr2.write(|w| w.fltsd().bits(self.divider as u8));
         }
 
-        (HrPwmControl { _x: PhantomData }, FaultInputs { _x: () })
+        (
+            HrPwmControl {
+                _x: PhantomData,
+                fault_sys: FltMonitorSys { _x: PhantomData },
+                fault_1: FltMonitor1 { _x: PhantomData },
+                fault_2: FltMonitor2 { _x: PhantomData },
+                fault_3: FltMonitor3 { _x: PhantomData },
+                fault_4: FltMonitor4 { _x: PhantomData },
+                fault_5: FltMonitor5 { _x: PhantomData },
+                fault_6: FltMonitor6 { _x: PhantomData },
+            },
+            FaultInputs {
+                fault_input1: FaultInput1 { _x: PhantomData },
+                fault_input2: FaultInput2 { _x: PhantomData },
+                fault_input3: FaultInput3 { _x: PhantomData },
+                fault_input4: FaultInput4 { _x: PhantomData },
+                fault_input5: FaultInput5 { _x: PhantomData },
+                fault_input6: FaultInput6 { _x: PhantomData },
+            },
+        )
     }
 
     pub fn wait_for_calibration(self) -> (HrPwmControl, FaultInputs) {
@@ -839,3 +1069,38 @@ impl HrTimOngoingCalibration {
         unsafe { self.init() }
     }
 }
+
+macro_rules! impl_flt_monitor {
+    ($($t:ident: ($fltx:ident, $fltxc:ident),)+) => {$(
+        pub struct $t {
+            _x: PhantomData<()>
+        }
+
+        impl FaultMonitor for $t {
+            fn is_fault_active(&self) -> bool {
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common.isr.read().$fltx().bit()
+            }
+
+            fn clear_fault(&mut self) {
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common.icr.write(|w| w.$fltxc().set_bit());
+            }
+
+            // TODO: Should we have our own trait since it does not seem possible to implement this
+            fn set_fault(&mut self) {
+                todo!()
+            }
+        }
+    )+};
+}
+
+impl_flt_monitor!(
+    FltMonitorSys: (sysflt, sysfltc),
+    FltMonitor1: (flt1, flt1c),
+    FltMonitor2: (flt2, flt2c),
+    FltMonitor3: (flt3, flt3c),
+    FltMonitor4: (flt4, flt4c),
+    FltMonitor5: (flt5, flt5c),
+    FltMonitor6: (flt6, flt6c),
+);

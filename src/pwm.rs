@@ -258,6 +258,7 @@ pub struct ComplementaryDisabled;
 pub struct ComplementaryEnabled;
 
 /// Enum for IO polarity
+#[derive(Debug, PartialEq)]
 pub enum Polarity {
     ActiveHigh,
     ActiveLow,
