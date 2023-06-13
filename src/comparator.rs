@@ -563,6 +563,32 @@ macro_rules! impl_comparator {
 
 impl_comparator!(COMP1, comp1, ExtiEvent::COMP1);
 impl_comparator!(COMP2, comp2, ExtiEvent::COMP2);
+impl_comparator!(COMP3, comp1, ExtiEvent::COMP3);
+impl_comparator!(COMP4, comp2, ExtiEvent::COMP4);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+impl_comparator!(COMP5, comp1, ExtiEvent::COMP5);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+impl_comparator!(COMP6, comp2, ExtiEvent::COMP6);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g483",
+    feature = "stm32g474",
+    feature = "stm32g484"
+))]
+impl_comparator!(COMP7, comp2, ExtiEvent::COMP7);
 
 /*
 /// Uses two comparators to implement a window comparator.
