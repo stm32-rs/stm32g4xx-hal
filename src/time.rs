@@ -1,3 +1,6 @@
+/// This code has been taken from the stm32g0xx-hal project and modified slightly to support
+/// STM32G4xx MCUs.
+
 pub use fugit::{
     Duration, ExtU32, HertzU32 as Hertz, HoursDurationU32 as Hour,
     MicrosDurationU32 as MicroSecond, MinutesDurationU32 as Minute, NanosDurationU32 as NanoSecond,
