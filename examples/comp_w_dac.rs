@@ -44,7 +44,7 @@ fn main() -> ! {
 
     // Set up comparator with pa1 as positive, and the DAC as negative input
     let comp = comp1.comparator(
-        pa1,
+        &pa1,
         &dac,
         comparator::Config::default().hysteresis(comparator::Hysteresis::None),
         &rcc.clocks,

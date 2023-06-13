@@ -228,13 +228,13 @@ window_input_pin!(COMP2, Comp1InP);
 
 macro_rules! positive_input_pin {
     ($COMP:ident, $pin_0:ident, $pin_1:ident) => {
-        impl PositiveInput<$COMP> for $pin_0<Analog> {
+        impl PositiveInput<$COMP> for &$pin_0<Analog> {
             fn setup(&self, comp: &$COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(false))
             }
         }
 
-        impl PositiveInput<$COMP> for $pin_1<Analog> {
+        impl PositiveInput<$COMP> for &$pin_1<Analog> {
             fn setup(&self, comp: &$COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(true))
             }

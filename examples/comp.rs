@@ -38,7 +38,7 @@ fn main() -> ! {
 
     let pa1 = gpioa.pa1.into_analog();
     let pa0 = gpioa.pa0.into_analog();
-    let comp1 = comp1.comparator(pa1, pa0, Config::default(), &rcc.clocks);
+    let comp1 = comp1.comparator(&pa1, pa0, Config::default(), &rcc.clocks);
     let comp1 = comp1.enable();
 
     // led1 pa1 will be updated manually when to match comp1 value
@@ -46,7 +46,7 @@ fn main() -> ! {
 
     let pa7 = gpioa.pa7.into_analog();
     let comp2 = comp2.comparator(
-        pa7,
+        &pa7,
         RefintInput::VRefintM12,
         Config::default()
             .hysteresis(Hysteresis::None)
