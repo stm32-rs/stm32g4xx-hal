@@ -4,9 +4,10 @@
 
 use cortex_m_rt::entry;
 
-mod utils;
+//mod utils;
 
 use defmt_rtt as _; // global logger
+use panic_probe as _;
 
 #[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
 #[entry]
@@ -23,7 +24,7 @@ fn main() -> ! {
     use hal::gpio::Alternate;
     use hal::gpio::AF13;
     use hal::prelude::*;
-    use hal::pwm::hrtim::{HrPwmExt, Pscl4};
+    use hal::pwm::hrtim::{HrPwmExt, HrControltExt};
     use hal::rcc;
     use hal::stm32;
     use hal::time::RateExtU32;
@@ -39,10 +40,6 @@ fn main() -> ! {
         r: Some(rcc::PllRDiv::DIV_2),
         ..Default::default()
     }));
-
-    // ...with a prescaler of 4 this gives us a HrTimer with a tick rate of 1.2GHz
-    // With max the max period set, this would be 1.2GHz/2^16 ~= 18kHz...
-    type Prescaler = Pscl4; // Prescaler of 4
 
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
@@ -63,10 +60,10 @@ fn main() -> ! {
     //        .               .               .
     //        .               .               .
 
-    // ...Meaning that we will have plenty of resolution when producing a 20kHz waveform
+    let (mut control, _) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
     let (mut p1, mut p2) =
         dp.HRTIM_TIMA
-            .pwm::<_, _, Prescaler, _, _>((pin_a, pin_b), 20_u32.kHz(), &mut rcc);
+            .pwm((pin_a, pin_b), 20_u32.kHz(), &mut control, &mut rcc);
     let max_duty = p1.get_max_duty();
 
     p1.set_duty(max_duty / 3); // Set output 1 to about 33%

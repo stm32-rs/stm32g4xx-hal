@@ -4,9 +4,8 @@
 
 use cortex_m_rt::entry;
 
-mod utils;
-
 use defmt_rtt as _; // global logger
+use panic_probe as _;
 
 #[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
 #[entry]
@@ -26,6 +25,7 @@ fn main() -> ! {
     use hal::prelude::*;
     use hal::pwm::hrtim::EventSource;
     use hal::pwm::hrtim::HrCompareRegister;
+    use hal::pwm::hrtim::HrControltExt;
     use hal::pwm::hrtim::HrOutput;
     use hal::pwm::hrtim::HrPwmAdvExt;
     use hal::pwm::hrtim::HrTimer;
@@ -68,6 +68,7 @@ fn main() -> ! {
     // ------------------------    ----------------------------    ----
     //        .               .               .               .
     //        .               .               .               .
+    let (mut fault_control, _) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
     let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
@@ -77,7 +78,7 @@ fn main() -> ! {
         // alternated every period with one being
         // inactive and the other getting to output its wave form
         // as normal
-        .finalize();
+        .finalize(&mut fault_control);
 
     out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
     out2.enable_rst_event(EventSource::Cr1);
