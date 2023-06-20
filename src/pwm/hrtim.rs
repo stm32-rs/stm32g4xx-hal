@@ -100,12 +100,11 @@ pins_tuples! {
 /// Allows the pwm() method to be added to the peripheral register structs from the device crate
 pub trait HrPwmExt: Sized {
     /// The requested frequency will be rounded to the nearest achievable frequency; the actual frequency may be higher or lower than requested.
-    fn pwm<PINS, T, PSCL, U, V>(self, _pins: PINS, frequency: T, rcc: &mut Rcc) -> PINS::Channel
+    fn pwm<PINS, T, U, V>(self, _pins: PINS, frequency: T, control: &mut HrPwmControl, rcc: &mut Rcc) -> PINS::Channel
     where
-        PINS: Pins<Self, U, V>,
+        PINS: Pins<Self, U, V> + ToHrOut,
         T: Into<Hertz>,
-        U: HrtimChannel<PSCL>,
-        PSCL: HrtimPrescaler;
+        U: HrtimChannel<Pscl128>;
 }
 
 pub trait HrPwmAdvExt: Sized {
@@ -186,6 +185,17 @@ pub trait HrOutput {
 
     /// Stop listening to the specified event
     fn disable_rst_event(&mut self, reset_event: EventSource);
+
+    /// Get current state of the output
+    fn get_state(&self) -> State;
+}
+
+#[derive(Debug, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+pub enum State {
+    Idle,
+    Running,
+    Fault,
 }
 
 pub enum EventSource {
@@ -234,72 +244,29 @@ where
 pub struct HrOut1<TIM>(PhantomData<TIM>);
 pub struct HrOut2<TIM>(PhantomData<TIM>);
 
-// Implement HrPwmExt trait for hrtimer
-macro_rules! pwm_ext_hal {
-    ($TIMX:ident: $timX:ident) => {
-        impl HrPwmExt for $TIMX {
-            fn pwm<PINS, T, PSCL, U, V>(
-                self,
-                pins: PINS,
-                frequency: T,
-                rcc: &mut Rcc,
-            ) -> PINS::Channel
-            where
-                PINS: Pins<Self, U, V>,
-                T: Into<Hertz>,
-                U: HrtimChannel<PSCL>,
-                PSCL: HrtimPrescaler,
-            {
-                $timX(self, pins, frequency.into(), rcc)
-            }
-        }
-    };
-}
-
 // Implement PWM configuration for timer
 macro_rules! hrtim_hal {
     ($($TIMX:ident: ($timX:ident, $timXcr:ident, $perXr:ident, $tXcen:ident),)+) => {
         $(
-            pwm_ext_hal!($TIMX: $timX);
 
-            /// Configures PWM
-            fn $timX<PINS, T, PSCL, U>(
-                tim: $TIMX,
-                _pins: PINS,
-                freq: Hertz,
-                rcc: &mut Rcc,
-            ) -> PINS::Channel
-            where
-                PINS: super::Pins<$TIMX, T, U>,
-                T: HrtimChannel<PSCL>,
-                PSCL: HrtimPrescaler,
-            {
-                unsafe {
-                    let rcc_ptr = &*RCC::ptr();
-                    $TIMX::enable(rcc_ptr);
-                    $TIMX::reset(rcc_ptr);
-                }
-
-                // TODO: That 32x factor... Is that done by $TIMX::get_timer_frequency
-                // or should we do that? Also that will likely risk overflowing u32 since
-                // 170MHz * 32 = 5.44GHz > u32::MAX.Hz()
-                let clk = HertzU64::from($TIMX::get_timer_frequency(&rcc.clocks)) * 32;
-
-                let (period, prescaler_bits) = <TimerHrTim<PSCL>>::calculate_frequency(clk, freq, Alignment::Left);
-
-                // Write prescaler
-                tim.$timXcr.write(|w| unsafe { w.cont().set_bit().ck_pscx().bits(prescaler_bits as u8) });
-
-                // Write period
-                tim.$perXr.write(|w| unsafe { w.perx().bits(period as u16) });
-
-                // Start timer
-                cortex_m::interrupt::free(|_| {
-                    let master = unsafe { &*HRTIM_MASTER::ptr() };
-                    master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
-                });
+            // Implement HrPwmExt trait for hrtimer
+            impl HrPwmExt for $TIMX {
+                fn pwm<PINS, T, U, V>(
+                    self,
+                    pins: PINS,
+                    frequency: T,
+                    control: &mut HrPwmControl,
+                    rcc: &mut Rcc,
+                ) -> PINS::Channel
+                where
+                    PINS: Pins<Self, U, V> + ToHrOut,
+                    T: Into<Hertz>,
+                    U: HrtimChannel<Pscl128>,
+                {
+                    let _= self.pwm_advanced(pins, rcc).frequency(frequency).finalize(control);
 
                 unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
+                }
             }
 
             impl HrPwmAdvExt for $TIMX {
@@ -312,16 +279,10 @@ macro_rules! hrtim_hal {
                     PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
                     CHANNEL: HrtimChannel<Pscl128>
                 {
-                    unsafe {
-                        let rcc_ptr = &(*RCC::ptr());
-                        $TIMX::enable(rcc_ptr);
-                        $TIMX::reset(rcc_ptr);
-                    }
-
                     // TODO: That 32x factor... Is that included below, or should we
                     // do that? Also that will likely risk overflowing u32 since
                     // 170MHz * 32 = 5.44GHz > u32::MAX.Hz()
-                    let clk = HertzU64::from($TIMX::get_timer_frequency(&rcc.clocks)) * 32;
+                    let clk = HertzU64::from(HRTIM_COMMON::get_timer_frequency(&rcc.clocks)) * 32;
 
                     HrPwmBuilder {
                         _tim: PhantomData,
@@ -345,7 +306,7 @@ macro_rules! hrtim_hal {
             where
                 PSCL: HrtimPrescaler,
             {
-                pub fn finalize(self) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>), OUT) {
+                pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>), OUT) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     let (period, prescaler_bits) = match self.count {
@@ -424,10 +385,6 @@ macro_rules! hrtim_hal {
                         alignment,
                         base_freq,
                         count,
-                        //bkin_enabled: false,
-                        //bkin2_enabled: false,
-                        //fault_polarity: Polarity::ActiveLow,
-                        //deadtime: 0.nanos(),
                     }
                 }
 
@@ -473,7 +430,7 @@ macro_rules! hrtim_hal {
 
 macro_rules! hrtim_pin_hal {
     ($($TIMX:ident:
-        ($CH:ident, $perXr:ident, $cmpXYr:ident, $cmpYx:ident, $cmpY:ident, $tXYoen:ident, $setXYr:ident, $rstXYr:ident),)+
+        ($CH:ident, $perXr:ident, $cmpXYr:ident, $cmpYx:ident, $cmpY:ident, $tXYoen:ident, $tXYodis:ident, $setXYr:ident, $rstXYr:ident),)+
      ) => {
         $(
             impl<PSCL, COMP, POL, NPOL> hal::PwmPin for Pwm<$TIMX, $CH<PSCL>, COMP, POL, NPOL>
@@ -533,11 +490,9 @@ macro_rules! hrtim_pin_hal {
 
                     // TODO: Should this part only be in Pwm::enable?
                     // Enable output Y on channel X
-                    // NOTE(unsafe) critical section prevents races
-                    cortex_m::interrupt::free(|_| {
-                        let common = unsafe { &*HRTIM_COMMON::ptr() };
-                        common.oenr.modify(|_r, w| { w.$tXYoen().set_bit() });
-                    });
+                    // This is a set-only register, no risk for data race
+                    let common = unsafe { &*HRTIM_COMMON::ptr() };
+                    common.oenr.write(|w| { w.$tXYoen().set_bit() });
                 }
                 fn ccer_disable(&mut self) {
                     let tim = unsafe { &*$TIMX::ptr() };
@@ -545,13 +500,10 @@ macro_rules! hrtim_pin_hal {
                     tim.$setXYr.reset();
 
                     // TODO: Should this part only be in Pwm::disable
-                    // Do we want a potentially floating output after after disable?
                     // Disable output Y on channel X
-                    // NOTE(unsafe) critical section prevents races
-                    cortex_m::interrupt::free(|_| {
-                        let common = unsafe { &*HRTIM_COMMON::ptr() };
-                        common.oenr.modify(|_r, w| { w.$tXYoen().clear_bit() });
-                    });
+                    // This is a write only register, no risk for data race
+                    let common = unsafe { &*HRTIM_COMMON::ptr() };
+                    common.odisr.write(|w| { w.$tXYodis().set_bit() });
                 }
             }
         )+
@@ -573,19 +525,19 @@ macro_rules! hrtim_out_common {
 }
 
 macro_rules! hrtim_out {
-    ($($TIMX:ident: $out_type:ident: $tXYoen:ident, $setXYr:ident, $rstXYr:ident,)+) => {$(
+    ($($TIMX:ident: $out_type:ident: $tXYoen:ident, $tXYodis:ident, $tXYods:ident, $setXYr:ident, $rstXYr:ident,)+) => {$(
         impl HrOutput for $out_type<$TIMX> {
             fn enable(&mut self) {
                 cortex_m::interrupt::free(|_| {
                     let common = unsafe { &*HRTIM_COMMON::ptr() };
-                    common.oenr.modify(|_r, w| { w.$tXYoen().set_bit() });
+                    common.oenr.write(|w| { w.$tXYoen().set_bit() });
                 });
             }
 
             fn disable(&mut self) {
                 cortex_m::interrupt::free(|_| {
                     let common = unsafe { &*HRTIM_COMMON::ptr() };
-                    common.oenr.modify(|_r, w| { w.$tXYoen().clear_bit() });
+                    common.odisr.write(|w| { w.$tXYodis().set_bit() });
                 });
             }
 
@@ -602,31 +554,48 @@ macro_rules! hrtim_out {
             fn disable_rst_event(&mut self, reset_event: EventSource) {
                 hrtim_out_common!($TIMX, reset_event, $rstXYr, clear_bit)
             }
+
+            fn get_state(&self) -> State {
+                let ods;
+                let oen;
+
+                unsafe {
+                    let common = &*HRTIM_COMMON::ptr();
+                    ods = common.odsr.read().$tXYods().bit_is_set();
+                    oen = common.oenr.read().$tXYoen().bit_is_set();
+                }
+
+                match (oen, ods) {
+                    (true, _) => State::Running,
+                    (false, false) => State::Idle,
+                    (false, true) => State::Fault
+                }
+            }
         }
     )+};
 }
 
 hrtim_out! {
-    HRTIM_TIMA: HrOut1: ta1oen, seta1r, rsta1r,
-    HRTIM_TIMA: HrOut2: ta2oen, seta2r, rsta2r,
+    HRTIM_TIMA: HrOut1: ta1oen, ta1odis, ta1ods, seta1r, rsta1r,
+    HRTIM_TIMA: HrOut2: ta2oen, ta1odis, ta2ods, seta2r, rsta2r,
 
-    HRTIM_TIMB: HrOut1: tb1oen, setb1r, rstb1r,
-    HRTIM_TIMB: HrOut2: tb2oen, setb2r, rstb2r,
+    HRTIM_TIMB: HrOut1: tb1oen, tb1odis, tb1ods, setb1r, rstb1r,
+    HRTIM_TIMB: HrOut2: tb2oen, tb2odis, tb2ods, setb2r, rstb2r,
 
-    HRTIM_TIMC: HrOut1: tc1oen, setc1r, rstc1r,
-    HRTIM_TIMC: HrOut2: tc2oen, setc2r, rstc2r,
+    HRTIM_TIMC: HrOut1: tc1oen, tc1odis, tc1ods, setc1r, rstc1r,
+    HRTIM_TIMC: HrOut2: tc2oen, tc2odis, tc2ods, setc2r, rstc2r,
 
-    HRTIM_TIMD: HrOut1: td1oen, setd1r, rstd1r,
-    HRTIM_TIMD: HrOut2: td2oen, setd2r, rstd2r,
+    HRTIM_TIMD: HrOut1: td1oen, td1odis, td1ods, setd1r, rstd1r,
+    HRTIM_TIMD: HrOut2: td2oen, td2odis, td2ods, setd2r, rstd2r,
 
-    HRTIM_TIME: HrOut1: te1oen, sete1r, rste1r,
-    HRTIM_TIME: HrOut2: te2oen, sete2r, rste2r,
+    HRTIM_TIME: HrOut1: te1oen, te1odis, te1ods, sete1r, rste1r,
+    HRTIM_TIME: HrOut2: te2oen, te2odis, te2ods, sete2r, rste2r,
 
     // TODO: Somehow, there is no rstf1r
-    //HRTIM_TIMF: HrOut1: tf1oen, setf1r, rstf1r,
+    //HRTIM_TIMF: HrOut1: tf1oen, tf1odis, tf1ods, setf1r, rstf1r,
 
     // TODO: Somehow, there is no tf2oen
-    //HRTIM_TIMF: HrOut2: tf2oen, setf2r, rstf2r,
+    //HRTIM_TIMF: HrOut2: tf2oen, tf2odis, tf2ods, setf2r, rstf2r,
 }
 
 macro_rules! hrtim_cr_helper {
@@ -704,27 +673,27 @@ hrtim_hal! {
 }
 
 hrtim_pin_hal! {
-    HRTIM_TIMA: (CH1, perar, cmp1ar, cmp1x, cmp1, ta1oen, seta1r, rsta1r),
-    HRTIM_TIMA: (CH2, perar, cmp3ar, cmp3x, cmp3, ta2oen, seta2r, rsta2r),
+    HRTIM_TIMA: (CH1, perar, cmp1ar, cmp1x, cmp1, ta1oen, ta1odis, seta1r, rsta1r),
+    HRTIM_TIMA: (CH2, perar, cmp3ar, cmp3x, cmp3, ta2oen, ta2odis, seta2r, rsta2r),
 
-    HRTIM_TIMB: (CH1, perbr, cmp1br, cmp1x, cmp1, tb1oen, setb1r, rstb1r),
-    HRTIM_TIMB: (CH2, perbr, cmp3br, cmp3x, cmp3, tb2oen, setb2r, rstb2r),
+    HRTIM_TIMB: (CH1, perbr, cmp1br, cmp1x, cmp1, tb1oen, tb1odis, setb1r, rstb1r),
+    HRTIM_TIMB: (CH2, perbr, cmp3br, cmp3x, cmp3, tb2oen, tb2odis, setb2r, rstb2r),
 
-    HRTIM_TIMC: (CH1, percr, cmp1cr, cmp1x, cmp1, tc1oen, setc1r, rstc1r),
-    HRTIM_TIMC: (CH2, percr, cmp3cr, cmp3x, cmp3, tc2oen, setc2r, rstc2r),
+    HRTIM_TIMC: (CH1, percr, cmp1cr, cmp1x, cmp1, tc1oen, tc1odis, setc1r, rstc1r),
+    HRTIM_TIMC: (CH2, percr, cmp3cr, cmp3x, cmp3, tc2oen, tc2odis, setc2r, rstc2r),
 
 
-    HRTIM_TIMD: (CH1, perdr, cmp1dr, cmp1x, cmp1, td1oen, setd1r, rstd1r),
-    HRTIM_TIMD: (CH2, perdr, cmp3dr, cmp3x, cmp3, td2oen, setd2r, rstd2r),
+    HRTIM_TIMD: (CH1, perdr, cmp1dr, cmp1x, cmp1, td1oen, td1odis, setd1r, rstd1r),
+    HRTIM_TIMD: (CH2, perdr, cmp3dr, cmp3x, cmp3, td2oen, td2odis, setd2r, rstd2r),
 
-    HRTIM_TIME: (CH1, perer, cmp1er, cmp1x, cmp1, te1oen, sete1r, rste1r),
-    HRTIM_TIME: (CH2, perer, cmp3er, cmp3x, cmp3, te2oen, sete2r, rste2r),
+    HRTIM_TIME: (CH1, perer, cmp1er, cmp1x, cmp1, te1oen, te1odis, sete1r, rste1r),
+    HRTIM_TIME: (CH2, perer, cmp3er, cmp3x, cmp3, te2oen, te2odis, sete2r, rste2r),
 
     // TODO: tf1oen and rstf1r are not defined
-    //HRTIM_TIMF: (CH1, perfr, cmp1fr, cmp1x, cmp1, tf1oen, setf1r, rstf1r),
+    //HRTIM_TIMF: (CH1, perfr, cmp1fr, cmp1x, cmp1, tf1oen, tf1odis, setf1r, rstf1r),
 
     // TODO: tf2oen is not defined
-    //HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, setf2r, rstf2r),
+    //HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, tf2odis, setf2r, rstf2r),
 }
 
 pub trait HrtimPrescaler {
@@ -780,3 +749,93 @@ pub trait HrtimChannel<PSCL> {}
 
 impl<PSCL> HrtimChannel<PSCL> for CH1<PSCL> {}
 impl<PSCL> HrtimChannel<PSCL> for CH2<PSCL> {}
+
+pub struct HrPwmControl {
+    _x: PhantomData<()>,
+}
+
+/// The divsion ratio between f_hrtim and the fault signal sampling clock for digital filters
+pub enum FaultSamplingClkDiv {
+    /// No division
+    ///
+    /// fault signal sampling clock = f_hrtim
+    None = 0b00,
+
+    /// 1/2
+    ///
+    /// fault signal sampling clock = f_hrtim / 2
+    Two = 0b01,
+
+    /// 1/4
+    ///
+    /// fault signal sampling clock = f_hrtim / 4
+    Four = 0b10,
+
+    /// 1/8
+    ///
+    /// fault signal sampling clock = f_hrtim / 8
+    Eight = 0b11,
+}
+
+pub struct FaultInputs {
+    _x: (),
+}
+
+pub trait HrControltExt {
+    fn hr_control(self, _rcc: &mut Rcc) -> HrTimOngoingCalibration;
+}
+
+impl HrControltExt for HRTIM_COMMON {
+    fn hr_control(self, _rcc: &mut Rcc) -> HrTimOngoingCalibration {
+        let common = unsafe { &*HRTIM_COMMON::ptr() };
+
+        unsafe {
+            let rcc_ptr = &*RCC::ptr();
+
+            HRTIM_COMMON::enable(rcc_ptr);
+            HRTIM_COMMON::reset(rcc_ptr);
+        }
+
+        // Start calibration procedure
+        common
+            .dllcr
+            .write(|w| w.cal().set_bit().calen().clear_bit());
+
+        HrTimOngoingCalibration {
+            divider: FaultSamplingClkDiv::None,
+        }
+    }
+}
+
+pub struct HrTimOngoingCalibration {
+    divider: FaultSamplingClkDiv,
+}
+
+impl HrTimOngoingCalibration {
+    /// SAFETY: Calibration needs to be done before calling this
+    unsafe fn init(self) -> (HrPwmControl, FaultInputs) {
+        let common = unsafe { &*HRTIM_COMMON::ptr() };
+
+        unsafe {
+            // Enable periodic calibration
+            // with f_hrtim at 170MHz, these settings leads to
+            // a period of about 6.2ms
+            common
+                .dllcr
+                .modify(|_r, w| w.calrte().bits(0b00).cal().set_bit().calen().clear_bit());
+            common.fltinr2.write(|w| w.fltsd().bits(self.divider as u8));
+        }
+
+        (HrPwmControl { _x: PhantomData }, FaultInputs { _x: () })
+    }
+
+    pub fn wait_for_calibration(self) -> (HrPwmControl, FaultInputs) {
+        let common = unsafe { &*HRTIM_COMMON::ptr() };
+        while common.isr.read().dllrdy().bit_is_clear() {
+            // Wait until ready
+        }
+
+        // Calibration is now done, it is safe to continue
+        unsafe { self.init() }
+    }
+}
