@@ -100,7 +100,13 @@ pins_tuples! {
 /// Allows the pwm() method to be added to the peripheral register structs from the device crate
 pub trait HrPwmExt: Sized {
     /// The requested frequency will be rounded to the nearest achievable frequency; the actual frequency may be higher or lower than requested.
-    fn pwm<PINS, T, U, V>(self, _pins: PINS, frequency: T, control: &mut HrPwmControl, rcc: &mut Rcc) -> PINS::Channel
+    fn pwm<PINS, T, U, V>(
+        self,
+        _pins: PINS,
+        frequency: T,
+        control: &mut HrPwmControl,
+        rcc: &mut Rcc,
+    ) -> PINS::Channel
     where
         PINS: Pins<Self, U, V> + ToHrOut,
         T: Into<Hertz>,
@@ -528,17 +534,13 @@ macro_rules! hrtim_out {
     ($($TIMX:ident: $out_type:ident: $tXYoen:ident, $tXYodis:ident, $tXYods:ident, $setXYr:ident, $rstXYr:ident,)+) => {$(
         impl HrOutput for $out_type<$TIMX> {
             fn enable(&mut self) {
-                cortex_m::interrupt::free(|_| {
-                    let common = unsafe { &*HRTIM_COMMON::ptr() };
-                    common.oenr.write(|w| { w.$tXYoen().set_bit() });
-                });
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common.oenr.write(|w| { w.$tXYoen().set_bit() });
             }
 
             fn disable(&mut self) {
-                cortex_m::interrupt::free(|_| {
-                    let common = unsafe { &*HRTIM_COMMON::ptr() };
-                    common.odisr.write(|w| { w.$tXYodis().set_bit() });
-                });
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common.odisr.write(|w| { w.$tXYodis().set_bit() });
             }
 
             fn enable_set_event(&mut self, set_event: EventSource) {
