@@ -37,12 +37,14 @@ fn main() -> ! {
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let cp = stm32::CorePeripherals::take().expect("cannot take core");
-    // Set system frequency to 16MHz * 75/4/2 = 150MHz
-    // This would lead to HrTim running at 150MHz * 32 = 4.8GHz...
+    // Set system frequency to 16MHz * 15/1/2 = 120MHz
+    // This would lead to HrTim running at 120MHz * 32 = 3.84...
     let mut rcc = dp.RCC.freeze(rcc::Config::pll().pll_cfg(rcc::PllConfig {
-        n: rcc::PllNMul::MUL_75,
-        m: rcc::PllMDiv::DIV_4,
+        mux: rcc::PLLSrc::HSI,
+        n: rcc::PllNMul::MUL_15,
+        m: rcc::PllMDiv::DIV_1,
         r: Some(rcc::PllRDiv::DIV_2),
+
         ..Default::default()
     }));
 

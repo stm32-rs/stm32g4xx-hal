@@ -4,6 +4,8 @@
 
 use cortex_m_rt::entry;
 use fugit::ExtU32;
+use hal::comparator::{ComparatorExt, ComparatorSplit, Config, Hysteresis, RefintInput};
+use hal::dac::{Dac1IntSig1, DacExt, DacOut};
 use hal::gpio::gpioa::PA8;
 use hal::gpio::Alternate;
 use hal::gpio::AF13;
@@ -41,14 +43,36 @@ fn main() -> ! {
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let gpiob = dp.GPIOB.split(&mut rcc);
+
+    let dac1ch1 = dp.DAC1.constrain(Dac1IntSig1, &mut rcc);
+    let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable();
+
+    // Use dac to define the fault threshold
+    // 2^12 / 2 = 2^11 for about half of VCC
+    let fault_limit = 1 << 11;
+    dac.set_value(fault_limit);
+
+    let (comp1, ..) = dp.COMP.split(&mut rcc);
+
+    let pa1 = gpioa.pa1.into_analog();
+    let comp1 = comp1
+        .comparator(
+            &pa1,
+            &dac,
+            Config::default()
+                .hysteresis(Hysteresis::None)
+                .output_inverted(),
+            &rcc.clocks,
+        )
+        .enable();
+
     let (mut fault_control, flt_inputs) =
         dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
 
-    let fault_source3 = flt_inputs
-        .fault_input3
-        .bind_pin(gpiob.pb10.into_pull_down_input())
-        .polarity(hal::pwm::Polarity::ActiveHigh)
+    let fault_source4 = flt_inputs
+        .fault_input4
+        .bind_comp(&comp1)
+        .polarity(hal::pwm::Polarity::ActiveLow)
         .finalize(&mut fault_control);
 
     // ...with a prescaler of 4 this gives us a HrTimer with a tick rate of 1.2GHz
@@ -76,17 +100,9 @@ fn main() -> ! {
         .pwm_advanced(pin_a, &mut rcc)
         .prescaler(prescaler)
         .period(0xFFFF)
-        //.with_fault_source(fault_source1)
-        //.with_fault_source(fault_source2)
-        .with_fault_source(fault_source3) // Set fault source
-        //.with_fault_source(fault_source4)
-        //.with_fault_source(fault_source5)
-        //.with_fault_source(fault_source6)
+        .with_fault_source(fault_source4) // Set fault source
         .fault_action1(FaultAction::ForceInactive)
         .fault_action2(FaultAction::ForceInactive)
-        // alternated every period with one being
-        // inactive and the other getting to output its wave form
-        // as normal
         .finalize(&mut fault_control);
 
     out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
@@ -100,10 +116,15 @@ fn main() -> ! {
     loop {
         for _ in 0..5 {
             delay.delay(500_u32.millis());
-            defmt::info!("State: {}", out1.get_state());
+            defmt::info!(
+                "State: {}, comp: {}, is_fault_active: {}",
+                out1.get_state(),
+                comp1.output(),
+                fault_control.fault_4.is_fault_active()
+            );
         }
-        if fault_control.fault_3.is_fault_active() {
-            fault_control.fault_3.clear_fault(); // Clear fault every 5s
+        if fault_control.fault_4.is_fault_active() {
+            fault_control.fault_4.clear_fault(); // Clear fault every 5s
             out1.enable();
             defmt::info!("failt cleared, and output reenabled");
         }

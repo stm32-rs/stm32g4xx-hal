@@ -1885,6 +1885,11 @@ macro_rules! adc {
                 /// Calibrate the adc for <Input Type>
                 #[inline(always)]
                 pub fn calibrate(&mut self, it: config::InputType) {
+                    let cr = self.adc_reg.cr().read();
+                    assert!(cr.aden().bit_is_clear());
+                    assert!(cr.adstart().bit_is_clear());
+                    assert!(cr.jadstart().bit_is_clear());
+
                     match it {
                         config::InputType::SingleEnded => {
                             self.adc_reg.cr().modify(|_, w| w.adcaldif().clear_bit() );
