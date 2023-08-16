@@ -209,7 +209,7 @@ macro_rules! opamps {
                 ) -> (
                     $($opamp::Disabled,)*
                 ) {
-                    rcc.rb.apb2enr.write(|w| w.syscfgen().set_bit());
+                    rcc.rb.apb2enr.modify(|_, w| w.syscfgen().set_bit());
 
                     (
                         $($opamp::Disabled,)*
