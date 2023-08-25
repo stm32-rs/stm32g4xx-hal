@@ -79,7 +79,7 @@ fn main() -> ! {
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)
-        .push_pull_mode(true) // Set push pull mode, out1 and out2 are
+        //.push_pull_mode(true) // Set push pull mode, out1 and out2 are
         // alternated every period with one being
         // inactive and the other getting to output its wave form
         // as normal
@@ -96,17 +96,17 @@ fn main() -> ! {
     out1.enable_rst_event(EventSource::MasterCr1); // Set low on compare match with cr1
     out2.enable_rst_event(EventSource::MasterCr1);
 
-    out1.enable_set_event(EventSource::Period); // Set high at new period
-    out2.enable_set_event(EventSource::Period);
+    out1.enable_set_event(EventSource::MasterPeriod); // Set high at new period
+    out2.enable_set_event(EventSource::MasterPeriod);
 
     out1.enable();
     out2.enable();
 
     let tima = unsafe { &*stm32g4xx_hal::stm32::HRTIM_TIMA::ptr() };
     info!("set1r: {}", tima.seta1r.read().bits());
-    info!("set2r: {}", tima.seta2r.read().bits());
-
     info!("rst1r: {}", tima.rsta1r.read().bits());
+    
+    info!("set2r: {}", tima.seta2r.read().bits());
     info!("rst2r: {}", tima.rsta2r.read().bits());
 
     info!("Running");
@@ -117,9 +117,9 @@ fn main() -> ! {
             let new_period = u16::MAX / i;
 
             mcr1.set_duty(new_period / 3);
-            //cr1.set_duty(new_period / 3);
+            cr1.set_duty(new_period / 3 - 1000);
             mtimer.set_period(new_period);
-            //timer.set_period(new_period);
+            timer.set_period(new_period - 1000);
             
             info!("period: {}, duty: {}, get_duty: {}, get_period: {}", new_period, new_period / 3, mcr1.get_duty(), mtimer.get_period());
 
