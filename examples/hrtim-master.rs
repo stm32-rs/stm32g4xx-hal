@@ -4,9 +4,6 @@
 
 use cortex_m_rt::entry;
 
-use defmt_rtt as _; // global logger
-use panic_probe as _;
-
 #[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
 #[entry]
 fn main() -> ! {
@@ -14,9 +11,16 @@ fn main() -> ! {
     loop {}
 }
 
+use utils::logger::info;
+
+#[macro_use]
+mod utils;
+
 #[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
 #[entry]
 fn main() -> ! {
+    utils::logger::init();
+
     use fugit::ExtU32;
     use hal::gpio::gpioa::PA8;
     use hal::gpio::gpioa::PA9;
@@ -29,7 +33,7 @@ fn main() -> ! {
     use hal::pwm::hrtim::HrOutput;
     use hal::pwm::hrtim::HrPwmAdvExt;
     use hal::pwm::hrtim::HrTimer;
-    use hal::pwm::hrtim::Pscl4;
+    use hal::pwm::hrtim::{Pscl4, MasterPreloadSource};
     use hal::rcc;
     use hal::stm32;
     use stm32g4xx_hal as hal;
@@ -75,15 +79,22 @@ fn main() -> ! {
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)
-        .period(0xFFFF)
         .push_pull_mode(true) // Set push pull mode, out1 and out2 are
         // alternated every period with one being
         // inactive and the other getting to output its wave form
         // as normal
         .finalize(&mut fault_control);
 
-    out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
-    out2.enable_rst_event(EventSource::Cr1);
+    let (mut mtimer, (mut mcr1, cr2, cr3, cr4)) = dp
+        .HRTIM_MASTER
+        .pwm_advanced((), &mut rcc)
+        .prescaler(prescaler)
+        .preload(MasterPreloadSource::OnMasterRepetitionUpdate)
+        .period(0xFFFF)
+        .finalize(&mut fault_control);
+
+    out1.enable_rst_event(EventSource::MasterCr1); // Set low on compare match with cr1
+    out2.enable_rst_event(EventSource::MasterCr1);
 
     out1.enable_set_event(EventSource::Period); // Set high at new period
     out2.enable_set_event(EventSource::Period);
@@ -91,15 +102,28 @@ fn main() -> ! {
     out1.enable();
     out2.enable();
 
+    let tima = unsafe { &*stm32g4xx_hal::stm32::HRTIM_TIMA::ptr() };
+    info!("set1r: {}", tima.seta1r.read().bits());
+    info!("set2r: {}", tima.seta2r.read().bits());
+
+    info!("rst1r: {}", tima.rsta1r.read().bits());
+    info!("rst2r: {}", tima.rsta2r.read().bits());
+
+    info!("Running");
+
     loop {
         // Step frequency from 18kHz to about 180kHz(half of that when only looking at one pin)
         for i in 1..10 {
             let new_period = u16::MAX / i;
 
-            cr1.set_duty(new_period / 3);
-            timer.set_period(new_period);
+            mcr1.set_duty(new_period / 3);
+            //cr1.set_duty(new_period / 3);
+            mtimer.set_period(new_period);
+            //timer.set_period(new_period);
+            
+            info!("period: {}, duty: {}, get_duty: {}, get_period: {}", new_period, new_period / 3, mcr1.get_duty(), mtimer.get_period());
 
-            delay.delay(500_u32.millis());
+            delay.delay(5000_u32.millis());
         }
     }
 }

@@ -51,9 +51,12 @@ fn main() -> ! {
         .ADC1
         .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
 
-    adc.set_external_trigger((adc::config::TriggerMode::RisingEdge, ExternalTrigger12::Hrtim_adc_trg_1));
+    adc.set_external_trigger((
+        adc::config::TriggerMode::RisingEdge,
+        ExternalTrigger12::Hrtim_adc_trg_1,
+    ));
     adc.enable_temperature(&dp.ADC12_COMMON);
-    adc.set_continuous(Continuous::Continuous);
+    adc.set_continuous(Continuous::Discontinuous);
     adc.reset_sequence();
     adc.configure_channel(&pa0, Sequence::One, SampleTime::Cycles_640_5);
     adc.configure_channel(&Temperature, Sequence::Two, SampleTime::Cycles_640_5);
@@ -67,6 +70,36 @@ fn main() -> ! {
     );
 
     transfer.start(|adc| adc.start_conversion());
+
+    //        .               .
+    //        .  50%          .
+    //         ------          ------
+    //out1    |      |        |      |
+    //        |      |        |      |
+    // --------      ----------      --------
+    let (mut fault_control, _) = dp
+        .HRTIM_COMMON
+        .hr_control(&mut rcc)
+        .set_adc_trigger1(Adc13Trigger::)
+        .wait_for_calibration();
+    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
+        .HRTIM_TIMA
+        .pwm_advanced((pin_a, pin_b), &mut rcc)
+        .prescaler(prescaler)
+        .period(0xFFFF)
+        // alternated every period with one being
+        // inactive and the other getting to output its wave form
+        // as normal
+        .finalize(&mut fault_control);
+
+    out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
+    out2.enable_rst_event(EventSource::Cr1);
+
+    out1.enable_set_event(EventSource::Period); // Set high at new period
+    out2.enable_set_event(EventSource::Period);
+
+    out1.enable();
+    out2.enable();
 
     loop {
         let mut b = [0_u16; 4];

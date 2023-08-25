@@ -64,6 +64,14 @@ pins! {
     HRTIM_TIMF: CH1: PC6<Alternate<AF13>>, CH2: PC7<Alternate<AF13>>
 }
 
+impl Pins<HRTIM_MASTER, (), ComplementaryImpossible> for () {
+    type Channel = ();
+}
+
+impl ToHrOut for () {
+    type Out = ();
+}
+
 // automatically implement Pins trait for tuples of individual pins
 macro_rules! pins_tuples {
     // Tuple of two pins
@@ -87,10 +95,12 @@ pins_tuples! {
     (CH2, CH1)
 }
 
+impl<PSCL> HrtimChannel<PSCL> for () {}
+
 /*pub struct Hrtimer<PSCL, TIM> {
     _prescaler: PhantomData<PSCL>,
     _timer: PhantomData<TIM>,
-    period: u16, // $perXr.perx
+    period: u16, // $perXr.$perx
 
     cmp_value1: u16, // $cmpX1r.cmp1x
     cmp_value2: u16, // $cmpX2r.cmp2x
@@ -116,25 +126,27 @@ pub trait HrPwmExt: Sized {
 }
 
 pub trait HrPwmAdvExt: Sized {
+    type PreloadSource;
+
     fn pwm_advanced<PINS, CHANNEL, COMP>(
         self,
         _pins: PINS,
         rcc: &mut Rcc,
-    ) -> HrPwmBuilder<Self, Pscl128, PINS::Out>
+    ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out>
     where
         PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
         CHANNEL: HrtimChannel<Pscl128>;
 }
 
 /// HrPwmBuilder is used to configure advanced HrTim PWM features
-pub struct HrPwmBuilder<TIM, PSCL, OUT> {
+pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
     _tim: PhantomData<TIM>,
     _prescaler: PhantomData<PSCL>,
     _out: PhantomData<OUT>,
     alignment: Alignment,
     base_freq: HertzU64,
     count: CountSettings,
-    preload_source: Option<PreloadSource>,
+    preload_source: Option<PS>,
     fault_enable_bits: u8,
     fault1_bits: u8,
     fault2_bits: u8,
@@ -145,6 +157,11 @@ pub struct HrPwmBuilder<TIM, PSCL, OUT> {
 pub enum PreloadSource {
     /// Preloaded registers are updated on counter roll over or counter reset
     OnCounterReset,
+}
+
+pub enum MasterPreloadSource {
+    /// Prealoaded registers are updaten when the master counter rolls over and the master repetition counter is 0
+    OnMasterRepetitionUpdate,
 }
 
 pub trait HrCompareRegister {
@@ -224,8 +241,9 @@ pub enum EventSource {
     /// Compare match with compare register 4 of this timer
     Cr4,
 
+    /// On complete period
     Period,
-    /*
+
     /// Compare match with compare register 1 of master timer
     MasterCr1,
 
@@ -238,7 +256,8 @@ pub enum EventSource {
     /// Compare match with compare register 4 of master timer
     MasterCr4,
 
-    MasterPeriod,*/
+    /// On complete master period
+    MasterPeriod,
     // TODO: These are unique for every timer output
     //Extra(E)
 }
@@ -257,9 +276,174 @@ where
 pub struct HrOut1<TIM>(PhantomData<TIM>);
 pub struct HrOut2<TIM>(PhantomData<TIM>);
 
+macro_rules! hrtim_finalize_body {
+    ($this:expr, $PreloadSource:ident, $TIMX:ident: (
+        $timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident $(, $fltXr:ident, $outXr:ident)*),
+    ) => {{
+        let tim = unsafe { &*$TIMX::ptr() };
+        let (period, prescaler_bits) = match $this.count {
+            CountSettings::Period(period) => (period as u32, PSCL::BITS as u16),
+            CountSettings::Frequency( freq ) => {
+                <TimerHrTim<PSCL>>::calculate_frequency($this.base_freq, freq, $this.alignment)
+            },
+        };
+
+        // Write prescaler and any special modes
+        tim.$timXcr.modify(|_r, w| unsafe {
+            w
+                // Enable Continous mode
+                .cont().set_bit()
+
+                // TODO: add support for more modes
+
+                // Set prescaler
+                .$ck_psc().bits(prescaler_bits as u8)
+        });
+
+        $(
+            // Only available for timers with outputs(not HRTIM_MASTER)
+            let _ = tim.$outXr;
+            tim.$timXcr.modify(|_r, w|
+                // Push-Pull mode
+                w.pshpll().bit($this.enable_push_pull)
+            );
+        )*
+
+        // Write period
+        tim.$perXr.write(|w| unsafe { w.$perx().bits(period as u16) });
+
+        // Enable fault sources and lock configuration
+
+        $(unsafe {
+            // Enable fault sources
+            let fault_enable_bits = $this.fault_enable_bits as u32;
+            tim.$fltXr.write(|w| w
+                .flt1en().bit(fault_enable_bits & (1 << 0) != 0)
+                .flt2en().bit(fault_enable_bits & (1 << 1) != 0)
+                .flt3en().bit(fault_enable_bits & (1 << 2) != 0)
+                .flt4en().bit(fault_enable_bits & (1 << 3) != 0)
+                .flt5en().bit(fault_enable_bits & (1 << 4) != 0)
+                .flt6en().bit(fault_enable_bits & (1 << 5) != 0)
+            );
+
+            // ... and lock configuration
+            tim.$fltXr.modify(|_r, w| w.fltlck().set_bit());
+
+            // Set actions on fault for both outputs
+            tim.$outXr.modify(|_r, w| w
+                .fault1().bits($this.fault1_bits)
+                .fault2().bits($this.fault2_bits)
+            );
+        })*
+
+
+        hrtim_finalize_body!($PreloadSource, $this, tim, $timXcr);
+
+        // Start timer
+        let master = unsafe { &*HRTIM_MASTER::ptr() };
+        master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
+
+        unsafe {
+            MaybeUninit::uninit().assume_init()
+        }
+    }};
+
+    (PreloadSource, $this:expr, $tim:expr, $timXcr:ident) => {{
+        match $this.preload_source {
+            Some(PreloadSource::OnCounterReset) => {
+                $tim.$timXcr.modify(|_r, w| w
+                    .tx_rstu().set_bit()
+                    .preen().set_bit()
+                )
+            },
+            None => ()
+        }
+    }};
+
+    (MasterPreloadSource, $this:expr, $tim:expr, $timXcr:ident) => {{
+        match $this.preload_source {
+            Some(MasterPreloadSource::OnMasterRepetitionUpdate) => {
+                $tim.$timXcr.modify(|_r, w| w
+                    .mrepu().set_bit()
+                    .preen().set_bit()
+                )
+            }
+            None => ()
+        }
+    }};
+}
+
+macro_rules! hrtim_common_methods {
+    ($TIMX:ident, $PS:ident) => {
+        /// Set the PWM frequency; will overwrite the previous prescaler and period
+        /// The requested frequency will be rounded to the nearest achievable frequency; the actual frequency may be higher or lower than requested.
+        pub fn frequency<T: Into<Hertz>>(mut self, freq: T) -> Self {
+            self.count = CountSettings::Frequency(freq.into());
+
+            self
+        }
+
+        /// Set the prescaler; PWM count runs at base_frequency/(prescaler+1)
+        pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, $PS, OUT>
+        where
+            P: HrtimPrescaler,
+        {
+            let HrPwmBuilder {
+                _tim,
+                _prescaler: _,
+                _out,
+                fault_enable_bits,
+                fault1_bits,
+                fault2_bits,
+                enable_push_pull,
+                alignment,
+                base_freq,
+                count,
+                preload_source,
+            } = self;
+
+            let period = match count {
+                CountSettings::Frequency(_) => u16::MAX,
+                CountSettings::Period(period) => period,
+            };
+
+            let count = CountSettings::Period(period);
+
+            HrPwmBuilder {
+                _tim,
+                _prescaler: PhantomData,
+                _out,
+                fault_enable_bits,
+                fault1_bits,
+                fault2_bits,
+                enable_push_pull,
+                alignment,
+                base_freq,
+                count,
+                preload_source,
+                //deadtime: 0.nanos(),
+            }
+        }
+
+        // TODO: Allow setting multiple?
+        pub fn preload(mut self, preload_source: $PS) -> Self {
+            self.preload_source = Some(preload_source);
+
+            self
+        }
+
+        /// Set the period; PWM count runs from 0 to period, repeating every (period+1) counts
+        pub fn period(mut self, period: u16) -> Self {
+            self.count = CountSettings::Period(period);
+
+            self
+        }
+    };
+}
+
 // Implement PWM configuration for timer
 macro_rules! hrtim_hal {
-    ($($TIMX:ident: ($timX:ident, $timXcr:ident, $perXr:ident, $tXcen:ident, $fltXr:ident, $outXr:ident),)+) => {
+    ($($TIMX:ident: ($timXcr:ident, $perXr:ident, $tXcen:ident, $fltXr:ident, $outXr:ident),)+) => {
         $(
 
             // Implement HrPwmExt trait for hrtimer
@@ -283,11 +467,13 @@ macro_rules! hrtim_hal {
             }
 
             impl HrPwmAdvExt for $TIMX {
+                type PreloadSource = PreloadSource;
+
                 fn pwm_advanced<PINS, CHANNEL, COMP>(
                     self,
                     _pins: PINS,
                     rcc: &mut Rcc,
-                ) -> HrPwmBuilder<Self, Pscl128, PINS::Out>
+                ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out>
                 where
                     PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
                     CHANNEL: HrtimChannel<Pscl128>
@@ -315,136 +501,15 @@ macro_rules! hrtim_hal {
             }
 
             impl<PSCL, OUT>
-                HrPwmBuilder<$TIMX, PSCL, OUT>
+                HrPwmBuilder<$TIMX, PSCL, PreloadSource, OUT>
             where
                 PSCL: HrtimPrescaler,
             {
                 pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>), OUT) {
-                    let tim = unsafe { &*$TIMX::ptr() };
-
-                    let (period, prescaler_bits) = match self.count {
-                        CountSettings::Period(period) => (period as u32, PSCL::BITS as u16),
-                        CountSettings::Frequency( freq ) => {
-                            <TimerHrTim<PSCL>>::calculate_frequency(self.base_freq, freq, self.alignment)
-                        },
-                    };
-
-                    // Write prescaler and any special modes
-                    tim.$timXcr.write(|w| unsafe {
-                        w
-                            // Enable Continous mode
-                            .cont().set_bit()
-
-                            // Push-Pull mode
-                            .pshpll().bit(self.enable_push_pull)
-
-                            // TODO: add support for more modes
-
-                            // Set prescaler
-                            .ck_pscx().bits(prescaler_bits as u8)
-                    });
-
-                    // Write period
-                    tim.$perXr.write(|w| unsafe { w.perx().bits(period as u16) });
-
-                    // Enable fault sources and lock configuration
-                    unsafe {
-                        // Enable fault sources
-                        let fault_enable_bits = self.fault_enable_bits as u32;
-                        tim.$fltXr.write(|w| w
-                            .flt1en().bit(fault_enable_bits & (1 << 0) != 0)
-                            .flt2en().bit(fault_enable_bits & (1 << 1) != 0)
-                            .flt3en().bit(fault_enable_bits & (1 << 2) != 0)
-                            .flt4en().bit(fault_enable_bits & (1 << 3) != 0)
-                            .flt5en().bit(fault_enable_bits & (1 << 4) != 0)
-                            .flt6en().bit(fault_enable_bits & (1 << 5) != 0)
-                        );
-
-                        // ... and lock configuration
-                        tim.$fltXr.modify(|_r, w| w.fltlck().set_bit());
-
-                        // Set actions on fault for both outputs
-                        tim.$outXr.modify(|_r, w| w
-                            .fault1().bits(self.fault1_bits)
-                            .fault2().bits(self.fault2_bits)
-                        );
-
-                        match self.preload_source {
-                            Some(PreloadSource::OnCounterReset) => {
-                                tim.$timXcr.modify(|_r, w| w
-                                    .tx_rstu().set_bit()
-                                    .preen().set_bit()
-                                )
-                            },
-                            None => ()
-                        }
-                    }
-
-                    // Start timer
-                    let master = unsafe { &*HRTIM_MASTER::ptr() };
-                    master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
-
-                    unsafe {
-                        MaybeUninit::uninit().assume_init()
-                    }
+                    hrtim_finalize_body!(self, PreloadSource, $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $fltXr, $outXr),)
                 }
 
-                /// Set the PWM frequency; will overwrite the previous prescaler and period
-                /// The requested frequency will be rounded to the nearest achievable frequency; the actual frequency may be higher or lower than requested.
-                pub fn frequency<T: Into<Hertz>>(mut self, freq: T) -> Self {
-                    self.count = CountSettings::Frequency( freq.into() );
-
-                    self
-                }
-
-                /// Set the prescaler; PWM count runs at base_frequency/(prescaler+1)
-                pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, OUT>
-                where
-                    P: HrtimPrescaler,
-                {
-                    let HrPwmBuilder {
-                        _tim,
-                        _prescaler: _,
-                        _out,
-                        fault_enable_bits,
-                        fault1_bits,
-                        fault2_bits,
-                        enable_push_pull,
-                        alignment,
-                        base_freq,
-                        count,
-                        preload_source,
-                    } = self;
-
-                    let period = match count {
-                        CountSettings::Frequency(_) => u16::MAX,
-                        CountSettings::Period(period) => period,
-                    };
-
-                    let count = CountSettings::Period(period);
-
-                    HrPwmBuilder {
-                        _tim,
-                        _prescaler: PhantomData,
-                        _out,
-                        fault_enable_bits,
-                        fault1_bits,
-                        fault2_bits,
-                        enable_push_pull,
-                        alignment,
-                        base_freq,
-                        count,
-                        preload_source,
-                        //deadtime: 0.nanos(),
-                    }
-                }
-
-                // TODO: Allow setting multiple?
-                pub fn preload(mut self, preload_source: PreloadSource) -> Self {
-                    self.preload_source = Some(preload_source);
-
-                    self
-                }
+                hrtim_common_methods!($TIMX, PreloadSource);
 
                 pub fn with_fault_source<FS>(mut self, _fault_source: FS) -> Self
                     where FS: FaultSource
@@ -462,13 +527,6 @@ macro_rules! hrtim_hal {
 
                 pub fn fault_action2(mut self, fault_action2: FaultAction) -> Self {
                     self.fault2_bits = fault_action2 as _;
-
-                    self
-                }
-
-                /// Set the period; PWM count runs from 0 to period, repeating every (period+1) counts
-                pub fn period(mut self, period: u16) -> Self {
-                    self.count = CountSettings::Period(period);
 
                     self
                 }
@@ -503,12 +561,62 @@ macro_rules! hrtim_hal {
                 //pub fn swap_mode(mut self, enable: bool) -> Self
             }
         )+
-    }
+    };
+}
+
+macro_rules! hrtim_hal_master {
+    ($($TIMX:ident: ($timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident),)+) => {$(
+        impl HrPwmAdvExt for $TIMX {
+            type PreloadSource = MasterPreloadSource;
+
+            fn pwm_advanced<PINS, CHANNEL, COMP>(
+                self,
+                _pins: PINS,
+                rcc: &mut Rcc,
+            ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out>
+            where
+                PINS: /*Pins<Self, CHANNEL, COMP> +*/ ToHrOut,
+                CHANNEL: HrtimChannel<Pscl128>
+            {
+                // TODO: That 32x factor... Is that included below, or should we
+                // do that? Also that will likely risk overflowing u32 since
+                // 170MHz * 32 = 5.44GHz > u32::MAX.Hz()
+                let clk = HertzU64::from(HRTIM_COMMON::get_timer_frequency(&rcc.clocks)) * 32;
+
+                HrPwmBuilder {
+                    _tim: PhantomData,
+                    _prescaler: PhantomData,
+                    _out: PhantomData,
+                    fault_enable_bits: 0b000000,
+                    fault1_bits: 0b00,
+                    fault2_bits: 0b00,
+                    alignment: Alignment::Left,
+                    base_freq: clk,
+                    count: CountSettings::Period(u16::MAX),
+                    preload_source: None,
+                    enable_push_pull: false,
+                    //deadtime: 0.nanos(),
+                }
+            }
+        }
+
+        impl<PSCL, OUT>
+            HrPwmBuilder<$TIMX, PSCL, MasterPreloadSource, OUT>
+        where
+            PSCL: HrtimPrescaler,
+        {
+            pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>)) {
+                hrtim_finalize_body!(self, MasterPreloadSource, $TIMX: ($timXcr, $ck_psc, $perXr, $perx, $tXcen),)
+            }
+
+            hrtim_common_methods!($TIMX, MasterPreloadSource);
+        }
+    )*}
 }
 
 macro_rules! hrtim_pin_hal {
     ($($TIMX:ident:
-        ($CH:ident, $perXr:ident, $cmpXYr:ident, $cmpYx:ident, $cmpY:ident, $tXYoen:ident, $tXYodis:ident, $setXYr:ident, $rstXYr:ident),)+
+        ($CH:ident, $perXr:ident, $cmpXYr:ident, $cmpYx:ident, $cmpY:ident, $tXYoen:ident, $tXYodis:ident),)+
      ) => {
         $(
             impl<PSCL, COMP, POL, NPOL> hal::PwmPin for Pwm<$TIMX, $CH<PSCL>, COMP, POL, NPOL>
@@ -549,6 +657,21 @@ macro_rules! hrtim_pin_hal {
                     }
                 }
 
+                /// Set duty cycle
+                ///
+                /// NOTE: Please observe limits:
+                /// | Prescaler | Min duty | Max duty |
+                /// |-----------|----------|----------|
+                /// |         1 |   0x0060 |   0xFFDF |
+                /// |         2 |   0x0030 |   0xFFEF |
+                /// |         4 |   0x0018 |   0xFFF7 |
+                /// |         8 |   0x000C |   0xFFFB |
+                /// |        16 |   0x0006 |   0xFFFD |
+                /// |        32 |   0x0003 |   0xFFFD |
+                /// |        64 |   0x0003 |   0xFFFD |
+                /// |       128 |   0x0003 |   0xFFFD |
+                ///
+                /// Also, writing 0 as duty is only valid for CR1 and CR3
                 fn set_duty(&mut self, duty: Self::Duty) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
@@ -559,13 +682,6 @@ macro_rules! hrtim_pin_hal {
             // Enable implementation for ComplementaryImpossible
             impl<POL, NPOL, PSCL> PwmPinEnable for Pwm<$TIMX, $CH<PSCL>, ComplementaryImpossible, POL, NPOL> {
                 fn ccer_enable(&mut self) {
-                    let tim = unsafe { &*$TIMX::ptr() };
-                    // Select period as a SET-event
-                    tim.$setXYr.write(|w| { w.per().set_bit() } );
-
-                    // Select cmpY as a RESET-event
-                    tim.$rstXYr.write(|w| { w.$cmpY().set_bit() } );
-
                     // TODO: Should this part only be in Pwm::enable?
                     // Enable output Y on channel X
                     // This is a set-only register, no risk for data race
@@ -573,10 +689,6 @@ macro_rules! hrtim_pin_hal {
                     common.oenr.write(|w| { w.$tXYoen().set_bit() });
                 }
                 fn ccer_disable(&mut self) {
-                    let tim = unsafe { &*$TIMX::ptr() };
-                    // Clear SET-events
-                    tim.$setXYr.reset();
-
                     // TODO: Should this part only be in Pwm::disable
                     // Disable output Y on channel X
                     // This is a write only register, no risk for data race
@@ -598,6 +710,12 @@ macro_rules! hrtim_out_common {
             EventSource::Cr3 => tim.$register.modify(|_r, w| w.cmp3().$action()),
             EventSource::Cr4 => tim.$register.modify(|_r, w| w.cmp4().$action()),
             EventSource::Period => tim.$register.modify(|_r, w| w.per().$action()),
+
+            EventSource::MasterCr1 => tim.$register.modify(|_r, w| w.mstcmp1().$action()),
+            EventSource::MasterCr2 => tim.$register.modify(|_r, w| w.mstcmp2().$action()),
+            EventSource::MasterCr3 => tim.$register.modify(|_r, w| w.mstcmp3().$action()),
+            EventSource::MasterCr4 => tim.$register.modify(|_r, w| w.mstcmp4().$action()),
+            EventSource::MasterPeriod => tim.$register.modify(|_r, w| w.mstper().$action()),
         }
     }};
 }
@@ -651,7 +769,7 @@ macro_rules! hrtim_out {
 
 hrtim_out! {
     HRTIM_TIMA: HrOut1: ta1oen, ta1odis, ta1ods, seta1r, rsta1r,
-    HRTIM_TIMA: HrOut2: ta2oen, ta1odis, ta2ods, seta2r, rsta2r,
+    HRTIM_TIMA: HrOut2: ta2oen, ta2odis, ta2ods, seta2r, rsta2r,
 
     HRTIM_TIMB: HrOut1: tb1oen, tb1odis, tb1ods, setb1r, rstb1r,
     HRTIM_TIMB: HrOut2: tb2oen, tb2odis, tb2ods, setb2r, rstb2r,
@@ -687,105 +805,124 @@ macro_rules! hrtim_cr_helper {
 }
 
 macro_rules! hrtim_cr {
-    ($($TIMX:ident: [$cmpX1r:ident, $cmpX2r:ident, $cmpX3r:ident, $cmpX4r:ident],)+) => {$(
-        hrtim_cr_helper!($TIMX: HrCr1: $cmpX1r, cmp1x);
-        hrtim_cr_helper!($TIMX: HrCr2: $cmpX2r, cmp2x);
-        hrtim_cr_helper!($TIMX: HrCr3: $cmpX3r, cmp3x);
-        hrtim_cr_helper!($TIMX: HrCr4: $cmpX4r, cmp4x);
+    ($($TIMX:ident: [
+        $cmpX1r:ident, $cmpX2r:ident, $cmpX3r:ident, $cmpX4r:ident,
+        $cmp1x:ident, $cmp2x:ident, $cmp3x:ident, $cmp4x:ident
+    ],)+) => {$(
+        hrtim_cr_helper!($TIMX: HrCr1: $cmpX1r, $cmp1x);
+        hrtim_cr_helper!($TIMX: HrCr2: $cmpX2r, $cmp2x);
+        hrtim_cr_helper!($TIMX: HrCr3: $cmpX3r, $cmp3x);
+        hrtim_cr_helper!($TIMX: HrCr4: $cmpX4r, $cmp4x);
     )+};
 }
 
 macro_rules! hrtim_timer {
-    ($($TIMX:ident: $perXr:ident,)+) => {$(
+    ($($TIMX:ident: $perXr:ident, $perx:ident,)+) => {$(
         impl<PSCL> HrTimer<$TIMX, PSCL> for HrTim<$TIMX, PSCL> {
             fn get_period(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$perXr.read().perx().bits()
+                tim.$perXr.read().$perx().bits()
             }
             fn set_period(&mut self, period: u16) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$perXr.write(|w| unsafe { w.perx().bits(period as u16) });
+                tim.$perXr.write(|w| unsafe { w.$perx().bits(period as u16) });
             }
         }
     )+};
 }
 
 hrtim_timer! {
-    HRTIM_TIMA: perar,
-    HRTIM_TIMB: perbr,
-    HRTIM_TIMC: percr,
-    HRTIM_TIMD: perdr,
-    HRTIM_TIME: perer,
-    HRTIM_TIMF: perfr,
+    HRTIM_MASTER: mper, mper,
+
+    HRTIM_TIMA: perar, perx,
+    HRTIM_TIMB: perbr, perx,
+    HRTIM_TIMC: percr, perx,
+    HRTIM_TIMD: perdr, perx,
+    HRTIM_TIME: perer, perx,
+    HRTIM_TIMF: perfr, perx,
 }
 
 hrtim_cr! {
-    HRTIM_TIMA: [cmp1ar, cmp2ar, cmp3ar, cmp4ar],
-    HRTIM_TIMB: [cmp1br, cmp2br, cmp3br, cmp4br],
-    HRTIM_TIMC: [cmp1cr, cmp2cr, cmp3cr, cmp4cr],
-    HRTIM_TIMD: [cmp1dr, cmp2dr, cmp3dr, cmp4dr],
-    HRTIM_TIME: [cmp1er, cmp2er, cmp3er, cmp4er],
-    HRTIM_TIMF: [cmp1fr, cmp2fr, cmp3fr, cmp4fr],
+    HRTIM_MASTER: [mcmp1r, mcmp2r, mcmp3r, mcmp4r, mcmp1, mcmp2, mcmp3, mcmp4],
+
+    HRTIM_TIMA: [cmp1ar, cmp2ar, cmp3ar, cmp4ar, cmp1x, cmp2x, cmp3x, cmp4x],
+    HRTIM_TIMB: [cmp1br, cmp2br, cmp3br, cmp4br, cmp1x, cmp2x, cmp3x, cmp4x],
+    HRTIM_TIMC: [cmp1cr, cmp2cr, cmp3cr, cmp4cr, cmp1x, cmp2x, cmp3x, cmp4x],
+    HRTIM_TIMD: [cmp1dr, cmp2dr, cmp3dr, cmp4dr, cmp1x, cmp2x, cmp3x, cmp4x],
+    HRTIM_TIME: [cmp1er, cmp2er, cmp3er, cmp4er, cmp1x, cmp2x, cmp3x, cmp4x],
+    HRTIM_TIMF: [cmp1fr, cmp2fr, cmp3fr, cmp4fr, cmp1x, cmp2x, cmp3x, cmp4x],
 }
 
 hrtim_hal! {
-    // TODO: HRTIM_MASTER
-    HRTIM_TIMA: (hrtim_tima, timacr, perar, tacen, fltar, outar),
-    HRTIM_TIMB: (hrtim_timb, timbcr, perbr, tbcen, fltbr, outbr),
-    HRTIM_TIMC: (hrtim_timc, timccr, percr, tccen, fltcr, outcr),
-    HRTIM_TIMD: (hrtim_timd, timdcr, perdr, tdcen, fltdr, outdr),
-    HRTIM_TIME: (hrtim_time, timecr, perer, tecen, flter, outer),
-    HRTIM_TIMF: (hrtim_timf, timfcr, perfr, tfcen, fltfr, outfr),
+    HRTIM_TIMA: (timacr, perar, tacen, fltar, outar),
+    HRTIM_TIMB: (timbcr, perbr, tbcen, fltbr, outbr),
+    HRTIM_TIMC: (timccr, percr, tccen, fltcr, outcr),
+    HRTIM_TIMD: (timdcr, perdr, tdcen, fltdr, outdr),
+    HRTIM_TIME: (timecr, perer, tecen, flter, outer),
+    HRTIM_TIMF: (timfcr, perfr, tfcen, fltfr, outfr),
+}
+
+hrtim_hal_master! {
+    HRTIM_MASTER: (mcr, ck_psc, mper, mper, mcen),
 }
 
 hrtim_pin_hal! {
-    HRTIM_TIMA: (CH1, perar, cmp1ar, cmp1x, cmp1, ta1oen, ta1odis, seta1r, rsta1r),
-    HRTIM_TIMA: (CH2, perar, cmp3ar, cmp3x, cmp3, ta2oen, ta2odis, seta2r, rsta2r),
+    HRTIM_TIMA: (CH1, perar, cmp1ar, cmp1x, cmp1, ta1oen, ta1odis),
+    HRTIM_TIMA: (CH2, perar, cmp3ar, cmp3x, cmp3, ta2oen, ta2odis),
 
-    HRTIM_TIMB: (CH1, perbr, cmp1br, cmp1x, cmp1, tb1oen, tb1odis, setb1r, rstb1r),
-    HRTIM_TIMB: (CH2, perbr, cmp3br, cmp3x, cmp3, tb2oen, tb2odis, setb2r, rstb2r),
+    HRTIM_TIMB: (CH1, perbr, cmp1br, cmp1x, cmp1, tb1oen, tb1odis),
+    HRTIM_TIMB: (CH2, perbr, cmp3br, cmp3x, cmp3, tb2oen, tb2odis),
 
-    HRTIM_TIMC: (CH1, percr, cmp1cr, cmp1x, cmp1, tc1oen, tc1odis, setc1r, rstc1r),
-    HRTIM_TIMC: (CH2, percr, cmp3cr, cmp3x, cmp3, tc2oen, tc2odis, setc2r, rstc2r),
+    HRTIM_TIMC: (CH1, percr, cmp1cr, cmp1x, cmp1, tc1oen, tc1odis),
+    HRTIM_TIMC: (CH2, percr, cmp3cr, cmp3x, cmp3, tc2oen, tc2odis),
 
+    HRTIM_TIMD: (CH1, perdr, cmp1dr, cmp1x, cmp1, td1oen, td1odis),
+    HRTIM_TIMD: (CH2, perdr, cmp3dr, cmp3x, cmp3, td2oen, td2odis),
 
-    HRTIM_TIMD: (CH1, perdr, cmp1dr, cmp1x, cmp1, td1oen, td1odis, setd1r, rstd1r),
-    HRTIM_TIMD: (CH2, perdr, cmp3dr, cmp3x, cmp3, td2oen, td2odis, setd2r, rstd2r),
+    HRTIM_TIME: (CH1, perer, cmp1er, cmp1x, cmp1, te1oen, te1odis),
+    HRTIM_TIME: (CH2, perer, cmp3er, cmp3x, cmp3, te2oen, te2odis),
 
-    HRTIM_TIME: (CH1, perer, cmp1er, cmp1x, cmp1, te1oen, te1odis, sete1r, rste1r),
-    HRTIM_TIME: (CH2, perer, cmp3er, cmp3x, cmp3, te2oen, te2odis, sete2r, rste2r),
-
-    HRTIM_TIMF: (CH1, perfr, cmp1fr, cmp1x, cmp1, tf1oen, tf1odis, setf1r, rstf1r),
-    HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, tf2odis, setf2r, rstf2r),
+    HRTIM_TIMF: (CH1, perfr, cmp1fr, cmp1x, cmp1, tf1oen, tf1odis),
+    HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, tf2odis),
 }
 
 pub trait HrtimPrescaler {
     const BITS: u8;
     const VALUE: u8;
+
+    /// Minimum allowed value for compare registers used with the timer with this prescaler
+    ///
+    /// NOTE: That for CR1 and CR3, 0 is also allowed
+    const MIN_CR: u16;
+
+    /// Maximum allowed value for compare registers used with the timer with this prescaler
+    const MAX_CR: u16;
 }
 
 macro_rules! impl_pscl {
-    ($($t:ident => $b:literal, $c:literal,)+) => {$(
-        #[derive(Copy, Clone)]
+    ($($t:ident => $b:literal, $v:literal, $min:literal, $max:literal)+) => {$(
+        #[derive(Copy, Clone, Default)]
         pub struct $t;
         impl HrtimPrescaler for $t {
             const BITS: u8 = $b;
-            const VALUE: u8 = $c;
+            const VALUE: u8 = $v;
+            const MIN_CR: u16 = $min;
+            const MAX_CR: u16 = $max;
         }
     )+};
 }
 
 impl_pscl! {
-    Pscl1   => 0b000,   1,
-    Pscl2   => 0b001,   2,
-    Pscl4   => 0b010,   4,
-    Pscl8   => 0b011,   8,
-    Pscl16  => 0b100,  16,
-    Pscl32  => 0b101,  32,
-    Pscl64  => 0b110,  64,
-    Pscl128 => 0b111, 128,
+    Pscl1   => 0b000,   1, 0x0060, 0xFFDF
+    Pscl2   => 0b001,   2, 0x0030, 0xFFEF
+    Pscl4   => 0b010,   4, 0x0018, 0xFFF7
+    Pscl8   => 0b011,   8, 0x000C, 0xFFFB
+    Pscl16  => 0b100,  16, 0x0006, 0xFFFD
+    Pscl32  => 0b101,  32, 0x0003, 0xFFFD
+    Pscl64  => 0b110,  64, 0x0003, 0xFFFD
+    Pscl128 => 0b111, 128, 0x0003, 0xFFFD
 }
 
 /// HrTim timer
@@ -836,7 +973,11 @@ pub trait FaultSource: Copy {
 pub struct SourceBuilder<I> {
     _input: I,
     src_bits: u8,
+
+    /// FLTxP
     is_active_high: bool,
+
+    /// FLTxF[3:0]
     filter_bits: u8,
 }
 
@@ -922,8 +1063,12 @@ macro_rules! impl_faults {
             }
 
             // TODO: add more settings
-            /* pub fn filter(?) -> Self */
             /* pub fn blanking(?) -> Self */
+
+            pub fn filter(mut self, filter: FaultSamplingFilter) -> Self {
+                self.filter_bits = filter as u8;
+                self
+            }
         }
 
         impl FaultSource for $source {
@@ -968,23 +1113,81 @@ pub struct HrPwmControl {
 pub enum FaultSamplingClkDiv {
     /// No division
     ///
-    /// fault signal sampling clock = f_hrtim
+    /// fault signal sampling clock f_flts = f_hrtim
     None = 0b00,
 
     /// 1/2
     ///
-    /// fault signal sampling clock = f_hrtim / 2
+    /// fault signal sampling clock f_flts = f_hrtim / 2
     Two = 0b01,
 
     /// 1/4
     ///
-    /// fault signal sampling clock = f_hrtim / 4
+    /// fault signal sampling clock f_flts = f_hrtim / 4
     Four = 0b10,
 
     /// 1/8
     ///
-    /// fault signal sampling clock = f_hrtim / 8
+    /// fault signal sampling clock f_flts = f_hrtim / 8
     Eight = 0b11,
+}
+
+pub enum FaultSamplingFilter {
+    /// No filtering, fault acts asynchronously
+    ///
+    /// Note that this bypasses any f_flts (FaultSamplingClkDiv)
+    None = 0b0000,
+
+    /// Sample directly at rate f_hrtim, with a count of 2
+    ///
+    /// Note that this bypasses: any f_flts (FaultSamplingClkDiv)
+    HrtimN2 = 0b0001,
+
+    /// Sample directly at rate f_hrtim, with a count of 4
+    ///
+    /// Note that this bypasses any f_flts (FaultSamplingClkDiv)
+    HrtimN4 = 0b0010,
+
+    /// Sample directly at rate f_hrtim, with a count of 8
+    ///
+    /// Note that this bypasses any f_flts (FaultSamplingClkDiv)
+    HrtimN8 = 0b0011,
+
+    /// Sample at rate f_flts / 2, with a count of 6
+    FltsDiv2N6 = 0b0100,
+
+    /// Sample at rate f_flts / 2, with a count of 8
+    FltsDiv2N8 = 0b0101,
+
+    /// Sample at rate f_flts / 4, with a count of 6
+    FltsDiv4N6 = 0b0110,
+
+    /// Sample at rate f_flts / 4, with a count of 8
+    FltsDiv4N8 = 0b0111,
+
+    /// Sample at rate f_flts / 8, with a count of 6
+    FltsDiv8N6 = 0b1000,
+
+    /// Sample at rate f_flts / 8, with a count of 8
+    FltsDiv8N8 = 0b1001,
+
+    /// Sample at rate f_flts / 16, with a count of 5
+    FltsDiv16N5 = 0b1010,
+
+    /// Sample at rate f_flts / 16, with a count of 6
+    FltsDiv16N6 = 0b1011,
+
+    /// Sample at rate f_flts / 16, with a count of 8
+    FltsDiv16N8 = 0b1100,
+
+    /// Sample at rate f_flts / 32, with a count of 5
+    FltsDiv32N5 = 0b1101,
+
+    /// Sample at rate f_flts / 32, with a count of 6
+    FltsDiv32N6 = 0b1110,
+
+    /// Sample at rate f_flts / 32, with a count of 8
+    FltsDiv32N8 = 0b1111,
 }
 
 pub trait HrControltExt {
@@ -1013,10 +1216,24 @@ impl HrControltExt for HRTIM_COMMON {
             adc_trigger3_bits: 0,
             adc_trigger4_bits: 0,
 
+            adc_trigger5_bits: 0,
+            adc_trigger6_bits: 0,
+            adc_trigger7_bits: 0,
+            adc_trigger8_bits: 0,
+            adc_trigger9_bits: 0,
+            adc_trigger10_bits: 0,
+
             adc_trigger1_postscaler: AdcTriggerPostscaler::None,
             adc_trigger2_postscaler: AdcTriggerPostscaler::None,
             adc_trigger3_postscaler: AdcTriggerPostscaler::None,
             adc_trigger4_postscaler: AdcTriggerPostscaler::None,
+
+            adc_trigger5_postscaler: AdcTriggerPostscaler::None,
+            adc_trigger6_postscaler: AdcTriggerPostscaler::None,
+            adc_trigger7_postscaler: AdcTriggerPostscaler::None,
+            adc_trigger8_postscaler: AdcTriggerPostscaler::None,
+            adc_trigger9_postscaler: AdcTriggerPostscaler::None,
+            adc_trigger10_postscaler: AdcTriggerPostscaler::None,
 
             divider: FaultSamplingClkDiv::None,
         }
@@ -1029,10 +1246,24 @@ pub struct HrTimOngoingCalibration {
     adc_trigger3_bits: u32,
     adc_trigger4_bits: u32,
 
+    adc_trigger5_bits: u8,
+    adc_trigger6_bits: u8,
+    adc_trigger7_bits: u8,
+    adc_trigger8_bits: u8,
+    adc_trigger9_bits: u8,
+    adc_trigger10_bits: u8,
+
     adc_trigger1_postscaler: AdcTriggerPostscaler,
     adc_trigger2_postscaler: AdcTriggerPostscaler,
     adc_trigger3_postscaler: AdcTriggerPostscaler,
     adc_trigger4_postscaler: AdcTriggerPostscaler,
+
+    adc_trigger5_postscaler: AdcTriggerPostscaler,
+    adc_trigger6_postscaler: AdcTriggerPostscaler,
+    adc_trigger7_postscaler: AdcTriggerPostscaler,
+    adc_trigger8_postscaler: AdcTriggerPostscaler,
+    adc_trigger9_postscaler: AdcTriggerPostscaler,
+    adc_trigger10_postscaler: AdcTriggerPostscaler,
 
     divider: FaultSamplingClkDiv,
 }
@@ -1051,10 +1282,24 @@ impl HrTimOngoingCalibration {
             adc_trigger3_bits: ad3_bits,
             adc_trigger4_bits: ad4_bits,
 
-            adc_trigger1_postscaler, 
-            adc_trigger2_postscaler, 
+            adc_trigger5_bits: ad5_bits,
+            adc_trigger6_bits: ad6_bits,
+            adc_trigger7_bits: ad7_bits,
+            adc_trigger8_bits: ad8_bits,
+            adc_trigger9_bits: ad9_bits,
+            adc_trigger10_bits: ad10_bits,
+
+            adc_trigger1_postscaler,
+            adc_trigger2_postscaler,
             adc_trigger3_postscaler,
             adc_trigger4_postscaler,
+
+            adc_trigger5_postscaler,
+            adc_trigger6_postscaler,
+            adc_trigger7_postscaler,
+            adc_trigger8_postscaler,
+            adc_trigger9_postscaler,
+            adc_trigger10_postscaler,
 
             divider,
         } = self;
@@ -1068,152 +1313,284 @@ impl HrTimOngoingCalibration {
                 .modify(|_r, w| w.calrte().bits(0b00).cal().set_bit().calen().clear_bit());
             common.fltinr2.write(|w| w.fltsd().bits(divider as u8));
 
-            common.adc1r.write(|w| w
-                .eper().bit(ad1_bits | Ad13T::TimEPeriod as u32 != 0)
-                .ec4().bit(ad1_bits | Ad13T::TimECmp4 as u32 != 0)
-                .ec3().bit(ad1_bits | Ad13T::TimECmp3 as u32 != 0)
-                //.frst() 
-                .dper().bit(ad1_bits | Ad13T::TimDPeriod as u32 != 0)
-                .dc4().bit(ad1_bits | Ad13T::TimDCmp4 as u32 != 0)
-                .dc3().bit(ad1_bits | Ad13T::TimDCmp3 as u32 != 0)
-                .fper().bit(ad1_bits | Ad13T::TimFPeriod as u32 != 0)
-                .cper().bit(ad1_bits | Ad13T::TimCPeriod as u32 != 0)
-                .cc4().bit(ad1_bits | Ad13T::TimCCmp4 as u32 != 0)
-                .cc3().bit(ad1_bits | Ad13T::TimCCmp3 as u32 != 0)
-                .fc4().bit(ad1_bits | Ad13T::TimFCmp4 as u32 != 0)
-                //.brst()
-                .bper().bit(ad1_bits | Ad13T::TimBPeriod as u32 != 0)
-                .bc4().bit(ad1_bits | Ad13T::TimBCmp4 as u32 != 0)
-                .bc3().bit(ad1_bits | Ad13T::TimBCmp3 as u32 != 0)
-                .fc3().bit(ad1_bits | Ad13T::TimFCmp3 as u32 != 0)
-                //.arst()
-                .aper().bit(ad1_bits | Ad13T::TimAPeriod as u32 != 0)
-                .ac4().bit(ad1_bits | Ad13T::TimACmp4 as u32 != 0)
-                .ac3().bit(ad1_bits | Ad13T::TimACmp3 as u32 != 0)
-                .fc2().bit(ad1_bits | Ad13T::TimFCmp2 as u32 != 0)
-                //.eev5().bit(ad1_bits | Ad13T::_ as u32)
-                //.eev4().bit(ad1_bits | Ad13T::_ as u32)
-                //.eev3().bit(ad1_bits | Ad13T::_ as u32)
-                //.eev2().bit(ad1_bits | Ad13T::_ as u32)
-                //.eev1().bit(ad1_bits | Ad13T::_ as u32)
-                .mper().bit(ad1_bits | Ad13T::MasterPeriod as u32 != 0)
-                .mc4().bit(ad1_bits | Ad13T::MasterCmp4 as u32 != 0)
-                .mc3().bit(ad1_bits | Ad13T::MasterCmp3 as u32 != 0)
-                .mc2().bit(ad1_bits | Ad13T::MasterCmp2 as u32 != 0)
-                .mc1().bit(ad1_bits | Ad13T::MasterCmp1 as u32 != 0)
-            );
+            common.adc1r.write(|w| {
+                w.eper()
+                    .bit(ad1_bits | Ad13T::TimEPeriod as u32 != 0)
+                    .ec4()
+                    .bit(ad1_bits | Ad13T::TimECmp4 as u32 != 0)
+                    .ec3()
+                    .bit(ad1_bits | Ad13T::TimECmp3 as u32 != 0)
+                    //.frst()
+                    .dper()
+                    .bit(ad1_bits | Ad13T::TimDPeriod as u32 != 0)
+                    .dc4()
+                    .bit(ad1_bits | Ad13T::TimDCmp4 as u32 != 0)
+                    .dc3()
+                    .bit(ad1_bits | Ad13T::TimDCmp3 as u32 != 0)
+                    .fper()
+                    .bit(ad1_bits | Ad13T::TimFPeriod as u32 != 0)
+                    .cper()
+                    .bit(ad1_bits | Ad13T::TimCPeriod as u32 != 0)
+                    .cc4()
+                    .bit(ad1_bits | Ad13T::TimCCmp4 as u32 != 0)
+                    .cc3()
+                    .bit(ad1_bits | Ad13T::TimCCmp3 as u32 != 0)
+                    .fc4()
+                    .bit(ad1_bits | Ad13T::TimFCmp4 as u32 != 0)
+                    //.brst()
+                    .bper()
+                    .bit(ad1_bits | Ad13T::TimBPeriod as u32 != 0)
+                    .bc4()
+                    .bit(ad1_bits | Ad13T::TimBCmp4 as u32 != 0)
+                    .bc3()
+                    .bit(ad1_bits | Ad13T::TimBCmp3 as u32 != 0)
+                    .fc3()
+                    .bit(ad1_bits | Ad13T::TimFCmp3 as u32 != 0)
+                    //.arst()
+                    .aper()
+                    .bit(ad1_bits | Ad13T::TimAPeriod as u32 != 0)
+                    .ac4()
+                    .bit(ad1_bits | Ad13T::TimACmp4 as u32 != 0)
+                    .ac3()
+                    .bit(ad1_bits | Ad13T::TimACmp3 as u32 != 0)
+                    .fc2()
+                    .bit(ad1_bits | Ad13T::TimFCmp2 as u32 != 0)
+                    //.eev5().bit(ad1_bits | Ad13T::_ as u32)
+                    //.eev4().bit(ad1_bits | Ad13T::_ as u32)
+                    //.eev3().bit(ad1_bits | Ad13T::_ as u32)
+                    //.eev2().bit(ad1_bits | Ad13T::_ as u32)
+                    //.eev1().bit(ad1_bits | Ad13T::_ as u32)
+                    .mper()
+                    .bit(ad1_bits | Ad13T::MasterPeriod as u32 != 0)
+                    .mc4()
+                    .bit(ad1_bits | Ad13T::MasterCmp4 as u32 != 0)
+                    .mc3()
+                    .bit(ad1_bits | Ad13T::MasterCmp3 as u32 != 0)
+                    .mc2()
+                    .bit(ad1_bits | Ad13T::MasterCmp2 as u32 != 0)
+                    .mc1()
+                    .bit(ad1_bits | Ad13T::MasterCmp1 as u32 != 0)
+            });
 
-            common.adc3r.write(|w| w
-                .eper().bit(ad3_bits | Ad13T::TimEPeriod as u32 != 0)
-                .ec4().bit(ad3_bits | Ad13T::TimECmp4 as u32 != 0)
-                .ec3().bit(ad3_bits | Ad13T::TimECmp3 as u32 != 0)
-                //.frst() 
-                .dper().bit(ad3_bits | Ad13T::TimDPeriod as u32 != 0)
-                .dc4().bit(ad3_bits | Ad13T::TimDCmp4 as u32 != 0)
-                .dc3().bit(ad3_bits | Ad13T::TimDCmp3 as u32 != 0)
-                .fper().bit(ad3_bits | Ad13T::TimFPeriod as u32 != 0)
-                .cper().bit(ad3_bits | Ad13T::TimCPeriod as u32 != 0)
-                .cc4().bit(ad3_bits | Ad13T::TimCCmp4 as u32 != 0)
-                .cc3().bit(ad3_bits | Ad13T::TimCCmp3 as u32 != 0)
-                .fc4().bit(ad3_bits | Ad13T::TimFCmp4 as u32 != 0)
-                //.brst()
-                .bper().bit(ad3_bits | Ad13T::TimBPeriod as u32 != 0)
-                .bc4().bit(ad3_bits | Ad13T::TimBCmp4 as u32 != 0)
-                .bc3().bit(ad3_bits | Ad13T::TimBCmp3 as u32 != 0)
-                .fc3().bit(ad3_bits | Ad13T::TimFCmp3 as u32 != 0)
-                //.arst()
-                .aper().bit(ad3_bits | Ad13T::TimAPeriod as u32 != 0)
-                .ac4().bit(ad3_bits | Ad13T::TimACmp4 as u32 != 0)
-                .ac3().bit(ad3_bits | Ad13T::TimACmp3 as u32 != 0)
-                .fc2().bit(ad3_bits | Ad13T::TimFCmp2 as u32 != 0)
-                //.eev5().bit(ad3_bits | Ad13T::_ as u32)
-                //.eev4().bit(ad3_bits | Ad13T::_ as u32)
-                //.eev3().bit(ad3_bits | Ad13T::_ as u32)
-                //.eev2().bit(ad3_bits | Ad13T::_ as u32)
-                //.eev1().bit(ad3_bits | Ad13T::_ as u32)
-                .mper().bit(ad3_bits | Ad13T::MasterPeriod as u32 != 0)
-                .mc4().bit(ad3_bits | Ad13T::MasterCmp4 as u32 != 0)
-                .mc3().bit(ad3_bits | Ad13T::MasterCmp3 as u32 != 0)
-                .mc2().bit(ad3_bits | Ad13T::MasterCmp2 as u32 != 0)
-                .mc1().bit(ad3_bits | Ad13T::MasterCmp1 as u32 != 0)
-            );
+            common.adc3r.write(|w| {
+                w.eper()
+                    .bit(ad3_bits | Ad13T::TimEPeriod as u32 != 0)
+                    .ec4()
+                    .bit(ad3_bits | Ad13T::TimECmp4 as u32 != 0)
+                    .ec3()
+                    .bit(ad3_bits | Ad13T::TimECmp3 as u32 != 0)
+                    //.frst()
+                    .dper()
+                    .bit(ad3_bits | Ad13T::TimDPeriod as u32 != 0)
+                    .dc4()
+                    .bit(ad3_bits | Ad13T::TimDCmp4 as u32 != 0)
+                    .dc3()
+                    .bit(ad3_bits | Ad13T::TimDCmp3 as u32 != 0)
+                    .fper()
+                    .bit(ad3_bits | Ad13T::TimFPeriod as u32 != 0)
+                    .cper()
+                    .bit(ad3_bits | Ad13T::TimCPeriod as u32 != 0)
+                    .cc4()
+                    .bit(ad3_bits | Ad13T::TimCCmp4 as u32 != 0)
+                    .cc3()
+                    .bit(ad3_bits | Ad13T::TimCCmp3 as u32 != 0)
+                    .fc4()
+                    .bit(ad3_bits | Ad13T::TimFCmp4 as u32 != 0)
+                    //.brst()
+                    .bper()
+                    .bit(ad3_bits | Ad13T::TimBPeriod as u32 != 0)
+                    .bc4()
+                    .bit(ad3_bits | Ad13T::TimBCmp4 as u32 != 0)
+                    .bc3()
+                    .bit(ad3_bits | Ad13T::TimBCmp3 as u32 != 0)
+                    .fc3()
+                    .bit(ad3_bits | Ad13T::TimFCmp3 as u32 != 0)
+                    //.arst()
+                    .aper()
+                    .bit(ad3_bits | Ad13T::TimAPeriod as u32 != 0)
+                    .ac4()
+                    .bit(ad3_bits | Ad13T::TimACmp4 as u32 != 0)
+                    .ac3()
+                    .bit(ad3_bits | Ad13T::TimACmp3 as u32 != 0)
+                    .fc2()
+                    .bit(ad3_bits | Ad13T::TimFCmp2 as u32 != 0)
+                    //.eev5().bit(ad3_bits | Ad13T::_ as u32)
+                    //.eev4().bit(ad3_bits | Ad13T::_ as u32)
+                    //.eev3().bit(ad3_bits | Ad13T::_ as u32)
+                    //.eev2().bit(ad3_bits | Ad13T::_ as u32)
+                    //.eev1().bit(ad3_bits | Ad13T::_ as u32)
+                    .mper()
+                    .bit(ad3_bits | Ad13T::MasterPeriod as u32 != 0)
+                    .mc4()
+                    .bit(ad3_bits | Ad13T::MasterCmp4 as u32 != 0)
+                    .mc3()
+                    .bit(ad3_bits | Ad13T::MasterCmp3 as u32 != 0)
+                    .mc2()
+                    .bit(ad3_bits | Ad13T::MasterCmp2 as u32 != 0)
+                    .mc1()
+                    .bit(ad3_bits | Ad13T::MasterCmp1 as u32 != 0)
+            });
 
-            common.adc2r.write(|w| w
-                //.erst()
-                .ec4().bit(ad2_bits | Ad24T::TimECmp4 as u32 != 0)
-                .ec3().bit(ad2_bits | Ad24T::TimECmp3 as u32 != 0)
-                .ec2().bit(ad2_bits | Ad24T::TimECmp2 as u32 != 0)
-                //.drst().bit(ad2_bits | Ad24T::_ as u32 != 0)
-                .dper().bit(ad2_bits | Ad24T::TimDPeriod as u32 != 0)
-                .dc4().bit(ad2_bits | Ad24T::TimDCmp4 as u32 != 0)
-                .fper().bit(ad2_bits | Ad24T::TimFPeriod as u32 != 0)
-                .dc2().bit(ad2_bits | Ad24T::TimACmp2 as u32 != 0)
-                //.crst().bit(ad2_bits | Ad24T::_ as u32 != 0)
-                .cper().bit(ad2_bits | Ad24T::TimCPeriod as u32 != 0)
-                .cc4().bit(ad2_bits | Ad24T::TimCCmp4 as u32 != 0)
-                .fc4().bit(ad2_bits | Ad24T::TimFCmp4 as u32 != 0)
-                .cc2().bit(ad2_bits | Ad24T::TimCCmp2 as u32 != 0)
-                .bper().bit(ad2_bits | Ad24T::TimBPeriod as u32 != 0)
-                .bc4().bit(ad2_bits | Ad24T::TimBCmp4 as u32 != 0)
-                .fc3().bit(ad2_bits | Ad24T::TimFCmp3 as u32 != 0)
-                .bc2().bit(ad2_bits | Ad24T::TimBCmp2 as u32 != 0)
-                .aper().bit(ad2_bits | Ad24T::TimAPeriod as u32 != 0)
-                .ac4().bit(ad2_bits | Ad24T::TimACmp4 as u32 != 0)
-                .fc2().bit(ad2_bits | Ad24T::TimFCmp2 as u32 != 0)
-                .ac2().bit(ad2_bits | Ad24T::TimACmp2 as u32 != 0)
-                //.eev10()
-                //.eev9()
-                //.eev8()
-                //.eev7()
-                //.eev6()
-                .mper().bit(ad2_bits | Ad24T::MasterPeriod as u32 != 0)
-                .mc4().bit(ad2_bits | Ad24T::MasterCmp4 as u32 != 0)
-                .mc3().bit(ad2_bits | Ad24T::MasterCmp3 as u32 != 0)
-                .mc2().bit(ad2_bits | Ad24T::MasterCmp2 as u32 != 0)
-                .mc1().bit(ad2_bits | Ad24T::MasterCmp1 as u32 != 0)
-            );
+            common.adc2r.write(|w| {
+                w
+                    //.erst()
+                    .ec4()
+                    .bit(ad2_bits | Ad24T::TimECmp4 as u32 != 0)
+                    .ec3()
+                    .bit(ad2_bits | Ad24T::TimECmp3 as u32 != 0)
+                    .ec2()
+                    .bit(ad2_bits | Ad24T::TimECmp2 as u32 != 0)
+                    //.drst().bit(ad2_bits | Ad24T::_ as u32 != 0)
+                    .dper()
+                    .bit(ad2_bits | Ad24T::TimDPeriod as u32 != 0)
+                    .dc4()
+                    .bit(ad2_bits | Ad24T::TimDCmp4 as u32 != 0)
+                    .fper()
+                    .bit(ad2_bits | Ad24T::TimFPeriod as u32 != 0)
+                    .dc2()
+                    .bit(ad2_bits | Ad24T::TimDCmp2 as u32 != 0)
+                    //.crst().bit(ad2_bits | Ad24T::_ as u32 != 0)
+                    .cper()
+                    .bit(ad2_bits | Ad24T::TimCPeriod as u32 != 0)
+                    .cc4()
+                    .bit(ad2_bits | Ad24T::TimCCmp4 as u32 != 0)
+                    .fc4()
+                    .bit(ad2_bits | Ad24T::TimFCmp4 as u32 != 0)
+                    .cc2()
+                    .bit(ad2_bits | Ad24T::TimCCmp2 as u32 != 0)
+                    .bper()
+                    .bit(ad2_bits | Ad24T::TimBPeriod as u32 != 0)
+                    .bc4()
+                    .bit(ad2_bits | Ad24T::TimBCmp4 as u32 != 0)
+                    .fc3()
+                    .bit(ad2_bits | Ad24T::TimFCmp3 as u32 != 0)
+                    .bc2()
+                    .bit(ad2_bits | Ad24T::TimBCmp2 as u32 != 0)
+                    .aper()
+                    .bit(ad2_bits | Ad24T::TimAPeriod as u32 != 0)
+                    .ac4()
+                    .bit(ad2_bits | Ad24T::TimACmp4 as u32 != 0)
+                    .fc2()
+                    .bit(ad2_bits | Ad24T::TimFCmp2 as u32 != 0)
+                    .ac2()
+                    .bit(ad2_bits | Ad24T::TimACmp2 as u32 != 0)
+                    //.eev10()
+                    //.eev9()
+                    //.eev8()
+                    //.eev7()
+                    //.eev6()
+                    .mper()
+                    .bit(ad2_bits | Ad24T::MasterPeriod as u32 != 0)
+                    .mc4()
+                    .bit(ad2_bits | Ad24T::MasterCmp4 as u32 != 0)
+                    .mc3()
+                    .bit(ad2_bits | Ad24T::MasterCmp3 as u32 != 0)
+                    .mc2()
+                    .bit(ad2_bits | Ad24T::MasterCmp2 as u32 != 0)
+                    .mc1()
+                    .bit(ad2_bits | Ad24T::MasterCmp1 as u32 != 0)
+            });
 
-            common.adc4r.write(|w| w
-                //.erst()
-                .ec4().bit(ad4_bits | Ad24T::TimECmp4 as u32 != 0)
-                .ec3().bit(ad4_bits | Ad24T::TimECmp3 as u32 != 0)
-                .ec2().bit(ad4_bits | Ad24T::TimECmp2 as u32 != 0)
-                //.drst().bit(ad4_bits | Ad24T::_ as u32 != 0)
-                .dper().bit(ad4_bits | Ad24T::TimDPeriod as u32 != 0)
-                .dc4().bit(ad4_bits | Ad24T::TimDCmp4 as u32 != 0)
-                .fper().bit(ad4_bits | Ad24T::TimFPeriod as u32 != 0)
-                .dc2().bit(ad4_bits | Ad24T::TimACmp2 as u32 != 0)
-                //.crst().bit(ad4_bits | Ad24T::_ as u32 != 0)
-                .cper().bit(ad4_bits | Ad24T::TimCPeriod as u32 != 0)
-                .cc4().bit(ad4_bits | Ad24T::TimCCmp4 as u32 != 0)
-                .fc4().bit(ad4_bits | Ad24T::TimFCmp4 as u32 != 0)
-                .cc2().bit(ad4_bits | Ad24T::TimCCmp2 as u32 != 0)
-                .bper().bit(ad4_bits | Ad24T::TimBPeriod as u32 != 0)
-                .bc4().bit(ad4_bits | Ad24T::TimBCmp4 as u32 != 0)
-                .fc3().bit(ad4_bits | Ad24T::TimFCmp3 as u32 != 0)
-                .bc2().bit(ad4_bits | Ad24T::TimBCmp2 as u32 != 0)
-                .aper().bit(ad4_bits | Ad24T::TimAPeriod as u32 != 0)
-                .ac4().bit(ad4_bits | Ad24T::TimACmp4 as u32 != 0)
-                .fc2().bit(ad4_bits | Ad24T::TimFCmp2 as u32 != 0)
-                .ac2().bit(ad4_bits | Ad24T::TimACmp2 as u32 != 0)
-                //.eev10()
-                //.eev9()
-                //.eev8()
-                //.eev7()
-                //.eev6()
-                .mper().bit(ad4_bits | Ad24T::MasterPeriod as u32 != 0)
-                .mc4().bit(ad4_bits | Ad24T::MasterCmp4 as u32 != 0)
-                .mc3().bit(ad4_bits | Ad24T::MasterCmp3 as u32 != 0)
-                .mc2().bit(ad4_bits | Ad24T::MasterCmp2 as u32 != 0)
-                .mc1().bit(ad4_bits | Ad24T::MasterCmp1 as u32 != 0)
-            );
+            common.adc4r.write(|w| {
+                w
+                    //.erst()
+                    .ec4()
+                    .bit(ad4_bits | Ad24T::TimECmp4 as u32 != 0)
+                    .ec3()
+                    .bit(ad4_bits | Ad24T::TimECmp3 as u32 != 0)
+                    .ec2()
+                    .bit(ad4_bits | Ad24T::TimECmp2 as u32 != 0)
+                    //.drst().bit(ad4_bits | Ad24T::_ as u32 != 0)
+                    .dper()
+                    .bit(ad4_bits | Ad24T::TimDPeriod as u32 != 0)
+                    .dc4()
+                    .bit(ad4_bits | Ad24T::TimDCmp4 as u32 != 0)
+                    .fper()
+                    .bit(ad4_bits | Ad24T::TimFPeriod as u32 != 0)
+                    .dc2()
+                    .bit(ad4_bits | Ad24T::TimDCmp2 as u32 != 0)
+                    //.crst().bit(ad4_bits | Ad24T::_ as u32 != 0)
+                    .cper()
+                    .bit(ad4_bits | Ad24T::TimCPeriod as u32 != 0)
+                    .cc4()
+                    .bit(ad4_bits | Ad24T::TimCCmp4 as u32 != 0)
+                    .fc4()
+                    .bit(ad4_bits | Ad24T::TimFCmp4 as u32 != 0)
+                    .cc2()
+                    .bit(ad4_bits | Ad24T::TimCCmp2 as u32 != 0)
+                    .bper()
+                    .bit(ad4_bits | Ad24T::TimBPeriod as u32 != 0)
+                    .bc4()
+                    .bit(ad4_bits | Ad24T::TimBCmp4 as u32 != 0)
+                    .fc3()
+                    .bit(ad4_bits | Ad24T::TimFCmp3 as u32 != 0)
+                    .bc2()
+                    .bit(ad4_bits | Ad24T::TimBCmp2 as u32 != 0)
+                    .aper()
+                    .bit(ad4_bits | Ad24T::TimAPeriod as u32 != 0)
+                    .ac4()
+                    .bit(ad4_bits | Ad24T::TimACmp4 as u32 != 0)
+                    .fc2()
+                    .bit(ad4_bits | Ad24T::TimFCmp2 as u32 != 0)
+                    .ac2()
+                    .bit(ad4_bits | Ad24T::TimACmp2 as u32 != 0)
+                    //.eev10()
+                    //.eev9()
+                    //.eev8()
+                    //.eev7()
+                    //.eev6()
+                    .mper()
+                    .bit(ad4_bits | Ad24T::MasterPeriod as u32 != 0)
+                    .mc4()
+                    .bit(ad4_bits | Ad24T::MasterCmp4 as u32 != 0)
+                    .mc3()
+                    .bit(ad4_bits | Ad24T::MasterCmp3 as u32 != 0)
+                    .mc2()
+                    .bit(ad4_bits | Ad24T::MasterCmp2 as u32 != 0)
+                    .mc1()
+                    .bit(ad4_bits | Ad24T::MasterCmp1 as u32 != 0)
+            });
 
-            common.adcps1.write(|w| w
-                .adc1psc().bits(adc_trigger1_postscaler as u8)
-                .adc2psc().bits(adc_trigger2_postscaler as u8)
-                .adc3psc().bits(adc_trigger3_postscaler as u8)
-                .adc4psc().bits(adc_trigger4_postscaler as u8)
-            );
+            common.adcer.write(|w| {
+                w.adc5trg()
+                    .variant(ad5_bits)
+                    .adc6trg()
+                    .variant(ad6_bits)
+                    .adc7trg()
+                    .variant(ad7_bits)
+                    .adc8trg()
+                    .variant(ad8_bits)
+                    .adc9trg()
+                    .variant(ad9_bits)
+                    .adc10trg()
+                    .variant(ad10_bits)
+            });
+
+            common.adcps1.write(|w| {
+                w.adc1psc()
+                    .bits(adc_trigger1_postscaler as u8)
+                    .adc2psc()
+                    .bits(adc_trigger2_postscaler as u8)
+                    .adc3psc()
+                    .bits(adc_trigger3_postscaler as u8)
+                    .adc4psc()
+                    .bits(adc_trigger4_postscaler as u8)
+                    .adc5psc()
+                    .bits(adc_trigger5_postscaler as u8)
+            });
+
+            common.adcps2.write(|w| {
+                w.adc6psc()
+                    .bits(adc_trigger6_postscaler as u8)
+                    .adc7psc()
+                    .bits(adc_trigger7_postscaler as u8)
+                    .adc8psc()
+                    .bits(adc_trigger8_postscaler as u8)
+                    .adc9psc()
+                    .bits(adc_trigger9_postscaler as u8)
+                    .adc10psc()
+                    .bits(adc_trigger10_postscaler as u8)
+            });
 
             // TODO: Adc trigger 5-10
         }
@@ -1270,6 +1647,36 @@ impl HrTimOngoingCalibration {
         self
     }
 
+    pub fn set_adc_trigger5(mut self, trigger: Adc579Trigger) -> Self {
+        self.adc_trigger5_bits = trigger as u8;
+        self
+    }
+
+    pub fn set_adc_trigger6(mut self, trigger: Adc6810Trigger) -> Self {
+        self.adc_trigger6_bits = trigger as u8;
+        self
+    }
+
+    pub fn set_adc_trigger7(mut self, trigger: Adc579Trigger) -> Self {
+        self.adc_trigger7_bits = trigger as u8;
+        self
+    }
+
+    pub fn set_adc_trigger8(mut self, trigger: Adc6810Trigger) -> Self {
+        self.adc_trigger8_bits = trigger as u8;
+        self
+    }
+
+    pub fn set_adc_trigger9(mut self, trigger: Adc579Trigger) -> Self {
+        self.adc_trigger9_bits = trigger as u8;
+        self
+    }
+
+    pub fn set_adc_trigger10(mut self, trigger: Adc6810Trigger) -> Self {
+        self.adc_trigger10_bits = trigger as u8;
+        self
+    }
+
     pub fn set_adc1_trigger_psc(mut self, post_scaler: AdcTriggerPostscaler) -> Self {
         self.adc_trigger1_postscaler = post_scaler;
         self
@@ -1290,6 +1697,11 @@ impl HrTimOngoingCalibration {
         self
     }
 
+    pub fn set_fault_sampling_division(mut self, divider: FaultSamplingClkDiv) -> Self {
+        self.divider = divider;
+        self
+    }
+
     // TODO: Adc trigger 5-10
 }
 
@@ -1305,7 +1717,6 @@ pub enum Adc13Trigger {
 
     // /// bit 28 ADCxTFRST
     // _ = 1 << 28,
-
     /// bit 27 ADCxTDPER - Trigger on HRTIM_TIMD period
     TimDPeriod = 1 << 27,
 
@@ -1332,7 +1743,6 @@ pub enum Adc13Trigger {
 
     // /// bit 19 ADCxTBRST
     // _ = 1 << 19,
-
     /// bit 18 ADCxTBPER - Trigger on HRTIM_TIMB period
     TimBPeriod = 1 << 18,
 
@@ -1347,7 +1757,6 @@ pub enum Adc13Trigger {
 
     // /// bit 14 ADCxTARST
     // _ = 1 << 14,
-
     /// bit 13 ADCxTAPER - Trigger on HRTIM_TIMA period
     TimAPeriod = 1 << 13,
 
@@ -1371,7 +1780,6 @@ pub enum Adc13Trigger {
 
     // /// bit 6 ADCxEEV2
     // _ = 1 << 6,
-
     /// bit 5 ADCxEEV1
     // _ = 1 << 5,
 
@@ -1429,7 +1837,6 @@ pub enum AdcTriggerPostscaler {
 pub enum Adc24Trigger {
     // /// bit 31 ADCxTERST
     // _ = 1 << 31,
-
     /// bit 30 ADCxTEC4 - Trigger on HRTIM_TIME compare match for compare register 4
     TimECmp4 = 1 << 30,
 
@@ -1441,7 +1848,6 @@ pub enum Adc24Trigger {
 
     // /// bit 27 ADCxTDRST
     // _ = 1 << 27,
-
     /// bit 26 ADCxTDPER - Trigger on HRTIM_TIMD period
     TimDPeriod = 1 << 26,
 
@@ -1507,7 +1913,6 @@ pub enum Adc24Trigger {
 
     // /// bit 5 ADCxEEV6
     // _ = 1 << 5,
-
     /// bit 4 ADCxMPER - Trigger on HRTIM_MASTER period
     MasterPeriod = 1 << 4,
 
@@ -1522,6 +1927,194 @@ pub enum Adc24Trigger {
 
     /// bit 0 ADCxMC1 - Trigger on HRTIM_MASTER compare match for compare register 1
     MasterCmp1 = 1 << 0,
+}
+
+pub enum Adc579Trigger {
+    // /// Trigger on F reset and counter roll-over
+    // _ = 31
+    /// Trigger on HRTIM_TIMF period
+    TimFPeriod = 30,
+
+    /// Trigger on HRTIM_TIMF compare match for compare register 4
+    TimFCmp4 = 29,
+
+    /// Trigger on HRTIM_TIMF compare match for compare register 3
+    TimFCmp3 = 28,
+
+    /// Trigger on HRTIM_TIMF compare match for compare register 2
+    TimFCmp2 = 27,
+
+    /// Trigger on HRTIM_TIME period
+    TimEPeriod = 26,
+
+    /// Trigger on HRTIM_TIME compare match for compare register 4
+    TimECmp4 = 25,
+
+    /// Trigger on HRTIM_TIME compare match for compare register 3
+    TimECmp3 = 24,
+
+    /// Trigger on HRTIM_TIMD period
+    TimDPeriod = 23,
+
+    /// Trigger on HRTIM_TIMD compare match for compare register 4
+    TimDCmp4 = 22,
+
+    /// Trigger on HRTIM_TIMD compare match for compare register 3
+    TimDCmp3 = 21,
+
+    /// Trigger on HRTIM_TIMC period
+    TimCPeriod = 20,
+
+    /// Trigger on HRTIM_TIMC compare match for compare register 4
+    TimCCmp4 = 19,
+
+    /// Trigger on HRTIM_TIMC compare match for compare register 3
+    TimCCmp3 = 18,
+
+    // /// Trigger on B reset and counter roll-over
+    // _ = 17
+    /// Trigger on HRTIM_TIMB period
+    TimBPeriod = 16,
+
+    /// Trigger on HRTIM_TIMB compare match for compare register 4
+    TimBCmp4 = 15,
+
+    /// Trigger on HRTIM_TIMB compare match for compare register 3
+    TimBCmp3 = 14,
+
+    // /// Trigger on A reset and counter roll-over
+    // _ = 13
+    /// Trigger on HRTIM_TIMA period
+    TimAPeriod = 12,
+
+    /// Trigger on HRTIM_TIMA compare match for compare register 4
+    TimACmp4 = 11,
+
+    /// Trigger on HRTIM_TIMA compare match for compare register 3
+    TimACmp3 = 10,
+
+    // /// Trigger on EEV5
+    // _ = 9,
+
+    // ///  Trigger on EEV4
+    // _ = 8,
+
+    // ///  Trigger on EEV3
+    // _ = 7,
+
+    // ///  Trigger on EEV2
+    // _ = 6,
+
+    // ///  Trigger on EEV1
+    // _ = 5,
+    /// Trigger on HRTIM_MASTER period
+    MasterPeriod = 4,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 4
+    MasterCmp4 = 3,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 3
+    MasterCmp3 = 2,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 2
+    MasterCmp2 = 1,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 1
+    MasterCmp1 = 0,
+}
+
+pub enum Adc6810Trigger {
+    /// Trigger on HRTIM_TIMF period
+    TimFPeriod = 31,
+
+    /// Trigger on HRTIM_TIMF compare match for compare register 4
+    TimFCmp4 = 30,
+
+    /// Trigger on HRTIM_TIMF compare match for compare register 3
+    TimFCmp3 = 29,
+
+    /// Trigger on HRTIM_TIMF compare match for compare register 2
+    TimFCmp2 = 28,
+
+    // /// Trigger on E reset and counter roll-over
+    // _ = 27
+    /// Trigger on HRTIM_TIME compare match for compare register 4
+    TimECmp4 = 26,
+
+    /// Trigger on HRTIM_TIME compare match for compare register 3
+    TimECmp3 = 25,
+
+    /// Trigger on HRTIM_TIME compare match for compare register 2
+    TimECmp2 = 24,
+
+    // /// Trigger on D reset and counter roll-over
+    // _ = 23
+    /// Trigger on HRTIM_TIMD period
+    TimDPeriod = 22,
+
+    /// Trigger on HRTIM_TIMD compare match for compare register 4
+    TimDCmp4 = 21,
+
+    /// Trigger on HRTIM_TIMD compare match for compare register 2
+    TimDCmp2 = 20,
+
+    // /// Trigger on D reset and counter roll-over
+    // _ = 19
+    /// Trigger on HRTIM_TIMC period
+    TimCPeriod = 18,
+
+    /// Trigger on HRTIM_TIMC compare match for compare register 4
+    TimCCmp4 = 17,
+
+    /// Trigger on HRTIM_TIMC compare match for compare register 2
+    TimCCmp2 = 16,
+
+    /// Trigger on HRTIM_TIMB period
+    TimBPeriod = 15,
+
+    /// Trigger on HRTIM_TIMB compare match for compare register 4
+    TimBCmp4 = 14,
+
+    /// Trigger on HRTIM_TIMB compare match for compare register 2
+    TimBCmp2 = 13,
+
+    /// Trigger on HRTIM_TIMA period
+    TimAPeriod = 12,
+
+    /// Trigger on HRTIM_TIMA compare match for compare register 4
+    TimACmp4 = 11,
+
+    /// Trigger on HRTIM_TIMA compare match for compare register 2
+    TimACmp2 = 10,
+
+    // /// Trigger on EEV10
+    // _ = 9,
+
+    // ///  Trigger on EEV9
+    // _ = 8,
+
+    // ///  Trigger on EEV8
+    // _ = 7,
+
+    // ///  Trigger on EEV7
+    // _ = 6,
+
+    // ///  Trigger on EEV6
+    // _ = 5,
+    /// Trigger on HRTIM_MASTER period
+    MasterPeriod = 4,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 4
+    MasterCmp4 = 3,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 3
+    MasterCmp3 = 2,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 2
+    MasterCmp2 = 1,
+
+    /// Trigger on HRTIM_MASTER compare match for compare register 1
+    MasterCmp1 = 0,
 }
 
 macro_rules! impl_flt_monitor {
