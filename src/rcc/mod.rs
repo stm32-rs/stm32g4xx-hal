@@ -1,3 +1,4 @@
+use crate::pwr::{PowerConfiguration, self};
 use crate::stm32::{rcc, FLASH, PWR, RCC};
 use crate::time::{Hertz, RateExtU32};
 
@@ -74,7 +75,7 @@ pub struct Rcc {
 
 impl Rcc {
     /// Apply clock configuration
-    pub fn freeze(self, rcc_cfg: Config) -> Self {
+    pub fn freeze(self, rcc_cfg: Config, pwr_cfg: PowerConfiguration) -> Self {
         let pll_clk = self.config_pll(rcc_cfg.pll_cfg);
 
         let (sys_clk, sw_bits) = match rcc_cfg.sys_mux {
@@ -94,6 +95,8 @@ impl Rcc {
                 (pll_clk.r.unwrap(), 0b11)
             }
         };
+
+        debug_assert!(sys_clk < Hertz::MHz(150) || (sys_clk < Hertz::MHz(170) && rcc_cfg.enable_boost));
 
         let sys_freq = sys_clk.raw();
         let (ahb_freq, ahb_psc_bits) = match rcc_cfg.ahb_psc {
@@ -122,17 +125,45 @@ impl Rcc {
             _ => (sys_freq, 0b000),
         };
 
+        // Calculate wait states depending on voltage scale and sys_freq
+        //
+        // See 'Number of wait states according to CPU clock (HCLK) frequency' in RM0440
+        let latency = match pwr_cfg.vos() {
+            pwr::VoltageScale::Range1 { enable_boost: true } => {
+                match sys_freq {
+                    0..=34_000_000 => 0b0000,
+                    34_000_001..=68_000_000 => 0b0001,
+                    68_000_001..=102_000_000 => 0b0010,
+                    102_000_001..=136_000_000 => 0b0011,
+                    136_000_001..=170_000_000 => 0b0100,
+                    170_000_001.. => panic!("Too high f_sys: {}, max with voltage scale in 'range1 boost mode' is: 170MHz", sys_freq)
+                }
+            },
+            pwr::VoltageScale::Range1 { enable_boost: false } => {
+                match sys_freq {
+                    0..=30_000_000 => 0b0000,
+                    30_000_001..=60_000_000 => 0b0001,
+                    60_000_001..=90_000_000 => 0b0010,
+                    90_000_001..=120_000_000 => 0b0011,
+                    120_000_001..=150_000_000 => 0b0100,
+                    150_000_001.. => panic!("Too high f_sys: {}, max with voltage scale in 'range1 normal mode' is: 150MHz", sys_freq)
+                }
+            },
+            pwr::VoltageScale::Range2 => {
+                match sys_freq {
+                    0..=12_000_000 => 0b0000,
+                    12_000_001..=24_000_000 => 0b0001,
+                    24_000_001..=26_000_000 => 0b0010,
+                    26_000_001.. => panic!("Too high f_sys: {}, max with voltage scale in 'range2' is: 26MHz", sys_freq)
+                }
+            },
+        };
+
         unsafe {
             // Adjust flash wait states
             let flash = &(*FLASH::ptr());
             flash.acr.modify(|_, w| {
-                w.latency().bits(if sys_freq <= 24_000_000 {
-                    0b000
-                } else if sys_freq <= 48_000_000 {
-                    0b001
-                } else {
-                    0b010
-                })
+                w.latency().bits(latency)
             })
         }
 
@@ -298,7 +329,7 @@ pub trait RccExt {
     fn constrain(self) -> Rcc;
 
     /// Constrains the `RCC` peripheral and apply clock configuration
-    fn freeze(self, rcc_cfg: Config) -> Rcc;
+    fn freeze(self, rcc_cfg: Config, pwr_config: PowerConfiguration) -> Rcc;
 }
 
 impl RccExt for RCC {
@@ -309,8 +340,8 @@ impl RccExt for RCC {
         }
     }
 
-    fn freeze(self, rcc_cfg: Config) -> Rcc {
-        self.constrain().freeze(rcc_cfg)
+    fn freeze(self, rcc_cfg: Config, pwr_config: PowerConfiguration) -> Rcc {
+        self.constrain().freeze(rcc_cfg, pwr_config)
     }
 }
 
