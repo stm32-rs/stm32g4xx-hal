@@ -1522,6 +1522,7 @@ macro_rules! adc {
                     self.set_align(config.align);
                     self.set_external_trigger(config.external_trigger);
                     self.set_continuous(config.continuous);
+                    self.set_subgroup_len(config.subgroup_len);
                     self.set_dma(config.dma);
                     self.set_end_of_conversion_interrupt(config.end_of_conversion_interrupt);
                     self.set_default_sample_time(config.default_sample_time);
@@ -1592,6 +1593,13 @@ macro_rules! adc {
                         .cont().bit(continuous == config::Continuous::Continuous)
                         .discen().bit(continuous == config::Continuous::Discontinuous)
                     );
+                }
+
+                #[inline(always)]
+                // NOTE: The software is allowed to write these bits only when ADSTART = 0
+                fn set_subgroup_len(&mut self, subgroup_len: config::SubGroupLength) {
+                    self.config.subgroup_len = subgroup_len;
+                    self.adc_reg.cfgr.modify(|_, w| w.discnum().bits(subgroup_len as u8))
                 }
 
                 /// Sets DMA to disabled, single or continuous
@@ -2128,6 +2136,11 @@ macro_rules! adc {
                 #[inline(always)]
                 pub fn set_continuous(&mut self, continuous: config::Continuous) {
                     self.adc.set_continuous(continuous)
+                }
+
+                /// Set subgroup length, number of AD readings per trigger event (only relevant in Discontinuous mode)
+                pub fn set_subgroup_len(&mut self, subgroup_len: config::SubGroupLength) {
+                    self.adc.set_subgroup_len(subgroup_len);
                 }
 
                 /// Sets DMA to disabled, single or continuous
