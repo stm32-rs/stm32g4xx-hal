@@ -31,6 +31,117 @@ enum CountSettings {
     Period(u16),
 }
 
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum HrTimerMode {
+    SingleShotNonRetriggerable,
+    SingleShotRetriggerable,
+    Continuous,
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum HrCountingDirection {
+    /// Asymetrical up counting mode
+    ///
+    ///
+
+    ///                   *                  *
+    ///  Counting up   *  |               *  |
+    ///             *                  *
+    ///          *        |         *        |
+    ///       *                  *           
+    ///    *              |   *              |
+    /// *                  *
+    /// --------------------------------------
+    ///
+    /// ```txt
+    /// |         *-------*                  *------
+    ///           |       |                  |
+    /// |         |       |                  |
+    ///           |       |                  |
+    /// ----------*       *------------------*
+    /// ```
+    ///
+    /// This is the most common mode with least amount of quirks
+    Up,
+
+    /// Symmetrical up-down counting mode
+    ///
+    ///
+    /// ```txt
+    /// Period-->                  *                      Counting     *
+    ///           Counting up   *  |  *     Counting        Up      *  |
+    ///                      *           *     down              *
+    ///                   *        |        *                 *        |
+    ///                *                       *           *
+    ///             *              |              *     *              |
+    /// 0     -->*                                   *                  
+    /// ---------------------------------------------------------------------------
+    ///          |         *---------------*         |         *---------------*
+    ///                    |       |       |                   |       |       |
+    ///          |         |               |         |         |               |
+    ///                    |       |       |                   |       |       |
+    ///          ----------*               *-------------------*               *---
+    /// ```
+    ///
+    /// NOTE: This is incompatible with
+    /// * Auto-delay
+    /// * Balanded Idle
+    /// * Triggered-half mode
+    ///
+    /// There is also differences in (including but not limited to) the following areas:
+    /// * Counter roll over event
+    /// * The events registered with `enable_set_event` will work as normal wen counting up, however when counting down, they will work as rst events.
+    /// * The events registered with `enable_rst_event` will work as normal wen counting up, however when counting down, they will work as set events.
+    UpDown,
+}
+
+// Needed to calculate frequency
+impl Into<super::Alignment> for HrCountingDirection {
+    fn into(self) -> super::Alignment {
+        match self {
+            HrCountingDirection::Up => super::Alignment::Left,
+            HrCountingDirection::UpDown => super::Alignment::Center,
+        }
+    }
+}
+
+#[derive(Copy, Clone, PartialEq, Debug)]
+pub enum InterleavedMode {
+    Disabled,
+
+    /// Dual interleaved or Half mode
+    ///
+    /// Automatically force
+    /// * Cr1 to PERIOD / 2 (not visable through `get_duty`).
+    /// Automatically updates when changing period
+    ///
+    /// NOTE: Affects Cr1
+    Dual,
+
+    /// Triple interleaved mode
+    ///
+    /// Automatically force
+    /// * Cr1 to 1 * PERIOD / 3 and
+    /// * Cr2 to 2 * PERIOD / 3
+    /// (not visable through `get_duty`). Automatically updates when changing period.
+    ///
+    /// NOTE: Must not be used simultaneously with other modes
+    /// using CMP2 (dual channel dac trigger and triggered-half modes).
+    Triple,
+
+    /// Quad interleaved mode
+    ///
+    /// Automatically force
+    /// * Cr1 to 1 * PERIOD / 4,
+    /// * Cr2 to 2 * PERIOD / 4 and
+    /// * Cr3 to 3 * PERIOD / 4
+    /// (not visable through `get_duty`). Automatically updates when changing period.
+    ///
+    /// NOTE: Must not be used simultaneously with other modes
+    /// using CMP2 (dual channel dac trigger and triggered-half modes).
+    Quad,
+}
+
 macro_rules! pins {
     ($($TIMX:ty: CH1: $CH1:ty, CH2: $CH2:ty)+) => {
         $(
@@ -42,11 +153,11 @@ macro_rules! pins {
                 type Channel = Pwm<$TIMX, CH2<PSCL>, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
             }
 
-            impl ToHrOut for $CH1 {
+            unsafe impl ToHrOut for $CH1 {
                 type Out = HrOut1<$TIMX>;
             }
 
-            impl ToHrOut for $CH2 {
+            unsafe impl ToHrOut for $CH2 {
                 type Out = HrOut2<$TIMX>;
             }
         )+
@@ -68,7 +179,7 @@ impl Pins<HRTIM_MASTER, (), ComplementaryImpossible> for () {
     type Channel = ();
 }
 
-impl ToHrOut for () {
+unsafe impl ToHrOut for () {
     type Out = ();
 }
 
@@ -143,7 +254,8 @@ pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
     _tim: PhantomData<TIM>,
     _prescaler: PhantomData<PSCL>,
     _out: PhantomData<OUT>,
-    alignment: Alignment,
+    timer_mode: HrTimerMode,
+    counting_direction: HrCountingDirection,
     base_freq: HertzU64,
     count: CountSettings,
     preload_source: Option<PS>,
@@ -151,12 +263,21 @@ pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
     fault1_bits: u8,
     fault2_bits: u8,
     enable_push_pull: bool,
+    interleaved_mode: InterleavedMode, // Also includes half mode
+    repetition_counter: u8,
     //deadtime: NanoSecond,
+    enable_repetition_interrupt: bool,
 }
 
 pub enum PreloadSource {
     /// Preloaded registers are updated on counter roll over or counter reset
     OnCounterReset,
+
+    /// Preloaded registers are updated by master timer update
+    OnMasterTimerUpdate,
+
+    /// Prealoaded registers are updaten when the counter rolls over and the repetition counter is 0
+    OnRepetitionUpdate,
 }
 
 pub enum MasterPreloadSource {
@@ -261,11 +382,371 @@ pub enum EventSource {
     // TODO: These are unique for every timer output
     //Extra(E)
 }
-pub trait ToHrOut {
+
+macro_rules! hr_timer_reset_event_source_common {
+    ($(#[$($attrss:tt)*])* pub enum $t:ident { [COMMON], $(#[$($attrss2:tt)*] $vals:tt = 1 << $x:literal,)*}) => {
+        $(#[$($attrss)*])*
+        pub enum $t {
+            $(#[$($attrss2)*] $vals = 1 << $x,)*
+
+            /// The timer counter is reset upon external event 10.
+            Eevnt10 = 1 << 18,
+
+            /// The timer counter is reset upon external event 9.
+            Eevnt9 = 1 << 17,
+
+            /// The timer counter is reset upon external event 8.
+            Eevnt8 = 1 << 16,
+
+            /// The timer counter is reset upon external event 7.
+            Eevnt7 = 1 << 15,
+
+            /// The timer counter is reset upon external event 6.
+            Eevnt6 = 1 << 14,
+
+            /// The timer counter is reset upon external event 5.
+            Eevnt5 = 1 << 13,
+
+            /// The timer counter is reset upon external event 4.
+            Eevnt4 = 1 << 12,
+
+            /// The timer counter is reset upon external event 3.
+            Eevnt3 = 1 << 11,
+
+            /// The timer counter is reset upon external event 2.
+            Eevnt2 = 1 << 10,
+
+            /// The timer counter is reset upon external event 1.
+            Eevnt1 = 1 << 9,
+
+            /// The timer counter is reset upon master timer compare 4 event.
+            MasterCmp4 = 1 << 8,
+
+            /// The timer counter is reset upon master timer compare 3 event.
+            MasterCmp3 = 1 << 7,
+
+            /// The timer counter is reset upon master timer compare 2 event.
+            MasterCmp2 = 1 << 6,
+
+            /// The timer counter is reset upon master timer compare 1 event.
+            MasterCmp1 = 1 << 5,
+
+            /// The timer counter is reset upon master timer period event.
+            MasterPeriod = 1 << 4,
+
+            /// The timer counter is reset upon timer its own compare 4 event
+            Cmp4 = 1 << 3,
+
+            /// The timer counter is reset upon timer its own compare 2 event
+            Cmp2 = 1 << 2,
+
+            /// The timer counter is reset upon update event.
+            Update = 1 << 1,
+        }
+    };
+}
+
+hr_timer_reset_event_source_common!(
+    /// A
+    pub enum TimerAResetEventSource {
+        [COMMON],
+        /// The timer counter is reset upon timer F compare 2 event.
+        TimFCmp2 = 1 << 31,
+
+        /// The timer counter is reset upon timer E compare 4 event.
+        TimECmp4 = 1 << 30,
+
+        /// The timer counter is reset upon timer E compare 2 event.
+        TimECmp2 = 1 << 29,
+
+        /// The timer counter is reset upon timer E compare 1 event.
+        TimECmp1 = 1 << 28,
+
+        /// The timer counter is reset upon timer D compare 4 event.
+        TimDCmp4 = 1 << 27,
+
+        /// The timer counter is reset upon timer D compare 2 event.
+        TimDCmp2 = 1 << 26,
+
+        /// The timer counter is reset upon timer D compare 1 event.
+        TimDCmp1 = 1 << 25,
+
+        /// The timer counter is reset upon timer C compare 4 event.
+        TimCCmp4 = 1 << 24,
+
+        /// The timer counter is reset upon timer C compare 2 event.
+        TimCCmp2 = 1 << 23,
+
+        /// The timer counter is reset upon timer C compare 1 event.
+        TimCCmp1 = 1 << 22,
+
+        /// The timer counter is reset upon timer B compare 4 event.
+        TimBCmp4 = 1 << 21,
+
+        /// The timer counter is reset upon timer B compare 2 event.
+        TimBCmp2 = 1 << 20,
+
+        /// The timer counter is reset upon timer B compare 1 event.
+        TimBCmp1 = 1 << 19,
+
+        /// The timer counter is reset upon timer F compare 1 event.
+        TimFCmp1 = 1 << 0,
+    }
+);
+
+hr_timer_reset_event_source_common!(
+    /// B
+    pub enum TimerBResetEventSource {
+        [COMMON],
+
+        /// The timer counter is reset upon timer F compare 2 event.
+        TimFCmp2 = 1 << 31,
+
+        /// The timer counter is reset upon timer E compare 4 event.
+        TimECmp4 = 1 << 30,
+
+        /// The timer counter is reset upon timer E compare 2 event.
+        TimECmp2 = 1 << 29,
+
+        /// The timer counter is reset upon timer E compare 1 event.
+        TimECmp1 = 1 << 28,
+
+        /// The timer counter is reset upon timer D compare 4 event.
+        TimDCmp4 = 1 << 27,
+
+        /// The timer counter is reset upon timer D compare 2 event.
+        TimDCmp2 = 1 << 26,
+
+        /// The timer counter is reset upon timer D compare 1 event.
+        TimDCmp1 = 1 << 25,
+
+        /// The timer counter is reset upon timer C compare 4 event.
+        TimCCmp4 = 1 << 24,
+
+        /// The timer counter is reset upon timer C compare 2 event.
+        TimCCmp2 = 1 << 23,
+
+        /// The timer counter is reset upon timer C compare 1 event.
+        TimCCmp1 = 1 << 22,
+
+        /// The timer counter is reset upon timer A compare 4 event.
+        TimACmp4 = 1 << 21,
+
+        /// The timer counter is reset upon timer A compare 2 event.
+        TimACmp2 = 1 << 20,
+
+        /// The timer counter is reset upon timer A compare 1 event.
+        TimACmp1 = 1 << 19,
+
+
+        /// The timer counter is reset upon timer F compare 1 event.
+        TimFCmp1 = 1 << 0,
+    }
+);
+
+hr_timer_reset_event_source_common!(
+    /// C
+    pub enum TimerCResetEventSource {
+        [COMMON],
+
+        /// The timer counter is reset upon timer F compare 2 event.
+        TimFCmp2 = 1 << 31,
+
+        /// The timer counter is reset upon timer E compare 4 event.
+        TimECmp4 = 1 << 30,
+
+        /// The timer counter is reset upon timer E compare 2 event.
+        TimECmp2 = 1 << 29,
+
+        /// The timer counter is reset upon timer E compare 1 event.
+        TimECmp1 = 1 << 28,
+
+        /// The timer counter is reset upon timer D compare 4 event.
+        TimDCmp4 = 1 << 27,
+
+        /// The timer counter is reset upon timer D compare 2 event.
+        TimDCmp2 = 1 << 26,
+
+        /// The timer counter is reset upon timer D compare 1 event.
+        TimDCmp1 = 1 << 25,
+
+        /// The timer counter is reset upon timer B compare 4 event.
+        TimBCmp4 = 1 << 24,
+
+        /// The timer counter is reset upon timer B compare 2 event.
+        TimBCmp2 = 1 << 23,
+
+        /// The timer counter is reset upon timer B compare 1 event.
+        TimBCmp1 = 1 << 22,
+
+        /// The timer counter is reset upon timer A compare 4 event.
+        TimACmp4 = 1 << 21,
+
+        /// The timer counter is reset upon timer A compare 2 event.
+        TimACmp2 = 1 << 20,
+
+        /// The timer counter is reset upon timer A compare 1 event.
+        TimACmp1 = 1 << 19,
+
+
+        /// The timer counter is reset upon timer F compare 1 event.
+        TimFCmp1 = 1 << 0,
+    }
+);
+
+hr_timer_reset_event_source_common!(
+    /// D
+    pub enum TimerDResetEventSource {
+        [COMMON],
+
+        /// The timer counter is reset upon timer F compare 2 event.
+        TimFCmp2 = 1 << 31,
+
+        /// The timer counter is reset upon timer E compare 4 event.
+        TimECmp4 = 1 << 30,
+
+        /// The timer counter is reset upon timer E compare 2 event.
+        TimECmp2 = 1 << 29,
+
+        /// The timer counter is reset upon timer E compare 1 event.
+        TimECmp1 = 1 << 28,
+
+        /// The timer counter is reset upon timer C compare 4 event.
+        TimCCmp4 = 1 << 27,
+
+        /// The timer counter is reset upon timer C compare 2 event.
+        TimCCmp2 = 1 << 26,
+
+        /// The timer counter is reset upon timer C compare 1 event.
+        TimCCmp1 = 1 << 25,
+
+        /// The timer counter is reset upon timer B compare 4 event.
+        TimBCmp4 = 1 << 24,
+
+        /// The timer counter is reset upon timer B compare 2 event.
+        TimBCmp2 = 1 << 23,
+
+        /// The timer counter is reset upon timer B compare 1 event.
+        TimBCmp1 = 1 << 22,
+
+        /// The timer counter is reset upon timer A compare 4 event.
+        TimACmp4 = 1 << 21,
+
+        /// The timer counter is reset upon timer A compare 2 event.
+        TimACmp2 = 1 << 20,
+
+        /// The timer counter is reset upon timer A compare 1 event.
+        TimACmp1 = 1 << 19,
+
+        /// The timer counter is reset upon timer F compare 1 event.
+        TimFCmp1 = 1 << 0,
+    }
+);
+
+hr_timer_reset_event_source_common!(
+    /// E
+    pub enum TimerEResetEventSource {
+        [COMMON],
+
+        /// The timer counter is reset upon timer F compare 2 event.
+        TimFCmp2 = 1 << 31,
+
+        /// The timer counter is reset upon timer D compare 4 event.
+        TimDCmp4 = 1 << 30,
+
+        /// The timer counter is reset upon timer D compare 2 event.
+        TimDCmp2 = 1 << 29,
+
+        /// The timer counter is reset upon timer D compare 1 event.
+        TimDCmp1 = 1 << 28,
+
+        /// The timer counter is reset upon timer C compare 4 event.
+        TimCCmp4 = 1 << 27,
+
+        /// The timer counter is reset upon timer C compare 2 event.
+        TimCCmp2 = 1 << 26,
+
+        /// The timer counter is reset upon timer C compare 1 event.
+        TimCCmp1 = 1 << 25,
+
+        /// The timer counter is reset upon timer B compare 4 event.
+        TimBCmp4 = 1 << 24,
+
+        /// The timer counter is reset upon timer B compare 2 event.
+        TimBCmp2 = 1 << 23,
+
+        /// The timer counter is reset upon timer B compare 1 event.
+        TimBCmp1 = 1 << 22,
+
+        /// The timer counter is reset upon timer A compare 4 event.
+        TimACmp4 = 1 << 21,
+
+        /// The timer counter is reset upon timer A compare 2 event.
+        TimACmp2 = 1 << 20,
+
+        /// The timer counter is reset upon timer A compare 1 event.
+        TimACmp1 = 1 << 19,
+
+
+        /// The timer counter is reset upon timer F compare 1 event.
+        TimFCmp1 = 1 << 0,
+    }
+);
+
+hr_timer_reset_event_source_common!(
+    /// F
+    pub enum TimerFResetEventSource {
+        [COMMON],
+
+        /// The timer counter is reset upon timer E compare 2 event.
+        TimECmp2 = 1 << 31,
+
+        /// The timer counter is reset upon timer D compare 4 event.
+        TimDCmp4 = 1 << 30,
+
+        /// The timer counter is reset upon timer D compare 2 event.
+        TimDCmp2 = 1 << 29,
+
+        /// The timer counter is reset upon timer D compare 1 event.
+        TimDCmp1 = 1 << 28,
+
+        /// The timer counter is reset upon timer C compare 4 event.
+        TimCCmp4 = 1 << 27,
+
+        /// The timer counter is reset upon timer C compare 2 event.
+        TimCCmp2 = 1 << 26,
+
+        /// The timer counter is reset upon timer C compare 1 event.
+        TimCCmp1 = 1 << 25,
+
+        /// The timer counter is reset upon timer B compare 4 event.
+        TimBCmp4 = 1 << 24,
+
+        /// The timer counter is reset upon timer B compare 2 event.
+        TimBCmp2 = 1 << 23,
+
+        /// The timer counter is reset upon timer B compare 1 event.
+        TimBCmp1 = 1 << 22,
+
+        /// The timer counter is reset upon timer A compare 4 event.
+        TimACmp4 = 1 << 21,
+
+        /// The timer counter is reset upon timer A compare 2 event.
+        TimACmp2 = 1 << 20,
+
+        /// The timer counter is reset upon timer A compare 1 event.
+        TimACmp1 = 1 << 19,
+
+        /// The timer counter is reset upon timer E compare 1 event.
+        TimECmp1 = 1 << 0,
+    }
+);
+
+pub unsafe trait ToHrOut {
     type Out;
 }
 
-impl<PA, PB> ToHrOut for (PA, PB)
+unsafe impl<PA, PB> ToHrOut for (PA, PB)
 where
     PA: ToHrOut,
     PB: ToHrOut,
@@ -278,29 +759,48 @@ pub struct HrOut2<TIM>(PhantomData<TIM>);
 
 macro_rules! hrtim_finalize_body {
     ($this:expr, $PreloadSource:ident, $TIMX:ident: (
-        $timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident $(, $fltXr:ident, $outXr:ident)*),
+        $timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident $(, $timXcr2:ident, $fltXr:ident, $outXr:ident)*),
     ) => {{
         let tim = unsafe { &*$TIMX::ptr() };
         let (period, prescaler_bits) = match $this.count {
             CountSettings::Period(period) => (period as u32, PSCL::BITS as u16),
             CountSettings::Frequency( freq ) => {
-                <TimerHrTim<PSCL>>::calculate_frequency($this.base_freq, freq, $this.alignment)
+                <TimerHrTim<PSCL>>::calculate_frequency($this.base_freq, freq, $this.counting_direction.into())
             },
+        };
+
+        let (half, intlvd) = match $this.interleaved_mode {
+            InterleavedMode::Disabled => (false, 0b00),
+            InterleavedMode::Dual => (true, 0b00),
+            InterleavedMode::Triple => (false, 0b01),
+            InterleavedMode::Quad => (false, 0b10),
         };
 
         // Write prescaler and any special modes
         tim.$timXcr.modify(|_r, w| unsafe {
             w
-                // Enable Continous mode
-                .cont().set_bit()
+                // Enable Continuous mode
+                .cont().bit($this.timer_mode == HrTimerMode::Continuous)
+                .retrig().bit($this.timer_mode == HrTimerMode::SingleShotRetriggerable)
 
                 // TODO: add support for more modes
+
+                // Interleaved mode
+                .intlvd().bits(intlvd)
+
+                // half/double interleaved mode
+                .half().bit(half)
 
                 // Set prescaler
                 .$ck_psc().bits(prescaler_bits as u8)
         });
 
         $(
+            tim.$timXcr2.modify(|_r, w| unsafe {
+                // Set counting direction
+                w.udm().bit($this.counting_direction == HrCountingDirection::UpDown)
+            });
+
             // Only available for timers with outputs(not HRTIM_MASTER)
             let _ = tim.$outXr;
             tim.$timXcr.modify(|_r, w|
@@ -339,6 +839,12 @@ macro_rules! hrtim_finalize_body {
 
         hrtim_finalize_body!($PreloadSource, $this, tim, $timXcr);
 
+        // Set repetition counter
+        unsafe { tim.$rep.write(|w| w.$repx().bits($this.repetition_counter)); }
+
+        // Enable interrupts
+        tim.$dier.modify(|_r, w| w.$repie().bit($this.enable_repetition_interrupt));
+
         // Start timer
         let master = unsafe { &*HRTIM_MASTER::ptr() };
         master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
@@ -356,6 +862,18 @@ macro_rules! hrtim_finalize_body {
                     .preen().set_bit()
                 )
             },
+            Some(PreloadSource::OnMasterTimerUpdate) => {
+                $tim.$timXcr.modify(|_r, w| w
+                    .mstu().set_bit()
+                    .preen().set_bit()
+                )
+            }
+            Some(PreloadSource::OnRepetitionUpdate) => {
+                $tim.$timXcr.modify(|_r, w| w
+                    .tx_repu().set_bit()
+                    .preen().set_bit()
+                )
+            }
             None => ()
         }
     }};
@@ -392,14 +910,19 @@ macro_rules! hrtim_common_methods {
                 _tim,
                 _prescaler: _,
                 _out,
+                timer_mode,
                 fault_enable_bits,
                 fault1_bits,
                 fault2_bits,
                 enable_push_pull,
-                alignment,
+                interleaved_mode,
+                counting_direction,
                 base_freq,
                 count,
                 preload_source,
+                repetition_counter,
+
+                enable_repetition_interrupt,
             } = self;
 
             let period = match count {
@@ -413,16 +936,26 @@ macro_rules! hrtim_common_methods {
                 _tim,
                 _prescaler: PhantomData,
                 _out,
+                timer_mode,
                 fault_enable_bits,
                 fault1_bits,
                 fault2_bits,
                 enable_push_pull,
-                alignment,
+                interleaved_mode,
+                counting_direction,
                 base_freq,
                 count,
                 preload_source,
+                repetition_counter,
                 //deadtime: 0.nanos(),
+                enable_repetition_interrupt,
             }
+        }
+
+        pub fn timer_mode(mut self, timer_mode: HrTimerMode) -> Self {
+            self.timer_mode = timer_mode;
+
+            self
         }
 
         // TODO: Allow setting multiple?
@@ -438,12 +971,26 @@ macro_rules! hrtim_common_methods {
 
             self
         }
+
+        /// Set repetition counter, useful to reduce interrupts generated
+        /// from timer by a factor (repetition_counter + 1)
+        pub fn repetition_counter(mut self, repetition_counter: u8) -> Self {
+            self.repetition_counter = repetition_counter;
+
+            self
+        }
+
+        pub fn enable_repetition_interrupt(mut self) -> Self {
+            self.enable_repetition_interrupt = true;
+
+            self
+        }
     };
 }
 
 // Implement PWM configuration for timer
 macro_rules! hrtim_hal {
-    ($($TIMX:ident: ($timXcr:ident, $perXr:ident, $tXcen:ident, $fltXr:ident, $outXr:ident),)+) => {
+    ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $fltXr:ident, $outXr:ident),)+) => {
         $(
 
             // Implement HrPwmExt trait for hrtimer
@@ -487,15 +1034,19 @@ macro_rules! hrtim_hal {
                         _tim: PhantomData,
                         _prescaler: PhantomData,
                         _out: PhantomData,
+                        timer_mode: HrTimerMode::Continuous,
                         fault_enable_bits: 0b000000,
                         fault1_bits: 0b00,
                         fault2_bits: 0b00,
-                        alignment: Alignment::Left,
+                        counting_direction: HrCountingDirection::Up,
                         base_freq: clk,
                         count: CountSettings::Period(u16::MAX),
                         preload_source: None,
                         enable_push_pull: false,
+                        interleaved_mode: InterleavedMode::Disabled,
+                        repetition_counter: 0,
                         //deadtime: 0.nanos(),
+                        enable_repetition_interrupt: false,
                     }
                 }
             }
@@ -506,7 +1057,7 @@ macro_rules! hrtim_hal {
                 PSCL: HrtimPrescaler,
             {
                 pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>), OUT) {
-                    hrtim_finalize_body!(self, PreloadSource, $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $fltXr, $outXr),)
+                    hrtim_finalize_body!(self, PreloadSource, $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $outXr),)
                 }
 
                 hrtim_common_methods!($TIMX, PreloadSource);
@@ -549,14 +1100,20 @@ macro_rules! hrtim_hal {
                 ///
                 /// NOTE: setting this will overide any 'Swap Mode' set
                 pub fn push_pull_mode(mut self, enable: bool) -> Self {
+                    // TODO: add check for incompatible modes
                     self.enable_push_pull = enable;
 
                     self
                 }
 
-                //pub fn half_mode(mut self, enable: bool) -> Self
+                /// Set interleaved or half modes
+                ///
+                /// NOTE: Check [`InterleavedMode`] for more info about special cases
+                pub fn interleaved_mode(mut self, mode: InterleavedMode) -> Self {
+                    self.interleaved_mode = mode;
 
-                //pub fn interleaved_mode(mut self, mode: _) -> Self
+                    self
+                }
 
                 //pub fn swap_mode(mut self, enable: bool) -> Self
             }
@@ -565,7 +1122,7 @@ macro_rules! hrtim_hal {
 }
 
 macro_rules! hrtim_hal_master {
-    ($($TIMX:ident: ($timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident),)+) => {$(
+    ($($TIMX:ident: ($timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $rep:ident, $tXcen:ident, $dier:ident, $repie:ident),)+) => {$(
         impl HrPwmAdvExt for $TIMX {
             type PreloadSource = MasterPreloadSource;
 
@@ -575,7 +1132,7 @@ macro_rules! hrtim_hal_master {
                 rcc: &mut Rcc,
             ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out>
             where
-                PINS: /*Pins<Self, CHANNEL, COMP> +*/ ToHrOut,
+                PINS: Pins<Self, CHANNEL, COMP> + ToHrOut, // TODO: figure out
                 CHANNEL: HrtimChannel<Pscl128>
             {
                 // TODO: That 32x factor... Is that included below, or should we
@@ -587,15 +1144,19 @@ macro_rules! hrtim_hal_master {
                     _tim: PhantomData,
                     _prescaler: PhantomData,
                     _out: PhantomData,
+                    timer_mode: HrTimerMode::Continuous,
                     fault_enable_bits: 0b000000,
                     fault1_bits: 0b00,
                     fault2_bits: 0b00,
-                    alignment: Alignment::Left,
+                    counting_direction: HrCountingDirection::Up,
                     base_freq: clk,
                     count: CountSettings::Period(u16::MAX),
                     preload_source: None,
                     enable_push_pull: false,
+                    interleaved_mode: InterleavedMode::Disabled,
+                    repetition_counter: 0,
                     //deadtime: 0.nanos(),
+                    enable_repetition_interrupt: false,
                 }
             }
         }
@@ -606,7 +1167,7 @@ macro_rules! hrtim_hal_master {
             PSCL: HrtimPrescaler,
         {
             pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>)) {
-                hrtim_finalize_body!(self, MasterPreloadSource, $TIMX: ($timXcr, $ck_psc, $perXr, $perx, $tXcen),)
+                hrtim_finalize_body!(self, MasterPreloadSource, $TIMX: ($timXcr, $ck_psc, $perXr, $perx, $tXcen, $rep, $rep, $dier, $repie),)
             }
 
             hrtim_common_methods!($TIMX, MasterPreloadSource);
@@ -817,7 +1378,7 @@ macro_rules! hrtim_cr {
 }
 
 macro_rules! hrtim_timer {
-    ($($TIMX:ident: $perXr:ident, $perx:ident,)+) => {$(
+    ($($TIMX:ident: $perXr:ident, $perx:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $icr:ident, $repc:ident, $([$rstXr:ident, $TimerXResetEventSource:ident],)*)+) => {$(
         impl<PSCL> HrTimer<$TIMX, PSCL> for HrTim<$TIMX, PSCL> {
             fn get_period(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
@@ -830,18 +1391,67 @@ macro_rules! hrtim_timer {
                 tim.$perXr.write(|w| unsafe { w.$perx().bits(period as u16) });
             }
         }
+
+        impl<PSCL> HrTim<$TIMX, PSCL> {
+            $(
+            /// Reset this timer every time the specified event occurs
+            ///
+            /// Behaviour depends on `timer_mode`:
+            ///
+            /// * `HrTimerMode::SingleShotNonRetriggable`: Enabling the timer enables it but does not start it.
+            ///   A first reset event starts the counting and any subsequent reset is ignored until the counter
+            ///   reaches the PER value. The PER event is then generated and the counter is stopped. A reset event
+            ///   restarts the counting from 0x0000.
+            /// * `HrTimerMode:SingleShotRetriggable`: Enabling the timer enables it but does not start it.
+            ///   A reset event starts the counting if the counter is stopped, otherwise it clears the counter.
+            ///   When the counter reaches the PER value, the PER event is generated and the counter is stopped.
+            ///   A reset event restarts the counting from 0x0000.
+            /// * `HrTimerMode::Continuous`: Enabling the timer enables and starts it simultaneously.
+            ///   When the counter reaches the PER value, it rolls-over to 0x0000 and resumes counting.
+            ///   The counter can be reset at any time
+            pub fn enable_reset_event(&mut self, set_event: $TimerXResetEventSource) {
+                let tim = unsafe { &*$TIMX::ptr() };
+
+                unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() | set_event as u32)); }
+            }
+
+            /// Stop listening to the specified event
+            pub fn disable_reset_event(&mut self, set_event: $TimerXResetEventSource) {
+                let tim = unsafe { &*$TIMX::ptr() };
+
+                unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() & !(set_event as u32))); }
+            })*
+
+            pub fn set_repetition_counter(&mut self, repetition_counter: u8) {
+                let tim = unsafe { &*$TIMX::ptr() };
+
+                unsafe { tim.$rep.write(|w| w.$repx().bits(repetition_counter)); }
+            }
+
+            pub fn enable_repetition_interrupt(&mut self, enable: bool) {
+                let tim = unsafe { &*$TIMX::ptr() };
+
+                tim.$dier.modify(|_r, w| w.$repie().bit(enable));
+            }
+
+            pub fn clear_repetition_interrupt(&mut self) {
+                let tim = unsafe { &*$TIMX::ptr() };
+
+                tim.$icr.write(|w| w.$repc().set_bit());
+            }
+        }
     )+};
 }
 
 hrtim_timer! {
-    HRTIM_MASTER: mper, mper,
+    HRTIM_MASTER: mper, mper, mrep, mrep, mdier, mrepie, micr, mrepc,
 
-    HRTIM_TIMA: perar, perx,
-    HRTIM_TIMB: perbr, perx,
-    HRTIM_TIMC: percr, perx,
-    HRTIM_TIMD: perdr, perx,
-    HRTIM_TIME: perer, perx,
-    HRTIM_TIMF: perfr, perx,
+    HRTIM_TIMA: perar, perx, repar, repx, timadier, repie, timaicr, repc, [rstar, TimerAResetEventSource],
+    HRTIM_TIMB: perbr, perx, repbr, repx, timbdier, repie, timbicr, repc, [rstbr, TimerBResetEventSource],
+    HRTIM_TIMC: percr, perx, repcr, repx, timcdier, repie, timcicr, repc, [rstcr, TimerCResetEventSource],
+    HRTIM_TIMD: perdr, perx, repdr, repx, timddier, repie, timdicr, repc, [rstdr, TimerDResetEventSource],
+    HRTIM_TIME: perer, perx, reper, repx, timedier, repie, timeicr, repc, [rster, TimerEResetEventSource],
+    HRTIM_TIMF: perfr, perx, repfr, repx, timfdier, repie, timficr, repc, [rstfr, TimerFResetEventSource],
 }
 
 hrtim_cr! {
@@ -856,16 +1466,16 @@ hrtim_cr! {
 }
 
 hrtim_hal! {
-    HRTIM_TIMA: (timacr, perar, tacen, fltar, outar),
-    HRTIM_TIMB: (timbcr, perbr, tbcen, fltbr, outbr),
-    HRTIM_TIMC: (timccr, percr, tccen, fltcr, outcr),
-    HRTIM_TIMD: (timdcr, perdr, tdcen, fltdr, outdr),
-    HRTIM_TIME: (timecr, perer, tecen, flter, outer),
-    HRTIM_TIMF: (timfcr, perfr, tfcen, fltfr, outfr),
+    HRTIM_TIMA: (timacr, timacr2, perar, tacen, repar, repx, timadier, repie, fltar, outar),
+    HRTIM_TIMB: (timbcr, timbcr2, perbr, tbcen, repbr, repx, timbdier, repie, fltbr, outbr),
+    HRTIM_TIMC: (timccr, timccr2, percr, tccen, repcr, repx, timcdier, repie, fltcr, outcr),
+    HRTIM_TIMD: (timdcr, timdcr2, perdr, tdcen, repdr, repx, timddier, repie, fltdr, outdr),
+    HRTIM_TIME: (timecr, timecr2, perer, tecen, reper, repx, timedier, repie, flter, outer),
+    HRTIM_TIMF: (timfcr, timfcr2, perfr, tfcen, repfr, repx, timfdier, repie, fltfr, outfr),
 }
 
 hrtim_hal_master! {
-    HRTIM_MASTER: (mcr, ck_psc, mper, mper, mcen),
+    HRTIM_MASTER: (mcr, ck_psc, mper, mper, mrep, mcen, mdier, mrepie),
 }
 
 hrtim_pin_hal! {
@@ -888,7 +1498,7 @@ hrtim_pin_hal! {
     HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, tf2odis),
 }
 
-pub trait HrtimPrescaler {
+pub unsafe trait HrtimPrescaler {
     const BITS: u8;
     const VALUE: u8;
 
@@ -905,7 +1515,7 @@ macro_rules! impl_pscl {
     ($($t:ident => $b:literal, $v:literal, $min:literal, $max:literal)+) => {$(
         #[derive(Copy, Clone, Default)]
         pub struct $t;
-        impl HrtimPrescaler for $t {
+        unsafe impl HrtimPrescaler for $t {
             const BITS: u8 = $b;
             const VALUE: u8 = $v;
             const MIN_CR: u16 = $min;
@@ -966,7 +1576,7 @@ pub enum FaultAction {
     Floating = 0b11,
 }
 
-pub trait FaultSource: Copy {
+pub unsafe trait FaultSource: Copy {
     const ENABLE_BITS: u8;
 }
 
@@ -1071,7 +1681,7 @@ macro_rules! impl_faults {
             }
         }
 
-        impl FaultSource for $source {
+        unsafe impl FaultSource for $source {
             const ENABLE_BITS: u8 = $enable_bits;
         }
     )+}
@@ -1627,52 +2237,52 @@ impl HrTimOngoingCalibration {
         unsafe { self.init() }
     }
 
-    pub fn set_adc_trigger1(mut self, trigger: Adc13Trigger) -> Self {
+    pub fn enable_adc_trigger1_source(mut self, trigger: Adc13Trigger) -> Self {
         self.adc_trigger1_bits |= trigger as u32;
         self
     }
 
-    pub fn set_adc_trigger2(mut self, trigger: Adc24Trigger) -> Self {
+    pub fn enable_adc_trigger2_source(mut self, trigger: Adc24Trigger) -> Self {
         self.adc_trigger2_bits |= trigger as u32;
         self
     }
 
-    pub fn set_adc_trigger3(mut self, trigger: Adc13Trigger) -> Self {
+    pub fn enable_adc_trigger3_source(mut self, trigger: Adc13Trigger) -> Self {
         self.adc_trigger3_bits |= trigger as u32;
         self
     }
 
-    pub fn set_adc_trigger4(mut self, trigger: Adc24Trigger) -> Self {
+    pub fn enable_adc_trigger4_source(mut self, trigger: Adc24Trigger) -> Self {
         self.adc_trigger4_bits |= trigger as u32;
         self
     }
 
-    pub fn set_adc_trigger5(mut self, trigger: Adc579Trigger) -> Self {
+    pub fn enable_adc_trigger5_source(mut self, trigger: Adc579Trigger) -> Self {
         self.adc_trigger5_bits = trigger as u8;
         self
     }
 
-    pub fn set_adc_trigger6(mut self, trigger: Adc6810Trigger) -> Self {
+    pub fn enable_adc_trigger6_source(mut self, trigger: Adc6810Trigger) -> Self {
         self.adc_trigger6_bits = trigger as u8;
         self
     }
 
-    pub fn set_adc_trigger7(mut self, trigger: Adc579Trigger) -> Self {
+    pub fn enable_adc_trigger7_source(mut self, trigger: Adc579Trigger) -> Self {
         self.adc_trigger7_bits = trigger as u8;
         self
     }
 
-    pub fn set_adc_trigger8(mut self, trigger: Adc6810Trigger) -> Self {
+    pub fn enable_adc_trigger8_source(mut self, trigger: Adc6810Trigger) -> Self {
         self.adc_trigger8_bits = trigger as u8;
         self
     }
 
-    pub fn set_adc_trigger9(mut self, trigger: Adc579Trigger) -> Self {
+    pub fn enable_adc_trigger9_source(mut self, trigger: Adc579Trigger) -> Self {
         self.adc_trigger9_bits = trigger as u8;
         self
     }
 
-    pub fn set_adc_trigger10(mut self, trigger: Adc6810Trigger) -> Self {
+    pub fn enable_adc_trigger10_source(mut self, trigger: Adc6810Trigger) -> Self {
         self.adc_trigger10_bits = trigger as u8;
         self
     }
