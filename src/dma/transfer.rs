@@ -512,7 +512,7 @@ impl_adc_overrun!(ADC4, ADC5,);
 
 macro_rules! impl_serial_timeout {
     ($($uart:ident, )*) => {$(
-        impl<STREAM, BUF, Pin> CircTransfer<STREAM, crate::serial::Rx<crate::stm32::$uart, Pin, crate::serial::DMA>, BUF>
+        impl<STREAM, BUF, Pin> CircTransfer<STREAM, crate::serial::Rx<crate::stm32::$uart, Pin, crate::serial::DMAOld>, BUF>
         where
             STREAM: Stream,
             /*BUF: StaticWriteBuffer + Deref*/ {

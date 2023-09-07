@@ -46,12 +46,12 @@ pub enum PllSrc {
     HSE_BYPASS(Hertz),
 }
 
-impl PLLSrc {
+impl PllSrc {
     pub const fn frequency(self) -> Hertz {
         match self {
-            PLLSrc::HSI => Hertz::MHz(16),
-            PLLSrc::HSE(f) => f,
-            PLLSrc::HSE_BYPASS(f) => f,
+            PllSrc::HSI => Hertz::MHz(16),
+            PllSrc::HSE(f) => f,
+            PllSrc::HSE_BYPASS(f) => f,
         }
     }
 }
