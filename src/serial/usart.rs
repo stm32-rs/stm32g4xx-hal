@@ -1,9 +1,9 @@
+use core::convert::Infallible;
 use core::fmt;
 use core::marker::PhantomData;
 
-use crate::dma::{
-    mux::DmaMuxResources, traits::TargetAddress, MemoryToPeripheral, PeripheralToMemory,
-};
+use crate::dma::traits::Stream;
+use crate::dma::{mux::DmaMuxResources, traits::TargetAddress, PeripheralToMemory, MemoryToPeripheral};
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*};
 use crate::gpio::{Alternate, AlternateOD, AF12, AF5, AF7, AF8};
 use crate::prelude::*;
@@ -84,7 +84,7 @@ pub struct Rx<USART, Pin, Dma> {
 pub struct Tx<USART, Pin, Dma> {
     pin: Pin,
     usart: USART,
-    _dma: PhantomData<Dma>,
+    dma: Dma,
 }
 
 /// Serial abstraction
@@ -108,7 +108,12 @@ impl<USART> TxPin<USART> for NoTx {}
 pub struct NoDMA;
 /// Type state for Tx/Rx, indicating configuration for DMA
 #[derive(Debug)]
-pub struct DMA;
+pub struct DMA<T, M> {
+    stream: T,
+    memory: M,
+}
+
+pub struct DMAOld;
 
 pub trait SerialExt<USART, Config> {
     fn usart<TX, RX>(
@@ -133,14 +138,18 @@ where
     }
 }
 
-impl<USART, Pin, Dma> fmt::Write for Tx<USART, Pin, Dma>
+impl<USART, Pin> fmt::Write for Tx<USART, Pin, NoDMA>
 where
-    Tx<USART, Pin, Dma>: hal::serial::Write<u8>,
+    Tx<USART, Pin, NoDMA>: hal::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
         Ok(())
     }
+}
+
+impl<USART, Pin, T, M> embedded_io::ErrorType for Tx<USART, Pin, DMA<T, M>> {
+    type Error = Infallible;
 }
 
 macro_rules! uart_shared {
@@ -189,7 +198,7 @@ macro_rules! uart_shared {
         }
 
         impl<Pin> Rx<$USARTX, Pin, NoDMA> {
-            pub fn enable_dma(self) -> Rx<$USARTX, Pin, DMA> {
+            pub fn enable_dma(self) -> Rx<$USARTX, Pin, DMAOld> {
                 // NOTE(unsafe) critical section prevents races
                 cortex_m::interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3();
@@ -204,7 +213,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> Rx<$USARTX, Pin, DMA> {
+        impl<Pin> Rx<$USARTX, Pin, DMAOld> {
             pub fn disable_dma(self) -> Rx<$USARTX, Pin, NoDMA> {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
@@ -280,37 +289,127 @@ macro_rules! uart_shared {
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 usart.isr().read().txft().bit_is_set()
             }
+
+            pub fn clear_transmission_complete(&mut self) {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.icr().write(|w| w.tccf().set_bit());
+            }
         }
 
         impl<Pin> Tx<$USARTX, Pin, NoDMA> {
-            pub fn enable_dma(self) -> Tx<$USARTX, Pin, DMA> {
+            pub fn enable_dma<STREAM, BUF>(self, mut stream: STREAM, memory: BUF) -> Tx<$USARTX, Pin, DMA<STREAM, BUF>>
+            where
+                STREAM: crate::dma::traits::Stream<Config = crate::dma::config::DmaConfig>,
+                BUF: embedded_dma::StaticReadBuffer<Word = u8>
+            {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3();
                     cr3.modify(|_, w| w.dmat().set_bit());
                 });
 
+                stream.disable();
+
+                core::sync::atomic::fence(core::sync::atomic::Ordering::SeqCst);
+
+                // Set peripheral to memory mode
+                stream.set_direction(crate::dma::DmaDirection::MemoryToPeripheral);
+
+                // NOTE(unsafe) We now own this buffer and we won't call any &mut
+                // methods on it until the end of the DMA transfer
+                let (buf_ptr, buf_len) = unsafe { memory.read_buffer() };
+
+                // Set the memory address
+                //
+                // # Safety
+                //
+                // Must be a valid memory address
+                unsafe {
+                    stream.set_memory_address(
+                        buf_ptr as u32,
+                    );
+                }
+
+                // Set the peripheral address or the source address in memory-to-memory mode
+                //
+                // # Safety
+                //
+                // Must be a valid peripheral address or source address
+                let write_register_address = &unsafe { &*<$USARTX>::ptr() }.tdr() as *const _ as u32;
+                unsafe { stream.set_peripheral_address(write_register_address); }
+
+                assert!(
+                    buf_len <= 65535,
+                    "Hardware does not support more than 65535 transfers"
+                );
+
+                // Set the DMAMUX request line
+                stream.set_request_line(DmaMuxResources::$dmamux_tx as u8);
+
+                let msize = core::mem::size_of::<u8>() / 2;
+
+                stream.clear_interrupts();
+
+                // NOTE(unsafe) These values are correct because of the
+                // invariants of TargetAddress
+                unsafe {
+                    stream.set_memory_size(msize as u8);
+                    stream.set_peripheral_size(msize as u8);
+                }
+
+                let config = crate::dma::config::DmaConfig::default()
+                    .transfer_complete_interrupt(false)
+                    .circular_buffer(false)
+                    .memory_increment(true);
+                stream.apply_config(config);
+
                 Tx {
                     pin: self.pin,
                     usart: self.usart,
-                    _dma: PhantomData,
+                    dma: DMA{ stream, memory },
                 }
             }
         }
 
-        impl<Pin> Tx<$USARTX, Pin, DMA> {
-            pub fn disable_dma(self) -> Tx<$USARTX, Pin, NoDMA> {
-                // NOTE(unsafe) critical section prevents races
-                interrupt::free(|_| unsafe {
-                    let cr3 = &(*$USARTX::ptr()).cr3();
-                    cr3.modify(|_, w| w.dmat().clear_bit());
-                });
+        impl<Pin, T, M> embedded_io::Write for Tx<$USARTX, Pin, DMA<T, M>>
+        where
+            T: Stream,
+            M: embedded_dma::StaticReadBuffer + core::ops::DerefMut,
+            <M as core::ops::Deref>::Target: core::ops::IndexMut<core::ops::Range<usize>, Output = [u8]>,
+        {
+            fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+                use core::sync::atomic::fence;
 
-                Tx {
-                    pin: self.pin,
-                    usart: self.usart,
-                    _dma: PhantomData,
+                let (_p, buffer_capacity) = unsafe { self.dma.memory.read_buffer() };
+                let count = buf.len().min(buffer_capacity);
+
+                embedded_io::Write::flush(self)?;
+
+                fence(core::sync::atomic::Ordering::SeqCst);
+                self.dma.stream.disable();
+
+                fence(core::sync::atomic::Ordering::SeqCst);
+
+                self.dma.memory[0..count].copy_from_slice(&buf[0..count]);
+                self.dma.stream.set_number_of_transfers(count as u16);
+
+                fence(core::sync::atomic::Ordering::SeqCst);
+
+                unsafe {
+                    self.clear_transmission_complete();
+                    self.dma.stream.enable();
                 }
+
+                Ok(count)
+            }
+
+            fn flush(&mut self) -> Result<(), Self::Error> {
+                while T::get_number_of_transfers() > 0 {
+                    assert!(!T::get_transfer_error_flag());
+                }
+                self.dma.stream.clear_transfer_complete_interrupt();
+                assert!(!T::get_transfer_error_flag());
+                Ok(())
             }
         }
 
@@ -388,7 +487,7 @@ macro_rules! uart_shared {
             }
         }
 
-        unsafe impl<Pin> TargetAddress<MemoryToPeripheral> for Tx<$USARTX, Pin, DMA> {
+        unsafe impl<Pin> TargetAddress<MemoryToPeripheral> for Tx<$USARTX, Pin, DMAOld> {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Tx part accesses the Tx register
@@ -400,7 +499,7 @@ macro_rules! uart_shared {
             const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::$dmamux_tx as u8);
         }
 
-        unsafe impl<Pin> TargetAddress<PeripheralToMemory> for Rx<$USARTX, Pin, DMA> {
+        unsafe impl<Pin> TargetAddress<PeripheralToMemory> for Rx<$USARTX, Pin, DMAOld> {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Rx part accesses the Rx register
@@ -513,7 +612,7 @@ macro_rules! uart_lp {
                     tx: Tx {
                         pin: tx,
                         usart,
-                        _dma: PhantomData,
+                        dma: NoDMA,
                     },
                     rx: Rx {
                         pin: rx,
@@ -667,7 +766,7 @@ macro_rules! uart_full {
                     tx: Tx {
                         pin: tx,
                         usart,
-                        _dma: PhantomData,
+                        dma: NoDMA,
                     },
                     rx: Rx {
                         pin: rx,
