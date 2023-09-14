@@ -5,17 +5,14 @@
 
 //#[macro_use]
 //mod utils;
-use stm32g4xx_hal::{
-    independent_watchdog::IndependentWatchdog, prelude::*,
-    stm32::Peripherals
-};
+use stm32g4xx_hal::{independent_watchdog::IndependentWatchdog, prelude::*, stm32::Peripherals};
 
 use cortex_m_rt::entry;
 
 // TODO: Use utils instead
+use defmt::Logger;
 use defmt_rtt as _; // global logger
 use panic_probe as _;
-pub use defmt::Logger;
 
 use defmt::info; // TODO: Use utils::logger instead
 

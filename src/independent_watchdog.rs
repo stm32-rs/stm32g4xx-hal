@@ -9,12 +9,12 @@
 //! # Examples
 //!
 //! - [IWDG Example](todo-insert-link-here)
-//! 
+//!
 //! Originally from stm32h7-hal, adapted for stm32g4xx-hal
-use crate::{time::{MicroSecond, U32Ext}, stm32::{
-    IWDG,
-    iwdg::pr::PR_A,
-}};
+use crate::{
+    stm32::{iwdg::pr::PR_A, IWDG},
+    time::{MicroSecond, U32Ext},
+};
 
 /// The implementation of the hardware IWDG
 pub struct IndependentWatchdog {
@@ -71,11 +71,7 @@ impl IndependentWatchdog {
 
     /// Start the watchdog where it must be fed before the max time is over and
     /// not before the min time has passed
-    pub fn start_windowed<T: Into<MicroSecond>>(
-        &mut self,
-        min_window_time: T,
-        max_window_time: T,
-    ) {
+    pub fn start_windowed<T: Into<MicroSecond>>(&mut self, min_window_time: T, max_window_time: T) {
         let min_window_time: MicroSecond = min_window_time.into();
         let max_window_time: MicroSecond = max_window_time.into();
 
@@ -103,11 +99,9 @@ impl IndependentWatchdog {
             .write(|w| w.win().bits(Self::MAX_COUNTER_VALUE as u16));
 
         // Calculate the counter values
-        let reload_value = (max_window_time.0 / 1000)
-            * (Self::CLOCK_SPEED / 1000)
+        let reload_value = (max_window_time.0 / 1000) * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
-        let window_value = (min_window_time.0 / 1000)
-            * (Self::CLOCK_SPEED / 1000)
+        let window_value = (min_window_time.0 / 1000) * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
 
         // Set the reload value
