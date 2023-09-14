@@ -69,6 +69,10 @@ fn main() -> ! {
     loop {
         let mut b = [0_u16; 4];
         let r = transfer.read_exact(&mut b);
+        assert!(
+            !transfer.get_overrun_flag(),
+            "DMA did not have time to read the ADC value before ADC was done with a new conversion"
+        );
 
         info!("read: {}", r);
         assert!(r == b.len());

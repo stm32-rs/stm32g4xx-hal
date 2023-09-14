@@ -436,6 +436,57 @@ where
     }
 }
 
+macro_rules! impl_adc_overrun {
+    ($($adc:ident, )*) => {$(
+        impl<STREAM, CONFIG, BUF> CircTransfer<STREAM, crate::adc::Adc<crate::stm32::$adc, crate::adc::DMA>, BUF>
+        where
+            STREAM: Stream<Config = CONFIG>,
+            BUF: StaticWriteBuffer + Deref,
+            <BUF as Deref>::Target: Index<Range<usize>, Output = [u16]> {
+            /// This is set when the AD finishes a conversion before the DMA has hade time to transfer the previous value
+            pub fn get_overrun_flag(&self) -> bool {
+                self.transfer.peripheral.get_overrun_flag()
+            }
+
+            pub fn clear_overrun_flag(&mut self) {
+                self.transfer.peripheral.clear_overrun_flag();
+            }
+        }
+    )*};
+}
+
+#[cfg(any(
+    feature = "stm32g431",
+    feature = "stm32g441",
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
+))]
+impl_adc_overrun!(ADC1, ADC2,);
+
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
+))]
+impl_adc_overrun!(ADC3,);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+))]
+impl_adc_overrun!(ADC4, ADC5,);
+
 pub trait TransferExt<STREAM>
 where
     STREAM: traits::Stream,

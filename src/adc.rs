@@ -795,6 +795,7 @@ pub mod config {
         pub(crate) subgroup_len: SubGroupLength,
         pub(crate) dma: Dma,
         pub(crate) end_of_conversion_interrupt: Eoc,
+        pub(crate) overrun_interrupt: bool,
         pub(crate) default_sample_time: SampleTime,
         pub(crate) vdda: Option<u32>,
         pub(crate) auto_delay: bool,
@@ -853,6 +854,15 @@ pub mod config {
             self.end_of_conversion_interrupt = end_of_conversion_interrupt;
             self
         }
+
+        /// Enable/disable overrun interrupt
+        ///
+        /// This is triggered when the AD finishes a conversion before the last value was read by CPU/DMA
+        pub fn overrun_interrupt(mut self, enable: bool) -> Self {
+            self.overrun_interrupt = enable;
+            self
+        }
+
         /// change the default_sample_time field
         #[inline(always)]
         pub fn default_sample_time(mut self, default_sample_time: SampleTime) -> Self {
@@ -932,6 +942,7 @@ pub mod config {
                 subgroup_len: SubGroupLength::One,
                 dma: Dma::Disabled,
                 end_of_conversion_interrupt: Eoc::Disabled,
+                overrun_interrupt: false,
                 default_sample_time: SampleTime::Cycles_640_5,
                 vdda: None,
                 difsel: DifferentialSelection::default(),
@@ -1525,6 +1536,7 @@ macro_rules! adc {
                     self.set_subgroup_len(config.subgroup_len);
                     self.set_dma(config.dma);
                     self.set_end_of_conversion_interrupt(config.end_of_conversion_interrupt);
+                    self.set_overrun_interrupt(config.overrun_interrupt);
                     self.set_default_sample_time(config.default_sample_time);
                     self.set_channel_input_type(config.difsel);
                     self.set_auto_delay(config.auto_delay);
@@ -1634,6 +1646,13 @@ macro_rules! adc {
                         .eosie().bit(eocs)
                         .eocie().bit(en)
                     );
+                }
+
+                /// Enable/disable overrun interrupt
+                ///
+                /// This is triggered when the AD finishes a conversion before the last value was read by CPU/DMA
+                pub fn set_overrun_interrupt(&mut self, enable: bool) {
+                    self.adc_reg.ier.modify(|_, w| w.ovrie().bit(enable));
                 }
 
                 /// Sets the default sample time that is used for one-shot conversions.
@@ -1919,6 +1938,18 @@ macro_rules! adc {
                 pub fn is_vref_enabled(&mut self, common: &stm32::$common_type) -> bool {
                     common.ccr.read().vrefen().bit_is_set()
                 }
+
+                /// Read overrun flag
+                #[inline(always)]
+                pub fn get_overrun_flag(&self) -> bool {
+                    self.adc_reg.isr.read().ovr().bit()
+                }
+
+                /// Resets the overrun flag
+                #[inline(always)]
+                pub fn clear_overrun_flag(&mut self) {
+                    self.adc_reg.isr.modify(|_, w| w.ovr().set_bit());
+                }
             }
 
             //TODO: claim now configures the clock for all ADCs in the group (12 and 345).
@@ -2156,6 +2187,14 @@ macro_rules! adc {
                     self.adc.set_end_of_conversion_interrupt(eoc)
                 }
 
+                /// Enable/disable overrun interrupt
+                ///
+                /// This is triggered when the AD finishes a conversion before the last value was read by CPU/DMA
+                #[inline(always)]
+                pub fn set_overrun_interrupt(&mut self, enable: bool) {
+                    self.adc.set_overrun_interrupt(enable)
+                }
+
                 /// Sets the default sample time that is used for one-shot conversions.
                 /// [configure_channel](#method.configure_channel) and [start_conversion](#method.start_conversion) can be \
                 /// used for configurations where different sampling times are required per channel.
@@ -2366,6 +2405,18 @@ macro_rules! adc {
                         adc: self.adc,
                         _status: PhantomData,
                     }
+                }
+
+                /// Read overrun flag
+                #[inline(always)]
+                pub fn get_overrun_flag(&self) -> bool {
+                    self.adc.get_overrun_flag()
+                }
+
+                /// Resets the overrun flag
+                #[inline(always)]
+                pub fn clear_overrun_flag(&mut self) {
+                    self.adc.clear_overrun_flag();
                 }
             }
 
