@@ -11,6 +11,9 @@ const _RDPRT_KEY: u16 = 0x00A5;
 const KEY1: u32 = 0x45670123;
 const KEY2: u32 = 0xCDEF89AB;
 
+const OPT_KEY1: u32 = 0x08192A3B;
+const OPT_KEY2: u32 = 0x4C5D6E7F;
+
 pub const SZ_1K: u32 = 1024;
 
 pub type Result<T> = core::result::Result<T, Error>;
@@ -26,7 +29,9 @@ pub enum Error {
     WriteError,
     VerifyError,
     UnlockError,
+    OptUnlockError,
     LockError,
+    OptLockError,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
@@ -53,6 +58,34 @@ pub struct FlashWriter<'a, const SECTOR_SZ_KB: u32> {
     verify: bool,
 }
 impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
+    fn unlock_options(&mut self) -> Result<()> {
+        // Check if flash is busy
+        while self.flash.sr.sr().read().bsy().bit_is_set() {}
+
+        // Unlock
+        self.unlock()?;
+
+        // Write the OPT Keys to the OPTKEYR register
+        unsafe {
+            self.flash
+                ._optkeyr
+                .optkeyr()
+                .write(|w| w.optkeyr().bits(OPT_KEY1));
+        }
+        unsafe {
+            self.flash
+                ._optkeyr
+                .optkeyr()
+                .write(|w| w.optkeyr().bits(OPT_KEY2));
+        }
+
+        // Verify success
+        match self.flash.cr.cr().read().lock().bit_is_clear() {
+            true => Ok(()),
+            false => Err(Error::OptUnlockError),
+        }
+    }
+
     fn unlock(&mut self) -> Result<()> {
         // Wait for any ongoing operations
         while self.flash.sr.sr().read().bsy().bit_is_set() {}
@@ -111,8 +144,6 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
             > self.flash_sz.kbytes() as u32
         {
             Err(Error::LengthTooLong)
-        } else if length & 0x1 != 0 {
-            Err(Error::LengthNotMultiple2)
         } else {
             Ok(())
         }
@@ -139,7 +170,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
             self.flash
                 .cr
                 .cr()
-                .write(|w| w.pnb().bits(page.try_into().unwrap()));
+                .modify(|_, w| w.pnb().bits(page.try_into().unwrap()));
         }
 
         // Start Operation
@@ -224,22 +255,47 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         // Unlock Flash
         self.unlock()?;
 
-        for idx in (0..data.len()).step_by(2) {
+        for idx in (0..data.len()).step_by(8) {
+            // Check the starting address
             self.valid_address(offset + idx as u32)?;
+            // Check the ending address to make sure there is no overflow
+            self.valid_address(offset + 8 + idx as u32)?;
 
-            let write_address = (FLASH_START + offset + idx as u32) as *mut u16;
+            let write_address1 = (FLASH_START + offset + idx as u32) as *mut u32;
+            let write_address2 = (FLASH_START + offset + 4 + idx as u32) as *mut u32;
+
+            let mut word1: u32 = 0;
+            let mut word2: u32 = 0;
+
+            // Check if there is enough data to make 2 words, if there isn't, pad the data with 0xFF
+            if idx + 8 > data.len() {
+                let mut tmp_buffer = [255 as u8; 8];
+                for jdx in idx..data.len() {
+                    tmp_buffer[jdx] = data[idx + jdx];
+                }
+                let tmp_dword = u64::from_le_bytes(tmp_buffer);
+                word1 = tmp_dword as u32;
+                word2 = (tmp_dword >> 32) as u32;
+            } else {
+                word1 = (data[idx] as u32)
+                    | (data[idx + 1] as u32) << 8
+                    | (data[idx + 2] as u32) << 16
+                    | (data[idx + 3] as u32) << 24;
+
+                word2 = (data[idx + 4] as u32)
+                    | (data[idx + 5] as u32) << 8
+                    | (data[idx + 6] as u32) << 16
+                    | (data[idx + 7] as u32) << 24;
+            }
 
             // Set Page Programming to 1
             self.flash.cr.cr().modify(|_, w| w.pg().set_bit());
 
             while self.flash.sr.sr().read().bsy().bit_is_set() {}
 
-            // Flash is written 16 bits at a time, so combine two bytes to get a
-            // half-word
-            let hword: u16 = (data[idx] as u16) | (data[idx + 1] as u16) << 8;
-
             // NOTE(unsafe) Write to FLASH area with no side effects
-            unsafe { core::ptr::write_volatile(write_address, hword) };
+            unsafe { core::ptr::write_volatile(write_address1, word1) };
+            unsafe { core::ptr::write_volatile(write_address2, word2) };
 
             // Wait for write
             while self.flash.sr.sr().read().bsy().bit_is_set() {}
@@ -261,8 +317,9 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
             } else if self.verify {
                 // Verify written WORD
                 // NOTE(unsafe) read with no side effects within FLASH area
-                let verify: u16 = unsafe { core::ptr::read_volatile(write_address) };
-                if verify != hword {
+                let verify1: u32 = unsafe { core::ptr::read_volatile(write_address1) };
+                let verify2: u32 = unsafe { core::ptr::read_volatile(write_address2) };
+                if verify1 != word1 && verify2 != word2 {
                     self.lock()?;
                     return Err(Error::VerifyError);
                 }
@@ -374,7 +431,10 @@ impl Parts {
         feature = "stm32g491",
         feature = "stm32g4a1",
     ))]
-    pub fn writer(&mut self, flash_sz: FlashSize) -> FlashWriter<{ 4 * SZ_1K }> {
+    pub fn writer<const PAGE_SIZE_KB: u32>(
+        &mut self,
+        flash_sz: FlashSize,
+    ) -> FlashWriter<PAGE_SIZE_KB> {
         FlashWriter {
             flash: self,
             flash_sz,
