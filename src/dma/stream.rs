@@ -251,6 +251,13 @@ macro_rules! dma_stream {
                 }
 
                 #[inline(always)]
+                fn get_transfer_error_flag() -> bool {
+                    //NOTE(unsafe) Atomic read with no side effects
+                    let dma = unsafe { &*I::ptr() };
+                    dma.isr.read().$teisr().bit_is_set()
+                }
+
+                #[inline(always)]
                 unsafe fn enable(&mut self) {
                     //NOTE(unsafe) We only access the registers that belongs to the StreamX
                     let dma = &*I::ptr();

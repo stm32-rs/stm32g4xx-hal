@@ -265,6 +265,11 @@ where
         STREAM::get_transfer_complete_flag()
     }
 
+    #[inline(always)]
+    pub fn get_transfer_error_flag(&self) -> bool {
+        STREAM::get_transfer_error_flag()
+    }
+
     /// Clear half transfer interrupt (htif) for the DMA stream.
     #[inline(always)]
     pub fn clear_half_transfer_interrupt(&mut self) {
@@ -435,6 +440,11 @@ where
     #[inline(always)]
     pub fn get_transfer_complete_flag(&self) -> bool {
         self.transfer.get_transfer_complete_flag()
+    }
+
+    #[inline(always)]
+    pub fn get_transfer_error_flag(&self) -> bool {
+        self.transfer.get_transfer_error_flag()
     }
 
     /// Clear half transfer interrupt (htif) for the DMA stream.
