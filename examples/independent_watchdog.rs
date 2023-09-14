@@ -1,46 +1,33 @@
+// Originaly from stm32h7xx-hal, adapted for stm32g4xx-hal
+
 #![no_main]
 #![no_std]
 
-#[macro_use]
-mod utilities;
-use stm32h7xx_hal::{
-    independent_watchdog::IndependentWatchdog, pac, prelude::*,
+//#[macro_use]
+//mod utils;
+use stm32g4xx_hal::{
+    independent_watchdog::IndependentWatchdog, prelude::*,
+    stm32::Peripherals
 };
 
 use cortex_m_rt::entry;
 
-use log::info;
+// TODO: Use utils instead
+use defmt_rtt as _; // global logger
+use panic_probe as _;
+pub use defmt::Logger;
+
+use defmt::info; // TODO: Use utils::logger instead
 
 #[entry]
 fn main() -> ! {
-    utilities::logger::init();
-    let dp = pac::Peripherals::take().unwrap();
+    //utils::logger::init();
+    let dp = Peripherals::take().unwrap();
 
-    // Constrain and Freeze power
-    info!("Setup PWR...                  ");
-    let pwr = dp.PWR.constrain();
-    let pwrcfg = example_power!(pwr).freeze();
-
-    // Constrain and Freeze clock
-    info!("Setup RCC...                  ");
-    let rcc = dp.RCC.constrain();
-    let _ccdr = rcc.sys_ck(96.MHz()).freeze(pwrcfg, &dp.SYSCFG);
-
-    #[cfg(any(feature = "rm0433", feature = "rm0455"))]
     let mut watchdog = IndependentWatchdog::new(dp.IWDG);
 
-    // Dual core parts
-    #[cfg(all(feature = "rm0399", feature = "cm7"))]
-    let mut watchdog = IndependentWatchdog::new(dp.IWDG1);
-    #[cfg(all(feature = "rm0399", feature = "cm4"))]
-    let mut watchdog = IndependentWatchdog::new(dp.IWDG2);
-
-    // RM0468
-    #[cfg(all(feature = "rm0468"))]
-    let mut watchdog = IndependentWatchdog::new(dp.IWDG1);
-
     info!("");
-    info!("stm32h7xx-hal example - Watchdog");
+    info!("stm32g4xx-hal example - Watchdog");
     info!("");
 
     // If the watchdog is working correctly this print should
@@ -49,7 +36,7 @@ fn main() -> ! {
 
     // Enable the watchdog with a limit of 32.76 seconds (which is the maximum this watchdog can do) and wait forever
     // -> restart the chip
-    watchdog.start(32_760.millis());
+    watchdog.start(32_760.ms());
 
     // Alternatively, there's also a windowed option where if the watchdog is fed before the window time, it will reset the chip as well
     // watchdog.start_windowed(100.millis(), 200.millis());

@@ -6,35 +6,15 @@
 //!
 //! The Independent Watchdog peripheral triggers a system reset when its internal counter expires.
 //!
-//! # Peripheral Naming
-//!
-//! The naming of the Independent Watchdog peripheral varies between parts
-//!
-//! | Parts | IWDG Peripheral | Second IWDG Peripheral |
-//! | --- | --- | --- |
-//! | stm32H742/743/750/753/7a3/7b0/7b3 | IWDG | - |
-//! | stm32h745/747/755/757 | IWDG1 | IWDG2 |
-//! | stm32h723/725/730/733/735 | IWDG1 | - |
-//!
 //! # Examples
 //!
-//! - [IWDG Example](https://github.com/stm32-rs/stm32h7xx-hal/blob/master/examples/independent_watchdog.rs)
-use crate::{prelude::*, time::MilliSeconds};
-
-#[cfg(any(feature = "rm0433", feature = "rm0455"))]
-use crate::stm32::iwdg::pr::PR_A;
-#[cfg(any(feature = "rm0433", feature = "rm0455"))]
-use crate::stm32::IWDG;
-
-#[cfg(any(all(feature = "rm0399", feature = "cm7"), feature = "rm0468"))]
-use crate::stm32::iwdg1::pr::PR_A;
-#[cfg(any(all(feature = "rm0399", feature = "cm7"), feature = "rm0468"))]
-use crate::stm32::IWDG1 as IWDG;
-
-#[cfg(all(feature = "rm0399", feature = "cm4"))]
-use crate::stm32::iwdg2::pr::PR_A;
-#[cfg(all(feature = "rm0399", feature = "cm4"))]
-use crate::stm32::IWDG2 as IWDG;
+//! - [IWDG Example](todo-insert-link-here)
+//! 
+//! Originally from stm32h7-hal, adapted for stm32g4xx-hal
+use crate::{time::{MicroSecond, U32Ext}, stm32::{
+    IWDG,
+    iwdg::pr::PR_A,
+}};
 
 /// The implementation of the hardware IWDG
 pub struct IndependentWatchdog {
@@ -91,13 +71,13 @@ impl IndependentWatchdog {
 
     /// Start the watchdog where it must be fed before the max time is over and
     /// not before the min time has passed
-    pub fn start_windowed<T: Into<MilliSeconds>>(
+    pub fn start_windowed<T: Into<MicroSecond>>(
         &mut self,
         min_window_time: T,
         max_window_time: T,
     ) {
-        let min_window_time: MilliSeconds = min_window_time.into();
-        let max_window_time: MilliSeconds = max_window_time.into();
+        let min_window_time: MicroSecond = min_window_time.into();
+        let max_window_time: MicroSecond = max_window_time.into();
 
         // Start the watchdog
         self.iwdg.kr.write(|w| w.key().start());
@@ -107,7 +87,7 @@ impl IndependentWatchdog {
         // Set the prescaler
         let (prescaler, _) = Self::MAX_MILLIS_FOR_PRESCALER
             .iter()
-            .find(|(_, max_millis)| *max_millis >= max_window_time.to_millis())
+            .find(|(_, max_millis)| *max_millis >= max_window_time.0 / 1000)
             .expect("IWDG max time is greater than is possible");
         while self.iwdg.sr.read().pvu().bit_is_set() {
             cortex_m::asm::nop();
@@ -123,10 +103,10 @@ impl IndependentWatchdog {
             .write(|w| w.win().bits(Self::MAX_COUNTER_VALUE as u16));
 
         // Calculate the counter values
-        let reload_value = max_window_time.to_millis()
+        let reload_value = (max_window_time.0 / 1000)
             * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
-        let window_value = min_window_time.to_millis()
+        let window_value = (min_window_time.0 / 1000)
             * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
 
@@ -157,8 +137,8 @@ impl IndependentWatchdog {
     }
 
     /// Start the watchdog with the given max time and no minimal time
-    pub fn start<T: Into<MilliSeconds>>(&mut self, max_time: T) {
-        self.start_windowed(0_u32.millis(), max_time.into());
+    pub fn start<T: Into<MicroSecond>>(&mut self, max_time: T) {
+        self.start_windowed(0_u32.ms(), max_time.into());
     }
 
     fn get_prescaler_divider(prescaler: &PR_A) -> u32 {
