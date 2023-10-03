@@ -90,6 +90,7 @@ log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
 defmt-logging = ["defmt"]
+pwm-open-drain = []
 
 [profile.dev]
 codegen-units = 1

@@ -214,7 +214,7 @@ use crate::gpio::gpiog::*;
 ))]
 use crate::gpio::AF14;
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiof::*};
-use crate::gpio::{Alternate, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
+use crate::gpio::{Alternate, AlternateOD, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
 
 // This trait marks that a GPIO pin can be used with a specific timer channel
 // TIM is the timer being used
@@ -561,12 +561,26 @@ pins! {
         CH1(ComplementaryDisabled): [
             PA2<Alternate<AF9>>,
             PB14<Alternate<AF1>>,
-            PF9<Alternate<AF3>>
+            PF9<Alternate<AF3>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA2<AlternateOD<AF9>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB14<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF9<AlternateOD<AF3>>
         ]
         CH2(ComplementaryImpossible): [
             PA3<Alternate<AF9>>,
             PB15<Alternate<AF1>>,
-            PF10<Alternate<AF3>>
+            PF10<Alternate<AF3>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA3<AlternateOD<AF9>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB15<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF10<AlternateOD<AF3>>
         ]
         CH1N: [
             PA1<Alternate<AF9>>,
@@ -578,12 +592,31 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484"
             ))]
-            PG9<Alternate<AF14>>
+            PG9<Alternate<AF14>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA1<AlternateOD<AF9>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB15<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g471",
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ), feature = "pwm-open-drain"
+            ))]
+            PG9<AlternateOD<AF14>>
         ]
         CH2N: []
         BRK: [
             PA9<Alternate<AF9>>,
-            PC5<Alternate<AF2>>
+            PC5<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA9<AlternateOD<AF9>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC5<AlternateOD<AF2>>
         ]
         BRK2: []
     TIM16:
@@ -592,16 +625,35 @@ pins! {
             PA12<Alternate<AF1>>,
             PB4<Alternate<AF1>>,
             PB8<Alternate<AF1>>,
-            PE0<Alternate<AF4>>
+            PE0<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA6<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA12<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB4<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB8<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE0<AlternateOD<AF4>>
         ]
         CH2(ComplementaryImpossible): []
         CH1N: [
             PA13<Alternate<AF1>>,
-            PB6<Alternate<AF1>>
+            PB6<Alternate<AF1>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA13<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB6<AlternateOD<AF1>>
         ]
         CH2N: []
         BRK: [
-            PB5<Alternate<AF1>>
+            PB5<Alternate<AF1>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB5<AlternateOD<AF1>>
         ]
         BRK2: []
     TIM17:
@@ -609,16 +661,33 @@ pins! {
             PA7<Alternate<AF1>>,
             PB5<Alternate<AF10>>,
             PB9<Alternate<AF1>>,
-            PE1<Alternate<AF4>>
+            PE1<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA7<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB5<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB9<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE1<AlternateOD<AF4>>
         ]
         CH2(ComplementaryImpossible): []
         CH1N: [
-            PB7<Alternate<AF1>>
+            PB7<Alternate<AF1>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB7<AlternateOD<AF1>>
         ]
         CH2N: []
         BRK: [
             PA10<Alternate<AF1>>,
-            PB4<Alternate<AF10>>
+            PB4<Alternate<AF10>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA10<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB4<AlternateOD<AF10>>
         ]
         BRK2: []
 }
@@ -628,46 +697,110 @@ pins! {
         CH1(ComplementaryDisabled): [
             PA8<Alternate<AF6>>,
             PC0<Alternate<AF2>>,
-            PE9<Alternate<AF2>>
+            PE9<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA8<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC0<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE9<AlternateOD<AF2>>
         ]
         CH2(ComplementaryDisabled): [
             PA9<Alternate<AF6>>,
             PC1<Alternate<AF2>>,
-            PE11<Alternate<AF2>>
+            PE11<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA9<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC1<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE11<AlternateOD<AF2>>
         ]
         CH3(ComplementaryDisabled): [
             PA10<Alternate<AF6>>,
             PC2<Alternate<AF2>>,
-            PE13<Alternate<AF2>>
+            PE13<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA10<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC2<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE13<AlternateOD<AF2>>
         ]
         CH4(ComplementaryDisabled): [
             PA11<Alternate<AF11>>,
             PC3<Alternate<AF2>>,
-            PE14<Alternate<AF2>>
+            PE14<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA11<AlternateOD<AF11>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC3<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE14<AlternateOD<AF2>>
         ]
         CH1N: [
             PA7<Alternate<AF6>>,
             PA11<Alternate<AF6>>,
             PB13<Alternate<AF6>>,
             PC13<Alternate<AF4>>,
-            PE8<Alternate<AF2>>
+            PE8<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA7<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA11<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB13<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC13<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE8<AlternateOD<AF2>>
         ]
         CH2N: [
             PA12<Alternate<AF6>>,
             PB0<Alternate<AF6>>,
             PB14<Alternate<AF6>>,
-            PE10<Alternate<AF2>>
+            PE10<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA12<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB0<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB14<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE10<AlternateOD<AF2>>
         ]
         CH3N: [
             PB1<Alternate<AF6>>,
             PB9<Alternate<AF12>>,
             PB15<Alternate<AF4>>,
             PE12<Alternate<AF2>>,
-            PF0<Alternate<AF6>>
+            PF0<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB1<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB9<AlternateOD<AF12>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB15<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE12<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF0<AlternateOD<AF6>>
         ]
         CH4N: [
             PC5<Alternate<AF6>>,
-            PE15<Alternate<AF6>>
+            PE15<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PC5<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE15<AlternateOD<AF6>>
         ]
         BRK: [
             PA6<Alternate<AF6>>,
@@ -677,36 +810,94 @@ pins! {
             PB10<Alternate<AF12>>,
             PB12<Alternate<AF6>>,
             PC13<Alternate<AF2>>,
-            PE15<Alternate<AF2>>
+            PE15<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA6<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA14<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA15<AlternateOD<AF9>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB8<AlternateOD<AF12>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB10<AlternateOD<AF12>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB12<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC13<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE15<AlternateOD<AF2>>
         ]
         BRK2: [
             PA11<Alternate<AF12>>,
             PC3<Alternate<AF6>>,
-            PE14<Alternate<AF6>>
+            PE14<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA11<AlternateOD<AF12>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC3<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE14<AlternateOD<AF6>>
         ]
     TIM2:
         CH1(ComplementaryImpossible): [
             PA0<Alternate<AF1>>,
             PA5<Alternate<AF1>>,
             PA15<Alternate<AF1>>,
-            PD3<Alternate<AF2>>
+            PD3<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA0<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA5<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA15<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD3<AlternateOD<AF2>>
         ]
         CH2(ComplementaryImpossible): [
             PA1<Alternate<AF1>>,
             PB3<Alternate<AF1>>,
-            PD4<Alternate<AF2>>
+            PD4<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA1<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB3<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD4<AlternateOD<AF2>>
         ]
         CH3(ComplementaryImpossible): [
             PA2<Alternate<AF1>>,
             PA9<Alternate<AF10>>,
             PB10<Alternate<AF1>>,
-            PD7<Alternate<AF2>>
+            PD7<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA2<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA9<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB10<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD7<AlternateOD<AF2>>
         ]
         CH4(ComplementaryImpossible): [
             PA3<Alternate<AF1>>,
             PA10<Alternate<AF10>>,
             PB11<Alternate<AF1>>,
-            PD6<Alternate<AF2>>
+            PD6<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA3<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA10<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB11<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD6<AlternateOD<AF2>>
         ]
         CH1N: []
         CH2N: []
@@ -719,25 +910,61 @@ pins! {
             PA6<Alternate<AF2>>,
             PB4<Alternate<AF2>>,
             PC6<Alternate<AF2>>,
-            PE2<Alternate<AF2>>
+            PE2<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA6<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB4<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC6<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE2<AlternateOD<AF2>>
         ]
         CH2(ComplementaryImpossible): [
             PA4<Alternate<AF2>>,
             PA7<Alternate<AF2>>,
             PB5<Alternate<AF2>>,
             PC7<Alternate<AF2>>,
-            PE3<Alternate<AF2>>
+            PE3<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA4<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA7<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB5<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC7<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE3<AlternateOD<AF2>>
         ]
         CH3(ComplementaryImpossible): [
             PB0<Alternate<AF2>>,
             PC8<Alternate<AF2>>,
-            PE4<Alternate<AF2>>
+            PE4<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB0<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC8<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE4<AlternateOD<AF2>>
         ]
         CH4(ComplementaryImpossible): [
             PB1<Alternate<AF2>>,
             PB7<Alternate<AF10>>,
             PC9<Alternate<AF2>>,
-            PE5<Alternate<AF2>>
+            PE5<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB1<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB7<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC9<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE5<AlternateOD<AF2>>
         ]
         CH1N: []
         CH2N: []
@@ -749,17 +976,38 @@ pins! {
         CH1(ComplementaryImpossible): [
             PA11<Alternate<AF10>>,
             PB6<Alternate<AF2>>,
-            PD12<Alternate<AF2>>
+            PD12<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA11<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB6<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD12<AlternateOD<AF2>>
         ]
         CH2(ComplementaryImpossible): [
             PA12<Alternate<AF10>>,
             PB7<Alternate<AF2>>,
-            PD13<Alternate<AF2>>
+            PD13<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA12<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB7<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD13<AlternateOD<AF2>>
         ]
         CH3(ComplementaryImpossible): [
             PA13<Alternate<AF10>>,
             PB8<Alternate<AF2>>,
-            PD14<Alternate<AF2>>
+            PD14<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA13<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB8<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD14<AlternateOD<AF2>>
         ]
         CH4(ComplementaryImpossible): [
             PB9<Alternate<AF2>>,
@@ -771,7 +1019,21 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484"
             ))]
-            PF6<Alternate<AF2>>
+            PF6<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB9<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD15<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g471",
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF6<AlternateOD<AF2>>
         ]
         CH1N: []
         CH2N: []
@@ -792,22 +1054,50 @@ pins! {
         CH1(ComplementaryImpossible): [
             PA0<Alternate<AF2>>,
             PB2<Alternate<AF2>>,
-            PF6<Alternate<AF6>>
+            PF6<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA0<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB2<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF6<AlternateOD<AF6>>
         ]
         CH2(ComplementaryImpossible): [
             PA1<Alternate<AF2>>,
             PC12<Alternate<AF1>>,
-            PF7<Alternate<AF6>>
+            PF7<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA1<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC12<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF7<AlternateOD<AF6>>
         ]
         CH3(ComplementaryImpossible): [
             PA2<Alternate<AF2>>,
             PE8<Alternate<AF1>>,
-            PF8<Alternate<AF6>>
+            PF8<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA2<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE8<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF8<AlternateOD<AF6>>
         ]
         CH4(ComplementaryImpossible): [
             PA3<Alternate<AF2>>,
             PE9<Alternate<AF1>>,
-            PF9<Alternate<AF6>>
+            PF9<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA3<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE9<AlternateOD<AF1>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF9<AlternateOD<AF6>>
         ]
         CH1N: []
         CH2N: []
@@ -821,51 +1111,119 @@ pins! {
         CH1(ComplementaryDisabled): [
             PA15<Alternate<AF2>>,
             PB6<Alternate<AF5>>,
-            PC6<Alternate<AF4>>
+            PC6<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA15<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB6<AlternateOD<AF5>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC6<AlternateOD<AF4>>
         ]
         CH2(ComplementaryDisabled): [
             PA14<Alternate<AF5>>,
             PB8<Alternate<AF10>>,
-            PC7<Alternate<AF4>>
+            PC7<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA14<AlternateOD<AF5>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB8<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC7<AlternateOD<AF4>>
         ]
         CH3(ComplementaryDisabled): [
             PB9<Alternate<AF10>>,
-            PC8<Alternate<AF4>>
+            PC8<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB9<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC8<AlternateOD<AF4>>
         ]
         CH4(ComplementaryDisabled): [
             PC9<Alternate<AF4>>,
-            PD1<Alternate<AF4>>
+            PD1<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PC9<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD1<AlternateOD<AF4>>
         ]
         CH1N: [
             PA7<Alternate<AF4>>,
             PB3<Alternate<AF4>>,
-            PC10<Alternate<AF4>>
+            PC10<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA7<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB3<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC10<AlternateOD<AF4>>
         ]
         CH2N: [
             PB0<Alternate<AF4>>,
             PB4<Alternate<AF4>>,
-            PC11<Alternate<AF4>>
+            PC11<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB0<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB4<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC11<AlternateOD<AF4>>
         ]
         CH3N: [
             PB1<Alternate<AF4>>,
             PB5<Alternate<AF3>>,
-            PC12<Alternate<AF4>>
+            PC12<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB1<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB5<AlternateOD<AF3>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC12<AlternateOD<AF4>>
         ]
         CH4N: [
             PC13<Alternate<AF4>>,
-            PD0<Alternate<AF6>>
+            PD0<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PC13<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD0<AlternateOD<AF6>>
         ]
         BRK: [
             PA0<Alternate<AF9>>,
             PA6<Alternate<AF4>>,
             PA10<Alternate<AF11>>,
             PB7<Alternate<AF5>>,
-            PD2<Alternate<AF4>>
+            PD2<Alternate<AF4>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PA0<AlternateOD<AF9>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA6<AlternateOD<AF4>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PA10<AlternateOD<AF11>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PB7<AlternateOD<AF5>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD2<AlternateOD<AF4>>
         ]
         BRK2: [
             PB6<Alternate<AF10>>,
             PC9<Alternate<AF6>>,
-            PD1<Alternate<AF6>>
+            PD1<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB6<AlternateOD<AF10>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PC9<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PD1<AlternateOD<AF6>>
         ]
 }
 #[cfg(any(
@@ -887,7 +1245,20 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF12<Alternate<AF2>>
+            PF12<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PB2<AlternateOD<AF3>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE2<AlternateOD<AF6>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF12<AlternateOD<AF2>>
         ]
         CH2(ComplementaryDisabled): [
             PC2<Alternate<AF6>>,
@@ -898,7 +1269,20 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF13<Alternate<AF2>>
+            PF13<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PC2<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PE3<AlternateOD<AF6>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF13<AlternateOD<AF2>>
         ]
         CH3(ComplementaryDisabled): [
             PC8<Alternate<AF6>>,
@@ -909,7 +1293,20 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF14<Alternate<AF2>>
+            PF14<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PC8<AlternateOD<AF6>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF2<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF14<AlternateOD<AF2>>
         ]
         CH4(ComplementaryDisabled): [
             PE1<Alternate<AF4>>,
@@ -926,7 +1323,26 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF15<Alternate<AF2>>
+            PF15<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PE1<AlternateOD<AF4>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF3<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF15<AlternateOD<AF2>>
         ]
         CH1N: [
             PE4<Alternate<AF6>>,
@@ -943,7 +1359,26 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG0<Alternate<AF2>>
+            PG0<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PE4<AlternateOD<AF6>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF4<AlternateOD<AF3>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PG0<AlternateOD<AF2>>
         ]
         CH2N: [
             PE5<Alternate<AF6>>,
@@ -960,7 +1395,26 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG1<Alternate<AF2>>
+            PG1<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PE5<AlternateOD<AF6>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF5<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PG1<AlternateOD<AF2>>
         ]
         CH3N: [
             PE6<Alternate<AF6>>,
@@ -970,7 +1424,18 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG2<Alternate<AF2>>
+            PG2<Alternate<AF2>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PE6<AlternateOD<AF6>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PG2<AlternateOD<AF2>>
         ]
         CH4N: [
             PE0<Alternate<AF3>>,
@@ -980,7 +1445,18 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG3<Alternate<AF6>>
+            PG3<Alternate<AF6>>,
+
+            #[cfg(feature = "pwm-open-drain")]
+            PE0<AlternateOD<AF3>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PG3<AlternateOD<AF6>>
         ]
         BRK: [
             #[cfg(any(
@@ -1004,7 +1480,35 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG6<Alternate<AF2>>
+            PG6<Alternate<AF2>>,
+
+
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF7<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF9<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PG3<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PG6<AlternateOD<AF2>>
         ]
         BRK2: [
             #[cfg(any(
@@ -1021,7 +1525,27 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG4<Alternate<AF2>>
+            PG4<Alternate<AF2>>,
+
+
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PF8<AlternateOD<AF2>>,
+            #[cfg(feature = "pwm-open-drain")]
+            PF10<AlternateOD<AF2>>,
+            #[cfg(all(any(
+                feature = "stm32g473",
+                feature = "stm32g474",
+                feature = "stm32g483",
+                feature = "stm32g484",
+            ),  feature = "pwm-open-drain"
+            ))]
+            PG4<AlternateOD<AF2>>
         ]
 }
 
