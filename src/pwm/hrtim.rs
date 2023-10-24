@@ -168,7 +168,7 @@ pins! {
     HRTIM_TIMA: CH1: PA8<Alternate<AF13>>, CH2: PA9<Alternate<AF13>>
 
     HRTIM_TIMB: CH1: PA10<Alternate<AF13>>, CH2: PA11<Alternate<AF13>>
-    HRTIM_TIMC: CH1: PA12<Alternate<AF13>>, CH2: PA13<Alternate<AF13>>
+    HRTIM_TIMC: CH1: PB12<Alternate<AF13>>, CH2: PB13<Alternate<AF13>>
     HRTIM_TIMD: CH1: PB14<Alternate<AF13>>, CH2: PB15<Alternate<AF13>>
 
     HRTIM_TIME: CH1: PC8<Alternate<AF3>>, CH2: PC9<Alternate<AF3>>
