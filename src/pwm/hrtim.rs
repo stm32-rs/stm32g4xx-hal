@@ -15,8 +15,8 @@ use crate::stm32::{
 };
 
 use super::{
-    ActiveHigh, Alignment, ComplementaryImpossible, FaultMonitor, Pins, Pwm, PwmPinEnable,
-    TimerType,
+    ActiveHigh, Alignment, ComplementaryImpossible, FaultMonitor, Pins, Polarity, Pwm,
+    PwmPinEnable, TimerType,
 };
 use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
 use crate::stm32::RCC;
@@ -267,6 +267,8 @@ pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
     repetition_counter: u8,
     //deadtime: NanoSecond,
     enable_repetition_interrupt: bool,
+    out1_polarity: Polarity,
+    out2_polarity: Polarity,
 }
 
 pub enum PreloadSource {
@@ -310,6 +312,15 @@ pub trait HrTimer<TIM, PSCL> {
     ///
     /// NOTE: This will affect the maximum duty usable for `HrCompareRegister::set_duty`
     fn set_period(&mut self, period: u16);
+
+    /// Start timer
+    fn start(&mut self, _hr_control: &mut HrPwmControl);
+
+    /// Stop timer
+    fn stop(&mut self, _hr_control: &mut HrPwmControl);
+
+    /// Stop timer and reset counter
+    fn stop_and_reset(&mut self, _hr_control: &mut HrPwmControl);
 }
 
 pub trait HrOutput {
@@ -796,10 +807,10 @@ macro_rules! hrtim_finalize_body {
         });
 
         $(
-            tim.$timXcr2.modify(|_r, w| unsafe {
+            tim.$timXcr2.modify(|_r, w|
                 // Set counting direction
                 w.udm().bit($this.counting_direction == HrCountingDirection::UpDown)
-            });
+            );
 
             // Only available for timers with outputs(not HRTIM_MASTER)
             let _ = tim.$outXr;
@@ -829,10 +840,14 @@ macro_rules! hrtim_finalize_body {
             // ... and lock configuration
             tim.$fltXr.modify(|_r, w| w.fltlck().set_bit());
 
-            // Set actions on fault for both outputs
             tim.$outXr.modify(|_r, w| w
+                // Set actions on fault for both outputs
                 .fault1().bits($this.fault1_bits)
                 .fault2().bits($this.fault2_bits)
+
+                // Set output polarity for both outputs
+                .pol1().bit($this.out1_polarity == Polarity::ActiveLow)
+                .pol2().bit($this.out2_polarity == Polarity::ActiveLow)
             );
         })*
 
@@ -846,8 +861,8 @@ macro_rules! hrtim_finalize_body {
         tim.$dier.modify(|_r, w| w.$repie().bit($this.enable_repetition_interrupt));
 
         // Start timer
-        let master = unsafe { &*HRTIM_MASTER::ptr() };
-        master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
+        //let master = unsafe { &*HRTIM_MASTER::ptr() };
+        //master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
 
         unsafe {
             MaybeUninit::uninit().assume_init()
@@ -923,6 +938,8 @@ macro_rules! hrtim_common_methods {
                 repetition_counter,
 
                 enable_repetition_interrupt,
+                out1_polarity,
+                out2_polarity,
             } = self;
 
             let period = match count {
@@ -949,6 +966,8 @@ macro_rules! hrtim_common_methods {
                 repetition_counter,
                 //deadtime: 0.nanos(),
                 enable_repetition_interrupt,
+                out1_polarity,
+                out2_polarity,
             }
         }
 
@@ -1047,6 +1066,8 @@ macro_rules! hrtim_hal {
                         repetition_counter: 0,
                         //deadtime: 0.nanos(),
                         enable_repetition_interrupt: false,
+                        out1_polarity: Polarity::ActiveHigh,
+                        out2_polarity: Polarity::ActiveHigh,
                     }
                 }
             }
@@ -1082,6 +1103,18 @@ macro_rules! hrtim_hal {
                     self
                 }
 
+                pub fn out1_polarity(mut self, polarity: Polarity) -> Self {
+                    self.out1_polarity = polarity;
+
+                    self
+                }
+
+                pub fn out2_polarity(mut self, polarity: Polarity) -> Self {
+                    self.out2_polarity = polarity;
+
+                    self
+                }
+
                 /// Enable or disable Push-Pull mode
                 ///
                 /// Enabling Push-Pull mode will make output 1 and 2
@@ -1102,6 +1135,15 @@ macro_rules! hrtim_hal {
                 pub fn push_pull_mode(mut self, enable: bool) -> Self {
                     // TODO: add check for incompatible modes
                     self.enable_push_pull = enable;
+
+                    self
+                }
+
+                /// Set counting direction
+                ///
+                /// See [`HrCountingDirection`]
+                pub fn counting_direction(mut self, counting_direction: HrCountingDirection) -> Self {
+                    self.counting_direction = counting_direction;
 
                     self
                 }
@@ -1157,6 +1199,8 @@ macro_rules! hrtim_hal_master {
                     repetition_counter: 0,
                     //deadtime: 0.nanos(),
                     enable_repetition_interrupt: false,
+                    out1_polarity: Polarity::ActiveHigh,
+                    out2_polarity: Polarity::ActiveHigh,
                 }
             }
         }
@@ -1220,7 +1264,7 @@ macro_rules! hrtim_pin_hal {
 
                 /// Set duty cycle
                 ///
-                /// NOTE: Please observe limits:
+                /// NOTE: Please observe limits(RM0440 "Period and compare registers min and max values"):
                 /// | Prescaler | Min duty | Max duty |
                 /// |-----------|----------|----------|
                 /// |         1 |   0x0060 |   0xFFDF |
@@ -1232,7 +1276,12 @@ macro_rules! hrtim_pin_hal {
                 /// |        64 |   0x0003 |   0xFFFD |
                 /// |       128 |   0x0003 |   0xFFFD |
                 ///
-                /// Also, writing 0 as duty is only valid for CR1 and CR3
+                /// Also, writing 0 as duty is only valid for CR1 and CR3 during a set of
+                /// specific conditions(see RM0440 "Null duty cycle exception case"):
+                /// – the output SET event is generated by the PERIOD event
+                /// – the output RESET if generated by the compare 1 (respectively compare 3) event
+                /// – the compare 1 (compare 3) event is active within the timer unit itself, and not used
+                /// for other timing units
                 fn set_duty(&mut self, duty: Self::Duty) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
@@ -1378,7 +1427,7 @@ macro_rules! hrtim_cr {
 }
 
 macro_rules! hrtim_timer {
-    ($($TIMX:ident: $perXr:ident, $perx:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $icr:ident, $repc:ident, $([$rstXr:ident, $TimerXResetEventSource:ident],)*)+) => {$(
+    ($($TIMX:ident: $cntXr:ident, $cntx:ident, $perXr:ident, $tXcen:ident, $perx:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $icr:ident, $repc:ident, $([$rstXr:ident, $TimerXResetEventSource:ident],)*)+) => {$(
         impl<PSCL> HrTimer<$TIMX, PSCL> for HrTim<$TIMX, PSCL> {
             fn get_period(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
@@ -1389,6 +1438,32 @@ macro_rules! hrtim_timer {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 tim.$perXr.write(|w| unsafe { w.$perx().bits(period as u16) });
+            }
+
+            /// Start timer
+            fn start(&mut self, _hr_control: &mut HrPwmControl) {
+                // Start timer
+
+                // SAFETY: Since we hold _hr_control there is no risk for a race condition
+                let master = unsafe { &*HRTIM_MASTER::ptr() };
+                master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
+            }
+
+            /// Stop timer
+            fn stop(&mut self, _hr_control: &mut HrPwmControl) {
+                // Stop counter
+                // SAFETY: Since we hold _hr_control there is no risk for a race condition
+                let master = unsafe { &*HRTIM_MASTER::ptr() };
+                master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
+            }
+
+            /// Stop timer and reset counter
+            fn stop_and_reset(&mut self, _hr_control: &mut HrPwmControl) {
+                self.stop(_hr_control);
+
+                // Reset counter
+                let tim = unsafe { &*$TIMX::ptr() };
+                unsafe { tim.$cntXr.write(|w| w.$cntx().bits(0)); }
             }
         }
 
@@ -1444,14 +1519,14 @@ macro_rules! hrtim_timer {
 }
 
 hrtim_timer! {
-    HRTIM_MASTER: mper, mper, mrep, mrep, mdier, mrepie, micr, mrepc,
+    HRTIM_MASTER: mcntr, mcnt, mper, mcen, mper, mrep, mrep, mdier, mrepie, micr, mrepc,
 
-    HRTIM_TIMA: perar, perx, repar, repx, timadier, repie, timaicr, repc, [rstar, TimerAResetEventSource],
-    HRTIM_TIMB: perbr, perx, repbr, repx, timbdier, repie, timbicr, repc, [rstbr, TimerBResetEventSource],
-    HRTIM_TIMC: percr, perx, repcr, repx, timcdier, repie, timcicr, repc, [rstcr, TimerCResetEventSource],
-    HRTIM_TIMD: perdr, perx, repdr, repx, timddier, repie, timdicr, repc, [rstdr, TimerDResetEventSource],
-    HRTIM_TIME: perer, perx, reper, repx, timedier, repie, timeicr, repc, [rster, TimerEResetEventSource],
-    HRTIM_TIMF: perfr, perx, repfr, repx, timfdier, repie, timficr, repc, [rstfr, TimerFResetEventSource],
+    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, [rstar, TimerAResetEventSource],
+    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, [rstbr, TimerBResetEventSource],
+    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, [rstcr, TimerCResetEventSource],
+    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, [rstdr, TimerDResetEventSource],
+    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, [rster, TimerEResetEventSource],
+    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, [rstfr, TimerFResetEventSource],
 }
 
 hrtim_cr! {
@@ -1498,7 +1573,7 @@ hrtim_pin_hal! {
     HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, tf2odis),
 }
 
-pub unsafe trait HrtimPrescaler {
+pub unsafe trait HrtimPrescaler: Default {
     const BITS: u8;
     const VALUE: u8;
 
@@ -2325,8 +2400,9 @@ pub enum Adc13Trigger {
     /// bit 29 ADCxTEC3 - Trigger on HRTIM_TIME compare match for compare register 3
     TimECmp3 = 1 << 29,
 
-    // /// bit 28 ADCxTFRST
-    // _ = 1 << 28,
+    /// bit 28 ADCxTFRST - Trigger on HRTIM_TIMF reset or counter roll-over
+    TimFRst = 1 << 28,
+
     /// bit 27 ADCxTDPER - Trigger on HRTIM_TIMD period
     TimDPeriod = 1 << 27,
 
@@ -2351,8 +2427,9 @@ pub enum Adc13Trigger {
     /// bit 20 ADCxTFC4 - Trigger on HRTIM_TIMF compare match for compare register 4
     TimFCmp4 = 1 << 20,
 
-    // /// bit 19 ADCxTBRST
-    // _ = 1 << 19,
+    /// bit 19 ADCxTBRST - Trigger on HRTIM_TIMB reset or counter roll-over
+    TimBRst = 1 << 19,
+
     /// bit 18 ADCxTBPER - Trigger on HRTIM_TIMB period
     TimBPeriod = 1 << 18,
 
@@ -2365,8 +2442,9 @@ pub enum Adc13Trigger {
     /// bit 15 ADCxTFC3 - Trigger on HRTIM_TIMF compare match for compare register 3
     TimFCmp3 = 1 << 15,
 
-    // /// bit 14 ADCxTARST
-    // _ = 1 << 14,
+    /// bit 14 ADCxTARST - Trigger on HRTIM_TIMA reset or counter roll-over
+    TimARst = 1 << 14,
+
     /// bit 13 ADCxTAPER - Trigger on HRTIM_TIMA period
     TimAPeriod = 1 << 13,
 
@@ -2445,8 +2523,9 @@ pub enum AdcTriggerPostscaler {
 }
 
 pub enum Adc24Trigger {
-    // /// bit 31 ADCxTERST
-    // _ = 1 << 31,
+    /// bit 31 ADCxTERST - Trigger on HRTIM_TIME reset or counter roll-over
+    TimERst = 1 << 31,
+
     /// bit 30 ADCxTEC4 - Trigger on HRTIM_TIME compare match for compare register 4
     TimECmp4 = 1 << 30,
 
@@ -2456,8 +2535,9 @@ pub enum Adc24Trigger {
     /// bit 28 ADCxTEC2 - Trigger on HRTIM_TIME compare match for compare register 2
     TimECmp2 = 1 << 28,
 
-    // /// bit 27 ADCxTDRST
-    // _ = 1 << 27,
+    /// bit 27 ADCxTDRST - Trigger on HRTIM_TIMD reset or counter roll-over
+    TimDRst = 1 << 27,
+
     /// bit 26 ADCxTDPER - Trigger on HRTIM_TIMD period
     TimDPeriod = 1 << 26,
 
@@ -2470,8 +2550,8 @@ pub enum Adc24Trigger {
     /// bit 23 ADCxTDC2 - Trigger on HRTIM_TIMD compare match for compare register 2
     TimDCmp2 = 1 << 23,
 
-    /// bit 22 ADCxTCRST
-    // _ = 1 << 22,
+    /// bit 22 ADCxTCRST - Trigger on HRTIM_TIMC reset or counter roll-over
+    TimCRst = 1 << 22,
 
     /// bit 21 ADCxTCPER - Trigger on HRTIM_TIMC period
     TimCPeriod = 1 << 21,
