@@ -4,8 +4,8 @@ use core::mem::MaybeUninit;
 use fugit::HertzU64;
 
 use crate::comparator::{COMP1, COMP2, COMP3, COMP4, COMP5, COMP6};
-use crate::gpio::gpioa::{PA10, PA11, PA12, PA13, PA15, PA8, PA9};
-use crate::gpio::gpiob::{PB0, PB10, PB11, PB14, PB15};
+use crate::gpio::gpioa::{PA10, PA11, PA12, PA15, PA8, PA9};
+use crate::gpio::gpiob::{PB0, PB10, PB11, PB12, PB13, PB14, PB15};
 use crate::gpio::gpioc::{PC10, PC6, PC7, PC8, PC9};
 use crate::gpio::{self, AF3};
 use crate::gpio::{Alternate, AF13};
@@ -154,11 +154,19 @@ macro_rules! pins {
             }
 
             unsafe impl ToHrOut for $CH1 {
-                type Out = HrOut1<$TIMX>;
+                type Out<PSCL> = HrOut1<$TIMX, PSCL>;
             }
 
             unsafe impl ToHrOut for $CH2 {
-                type Out = HrOut2<$TIMX>;
+                type Out<PSCL> = HrOut2<$TIMX, PSCL>;
+            }
+
+            unsafe impl<PSCL> ToHrOut for HrOut1<$TIMX, PSCL> {
+                type Out<P> = HrOut1<$TIMX, P>;
+            }
+
+            unsafe impl<PSCL> ToHrOut for HrOut2<$TIMX, PSCL> {
+                type Out<P> = HrOut2<$TIMX, P>;
             }
         )+
     }
@@ -180,7 +188,7 @@ impl Pins<HRTIM_MASTER, (), ComplementaryImpossible> for () {
 }
 
 unsafe impl ToHrOut for () {
-    type Out = ();
+    type Out<PSCL> = ();
 }
 
 // automatically implement Pins trait for tuples of individual pins
@@ -243,7 +251,7 @@ pub trait HrPwmAdvExt: Sized {
         self,
         _pins: PINS,
         rcc: &mut Rcc,
-    ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out>
+    ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out<Pscl128>>
     where
         PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
         CHANNEL: HrtimChannel<Pscl128>;
@@ -265,7 +273,7 @@ pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
     enable_push_pull: bool,
     interleaved_mode: InterleavedMode, // Also includes half mode
     repetition_counter: u8,
-    //deadtime: NanoSecond,
+    deadtime: Option<DeadtimeConfig>,
     enable_repetition_interrupt: bool,
     out1_polarity: Polarity,
     out2_polarity: Polarity,
@@ -282,6 +290,86 @@ pub enum PreloadSource {
     OnRepetitionUpdate,
 }
 
+#[derive(Copy, Clone, Debug)]
+pub struct DeadtimeConfig {
+    /// Prescaler for both rising and falling deadtime
+    prescaler: DeadtimePrescaler,
+
+    /// 9-bits
+    deadtime_rising_value: u16,
+
+    /// Is deadtime negative
+    deadtime_rising_sign: bool,
+
+    /// 9-bits
+    deadtime_falling_value: u16,
+
+    /// Is deadtime negative
+    deadtime_falling_sign: bool,
+}
+
+impl DeadtimeConfig {
+    /// See RM0440 Table 221 'Deadtime resolution and max absolute values'
+    pub fn prescaler(mut self, value: DeadtimePrescaler) -> Self {
+        self.prescaler = value;
+        self
+    }
+
+    /// Panic if value can not fit in 9 bits
+    pub fn deadtime_rising_value(mut self, value: u16) -> Self {
+        // 9 bits
+        assert!(value < (1 << 9));
+
+        self.deadtime_rising_value = value;
+
+        self
+    }
+
+    pub fn deadtime_rising_sign(mut self, is_negative: bool) -> Self {
+        self.deadtime_rising_sign = is_negative;
+        self
+    }
+
+    /// Panic if value can not fit in 9 bits
+    pub fn deadtime_falling_value(mut self, value: u16) -> Self {
+        // 9 bits
+        assert!(value < (1 << 9));
+
+        self.deadtime_falling_value = value;
+
+        self
+    }
+
+    pub fn deadtime_falling_sign(mut self, is_negative: bool) -> Self {
+        self.deadtime_falling_sign = is_negative;
+        self
+    }
+}
+
+impl Default for DeadtimeConfig {
+    fn default() -> Self {
+        Self {
+            prescaler: DeadtimePrescaler::Thrtim,
+            deadtime_rising_value: 170, // about 1us when f_sys = 170MHz
+            deadtime_rising_sign: false,
+            deadtime_falling_value: 170, // about 1us when f_sys = 170MHz
+            deadtime_falling_sign: false,
+        }
+    }
+}
+
+#[derive(Copy, Clone, Debug)]
+pub enum DeadtimePrescaler {
+    ThrtimDiv8 = 0b000,
+    ThrtimDiv4 = 0b001,
+    ThrtimDiv2 = 0b010,
+    Thrtim = 0b011,
+    ThrtimMul2 = 0b100,
+    ThrtimMul4 = 0b101,
+    ThrtimMul8 = 0b110,
+    ThrtimMul16 = 0b111,
+}
+
 pub enum MasterPreloadSource {
     /// Prealoaded registers are updaten when the master counter rolls over and the master repetition counter is 0
     OnMasterRepetitionUpdate,
@@ -292,10 +380,10 @@ pub trait HrCompareRegister {
     fn set_duty(&mut self, duty: u16);
 }
 
-pub struct HrCr1<TIM>(PhantomData<TIM>);
-pub struct HrCr2<TIM>(PhantomData<TIM>);
-pub struct HrCr3<TIM>(PhantomData<TIM>);
-pub struct HrCr4<TIM>(PhantomData<TIM>);
+pub struct HrCr1<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
+pub struct HrCr2<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
+pub struct HrCr3<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
+pub struct HrCr4<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 
 pub struct HrTim<TIM, PSCL> {
     _timer: PhantomData<TIM>,
@@ -323,7 +411,126 @@ pub trait HrTimer<TIM, PSCL> {
     fn stop_and_reset(&mut self, _hr_control: &mut HrPwmControl);
 }
 
-pub trait HrOutput {
+macro_rules! impl_into_es {
+    ($dst:ident: [$(($t:ty, $ES:ident),)*]) => {$(
+        impl_into_es!($dst, $t, $ES);
+    )*};
+
+    ($dst:ident, $t:ty, $ES:ident) => {
+        impl<PSCL> Into<EventSource<PSCL, $dst>> for &$t {
+            fn into(self) -> EventSource<PSCL, $dst> {
+                EventSource::$ES(PhantomData)
+            }
+        }
+    };
+    ($dst:ident) => {
+        impl_into_es! {
+            $dst: [
+                (HrCr1<$dst, PSCL>, Cr1),
+                (HrCr2<$dst, PSCL>, Cr2),
+                (HrCr3<$dst, PSCL>, Cr3),
+                (HrCr4<$dst, PSCL>, Cr4),
+                (HrTim<$dst, PSCL>, Period),
+
+                (HrCr1<HRTIM_MASTER, PSCL>, MasterCr1),
+                (HrCr2<HRTIM_MASTER, PSCL>, MasterCr2),
+                (HrCr3<HRTIM_MASTER, PSCL>, MasterCr3),
+                (HrCr4<HRTIM_MASTER, PSCL>, MasterCr4),
+                (HrTim<HRTIM_MASTER, PSCL>, MasterPeriod),
+            ]
+        }
+    };
+}
+
+impl_into_es!(HRTIM_TIMA);
+impl_into_es!(HRTIM_TIMB);
+impl_into_es!(HRTIM_TIMC);
+impl_into_es!(HRTIM_TIMD);
+impl_into_es!(HRTIM_TIME);
+impl_into_es!(HRTIM_TIMF);
+
+macro_rules! impl_into_neighbor_es {
+    (
+        DST: $dst:ident: [
+           ($src1:ident, $cr1:ident),
+           ($src2:ident, $cr2:ident),
+           ($src3:ident, $cr3:ident),
+           ($src4:ident, $cr4:ident),
+           ($src5:ident, $cr5:ident),
+           ($src6:ident, $cr6:ident),
+           ($src7:ident, $cr7:ident),
+           ($src8:ident, $cr8:ident),
+           ($src9:ident, $cr9:ident),
+        ]
+    ) => {
+        impl_into_neighbor_es!($dst, $src1, $cr1, TimEvent1);
+        impl_into_neighbor_es!($dst, $src2, $cr2, TimEvent2);
+        impl_into_neighbor_es!($dst, $src3, $cr3, TimEvent3);
+        impl_into_neighbor_es!($dst, $src4, $cr4, TimEvent4);
+        impl_into_neighbor_es!($dst, $src5, $cr5, TimEvent5);
+        impl_into_neighbor_es!($dst, $src6, $cr6, TimEvent6);
+        impl_into_neighbor_es!($dst, $src7, $cr7, TimEvent7);
+        impl_into_neighbor_es!($dst, $src8, $cr8, TimEvent8);
+        impl_into_neighbor_es!($dst, $src9, $cr9, TimEvent9);
+    };
+
+    ($dst:ident, $src:ident, $cr:ident, $TimEventX:ident) => {
+        impl<PSCL> Into<EventSource<PSCL, $dst>> for &$cr<$src, PSCL> {
+            fn into(self) -> EventSource<PSCL, $dst> {
+                EventSource::NeighborTimer(NeighborTimerEventSource::$TimEventX(PhantomData))
+            }
+        }
+    };
+}
+
+impl_into_neighbor_es! {
+    DST: HRTIM_TIMA: [
+        // src
+        (HRTIM_TIMB, HrCr1),
+        (HRTIM_TIMB, HrCr2),
+        (HRTIM_TIMC, HrCr2),
+        (HRTIM_TIMC, HrCr3),
+        (HRTIM_TIMD, HrCr1),
+        (HRTIM_TIMD, HrCr2),
+        (HRTIM_TIME, HrCr3),
+        (HRTIM_TIME, HrCr4),
+        (HRTIM_TIMF, HrCr4),
+    ]
+}
+
+impl_into_neighbor_es! {
+    DST: HRTIM_TIMB: [
+        // src
+        (HRTIM_TIMA, HrCr1),
+        (HRTIM_TIMA, HrCr2),
+        (HRTIM_TIMC, HrCr3),
+        (HRTIM_TIMC, HrCr4),
+        (HRTIM_TIMD, HrCr3),
+        (HRTIM_TIMD, HrCr4),
+        (HRTIM_TIME, HrCr1),
+        (HRTIM_TIME, HrCr2),
+        (HRTIM_TIMF, HrCr3),
+    ]
+}
+
+impl_into_neighbor_es! {
+    DST: HRTIM_TIMC: [
+        // src
+        (HRTIM_TIMA, HrCr2),
+        (HRTIM_TIMA, HrCr3),
+        (HRTIM_TIMB, HrCr2),
+        (HRTIM_TIMB, HrCr3),
+        (HRTIM_TIMD, HrCr2),
+        (HRTIM_TIMD, HrCr4),
+        (HRTIM_TIME, HrCr3),
+        (HRTIM_TIME, HrCr4),
+        (HRTIM_TIMF, HrCr2),
+    ]
+}
+
+// TODO: Continue for TIMD, TIME and TIMF, see RM0440 Table 218. 'Events mapping across timer A to F'
+
+pub trait HrOutput<PSCL, TIM> {
     /// Enable this output
     fn enable(&mut self);
 
@@ -334,19 +541,19 @@ pub trait HrOutput {
     ///
     /// NOTE: Enabling the same event for both SET and RESET
     /// will make that event TOGGLE the output
-    fn enable_set_event(&mut self, set_event: EventSource);
+    fn enable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, TIM>>);
 
     /// Stop listening to the specified event
-    fn disable_set_event(&mut self, set_event: EventSource);
+    fn disable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, TIM>>);
 
     /// Set this output to *not* active every time the specified event occurs
     ///
     /// NOTE: Enabling the same event for both SET and RESET
     /// will make that event TOGGLE the output
-    fn enable_rst_event(&mut self, reset_event: EventSource);
+    fn enable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, TIM>>);
 
     /// Stop listening to the specified event
-    fn disable_rst_event(&mut self, reset_event: EventSource);
+    fn disable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, TIM>>);
 
     /// Get current state of the output
     fn get_state(&self) -> State;
@@ -360,38 +567,115 @@ pub enum State {
     Fault,
 }
 
-pub enum EventSource {
+pub enum EventSource<PSCL, DST> {
     /// Compare match with compare register 1 of this timer
-    Cr1,
+    Cr1(PhantomData<(PSCL, DST)>),
 
     /// Compare match with compare register 2 of this timer
-    Cr2,
+    Cr2(PhantomData<(PSCL, DST)>),
 
     /// Compare match with compare register 3 of this timer
-    Cr3,
+    Cr3(PhantomData<(PSCL, DST)>),
 
     /// Compare match with compare register 4 of this timer
-    Cr4,
+    Cr4(PhantomData<(PSCL, DST)>),
 
     /// On complete period
-    Period,
+    Period(PhantomData<(PSCL, DST)>),
 
     /// Compare match with compare register 1 of master timer
-    MasterCr1,
+    MasterCr1(PhantomData<(PSCL, DST)>),
 
     /// Compare match with compare register 2 of master timer
-    MasterCr2,
+    MasterCr2(PhantomData<(PSCL, DST)>),
 
     /// Compare match with compare register 3 of master timer
-    MasterCr3,
+    MasterCr3(PhantomData<(PSCL, DST)>),
 
     /// Compare match with compare register 4 of master timer
-    MasterCr4,
+    MasterCr4(PhantomData<(PSCL, DST)>),
 
     /// On complete master period
-    MasterPeriod,
-    // TODO: These are unique for every timer output
-    //Extra(E)
+    MasterPeriod(PhantomData<(PSCL, DST)>),
+
+    NeighborTimer(NeighborTimerEventSource<PSCL, DST>),
+}
+
+/// Compare events from neighbor timers
+///
+/// See RM0440 Table 218. 'Events mapping across timer A to F'
+pub enum NeighborTimerEventSource<PSCL, DST> {
+    /// Timer event 1
+    ///
+    /// This is different depending on destination timer:
+    /// |dest | source |
+    /// |-----|--------|
+    /// |TimA | B CR1  |
+    /// |TimB | A CR1  |
+    /// |TimC | A CR2  |
+    /// |TimD | A CR1  |
+    /// |TimE | A CR4  |
+    /// |TimF | A CR3  |
+    TimEvent1(PhantomData<(PSCL, DST)>),
+
+    /// Timer event x
+    ///
+    /// This is different depending on destination timer:
+    /// |dest | source |
+    /// |-----|--------|
+    /// |TimA | x CRy  |
+    /// |TimB | x CRy  |
+    /// |TimC | x CRy  |
+    /// |TimD | x CRy  |
+    /// |TimE | x CRy  |
+    /// |TimF | x CRy  |
+    //TimEventx,
+
+    /// Timer event 2
+    ///
+    /// This is different depending on destination timer:
+    /// |dest | source |
+    /// |-----|--------|
+    /// |TimA | B CR2  |
+    /// |TimB | A CR2  |
+    /// |TimC | A CR3  |
+    /// |TimD | A CR4  |
+    /// |TimE | B CR3  |
+    /// |TimF | B CR1  |
+    TimEvent2(PhantomData<(PSCL, DST)>),
+
+    /// Timer event 3
+    ///
+    /// This is different depending on destination timer:
+    /// |dest | source |
+    /// |-----|--------|
+    /// |TimA | C CR2  |
+    /// |TimB | C CR3  |
+    /// |TimC | B CR2  |
+    /// |TimD | B CR2  |
+    /// |TimE | B CR4  |
+    /// |TimF | B CR4  |
+    TimEvent3(PhantomData<(PSCL, DST)>),
+
+    /// Timer event 4
+    ///
+    /// This is different depending on destination timer:
+    /// |dest | source |
+    /// |-----|--------|
+    /// |TimA | C CR3  |
+    /// |TimB | C CR4  |
+    /// |TimC | B CR3  |
+    /// |TimD | B CR4  |
+    /// |TimE | C CR1  |
+    /// |TimF | C CR1  |
+    TimEvent4(PhantomData<(PSCL, DST)>),
+
+    // TODO: Document those
+    TimEvent5(PhantomData<(PSCL, DST)>),
+    TimEvent6(PhantomData<(PSCL, DST)>),
+    TimEvent7(PhantomData<(PSCL, DST)>),
+    TimEvent8(PhantomData<(PSCL, DST)>),
+    TimEvent9(PhantomData<(PSCL, DST)>),
 }
 
 macro_rules! hr_timer_reset_event_source_common {
@@ -754,7 +1038,7 @@ hr_timer_reset_event_source_common!(
 );
 
 pub unsafe trait ToHrOut {
-    type Out;
+    type Out<PSCL>: ToHrOut;
 }
 
 unsafe impl<PA, PB> ToHrOut for (PA, PB)
@@ -762,15 +1046,15 @@ where
     PA: ToHrOut,
     PB: ToHrOut,
 {
-    type Out = (PA::Out, PB::Out);
+    type Out<PSCL> = (PA::Out<PSCL>, PB::Out<PSCL>);
 }
 
-pub struct HrOut1<TIM>(PhantomData<TIM>);
-pub struct HrOut2<TIM>(PhantomData<TIM>);
+pub struct HrOut1<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
+pub struct HrOut2<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 
 macro_rules! hrtim_finalize_body {
     ($this:expr, $PreloadSource:ident, $TIMX:ident: (
-        $timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident $(, $timXcr2:ident, $fltXr:ident, $outXr:ident)*),
+        $timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident $(, $timXcr2:ident, $fltXr:ident, $outXr:ident, $dtXr:ident)*),
     ) => {{
         let tim = unsafe { &*$TIMX::ptr() };
         let (period, prescaler_bits) = match $this.count {
@@ -824,7 +1108,6 @@ macro_rules! hrtim_finalize_body {
         tim.$perXr.write(|w| unsafe { w.$perx().bits(period as u16) });
 
         // Enable fault sources and lock configuration
-
         $(unsafe {
             // Enable fault sources
             let fault_enable_bits = $this.fault_enable_bits as u32;
@@ -849,6 +1132,26 @@ macro_rules! hrtim_finalize_body {
                 .pol1().bit($this.out1_polarity == Polarity::ActiveLow)
                 .pol2().bit($this.out2_polarity == Polarity::ActiveLow)
             );
+            if let Some(deadtime) = $this.deadtime {
+                let DeadtimeConfig {
+                    prescaler,
+                    deadtime_rising_value,
+                    deadtime_rising_sign,
+                    deadtime_falling_value,
+                    deadtime_falling_sign,
+                } = deadtime;
+
+                // SAFETY: DeadtimeConfig makes sure rising and falling values are valid
+                // and DeadtimePrescaler has its own garantuee
+                tim.$dtXr.modify(|_r, w| w
+                    .dtprsc().bits(prescaler as u8)
+                    .dtrx().bits(deadtime_rising_value)
+                    .sdtrx().bit(deadtime_rising_sign)
+                    .dtfx().bits(deadtime_falling_value)
+                    .sdtfx().bit(deadtime_falling_sign)
+                );
+                tim.$outXr.modify(|_r, w| w.dten().set_bit());
+            }
         })*
 
 
@@ -917,7 +1220,10 @@ macro_rules! hrtim_common_methods {
         }
 
         /// Set the prescaler; PWM count runs at base_frequency/(prescaler+1)
-        pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, $PS, OUT>
+        pub fn prescaler<P>(
+            self,
+            _prescaler: P,
+        ) -> HrPwmBuilder<$TIMX, P, $PS, <OUT as ToHrOut>::Out<P>>
         where
             P: HrtimPrescaler,
         {
@@ -936,7 +1242,7 @@ macro_rules! hrtim_common_methods {
                 count,
                 preload_source,
                 repetition_counter,
-
+                deadtime,
                 enable_repetition_interrupt,
                 out1_polarity,
                 out2_polarity,
@@ -952,7 +1258,7 @@ macro_rules! hrtim_common_methods {
             HrPwmBuilder {
                 _tim,
                 _prescaler: PhantomData,
-                _out,
+                _out: PhantomData,
                 timer_mode,
                 fault_enable_bits,
                 fault1_bits,
@@ -964,7 +1270,7 @@ macro_rules! hrtim_common_methods {
                 count,
                 preload_source,
                 repetition_counter,
-                //deadtime: 0.nanos(),
+                deadtime,
                 enable_repetition_interrupt,
                 out1_polarity,
                 out2_polarity,
@@ -1009,7 +1315,7 @@ macro_rules! hrtim_common_methods {
 
 // Implement PWM configuration for timer
 macro_rules! hrtim_hal {
-    ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $fltXr:ident, $outXr:ident),)+) => {
+    ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $fltXr:ident, $outXr:ident, $dtXr:ident),)+) => {
         $(
 
             // Implement HrPwmExt trait for hrtimer
@@ -1039,7 +1345,7 @@ macro_rules! hrtim_hal {
                     self,
                     _pins: PINS,
                     rcc: &mut Rcc,
-                ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out>
+                ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out<Pscl128>>
                 where
                     PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
                     CHANNEL: HrtimChannel<Pscl128>
@@ -1064,7 +1370,7 @@ macro_rules! hrtim_hal {
                         enable_push_pull: false,
                         interleaved_mode: InterleavedMode::Disabled,
                         repetition_counter: 0,
-                        //deadtime: 0.nanos(),
+                        deadtime: None,
                         enable_repetition_interrupt: false,
                         out1_polarity: Polarity::ActiveHigh,
                         out2_polarity: Polarity::ActiveHigh,
@@ -1076,9 +1382,10 @@ macro_rules! hrtim_hal {
                 HrPwmBuilder<$TIMX, PSCL, PreloadSource, OUT>
             where
                 PSCL: HrtimPrescaler,
+                OUT: ToHrOut,
             {
-                pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>), OUT) {
-                    hrtim_finalize_body!(self, PreloadSource, $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $outXr),)
+                pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX, PSCL>, HrCr2<$TIMX, PSCL>, HrCr3<$TIMX, PSCL>, HrCr4<$TIMX, PSCL>), OUT) {
+                    hrtim_finalize_body!(self, PreloadSource, $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $outXr, $dtXr),)
                 }
 
                 hrtim_common_methods!($TIMX, PreloadSource);
@@ -1157,6 +1464,12 @@ macro_rules! hrtim_hal {
                     self
                 }
 
+                pub fn deadtime(mut self, deadtime: DeadtimeConfig) -> Self {
+                    self.deadtime = Some(deadtime);
+
+                    self
+                }
+
                 //pub fn swap_mode(mut self, enable: bool) -> Self
             }
         )+
@@ -1172,7 +1485,7 @@ macro_rules! hrtim_hal_master {
                 self,
                 _pins: PINS,
                 rcc: &mut Rcc,
-            ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out>
+            ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out<Pscl128>>
             where
                 PINS: Pins<Self, CHANNEL, COMP> + ToHrOut, // TODO: figure out
                 CHANNEL: HrtimChannel<Pscl128>
@@ -1197,7 +1510,7 @@ macro_rules! hrtim_hal_master {
                     enable_push_pull: false,
                     interleaved_mode: InterleavedMode::Disabled,
                     repetition_counter: 0,
-                    //deadtime: 0.nanos(),
+                    deadtime: None,
                     enable_repetition_interrupt: false,
                     out1_polarity: Polarity::ActiveHigh,
                     out2_polarity: Polarity::ActiveHigh,
@@ -1209,8 +1522,9 @@ macro_rules! hrtim_hal_master {
             HrPwmBuilder<$TIMX, PSCL, MasterPreloadSource, OUT>
         where
             PSCL: HrtimPrescaler,
+            OUT: ToHrOut,
         {
-            pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX>, HrCr2<$TIMX>, HrCr3<$TIMX>, HrCr4<$TIMX>)) {
+            pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX, PSCL>, HrCr2<$TIMX, PSCL>, HrCr3<$TIMX, PSCL>, HrCr4<$TIMX, PSCL>)) {
                 hrtim_finalize_body!(self, MasterPreloadSource, $TIMX: ($timXcr, $ck_psc, $perXr, $perx, $tXcen, $rep, $rep, $dier, $repie),)
             }
 
@@ -1311,28 +1625,58 @@ macro_rules! hrtim_pin_hal {
 }
 
 macro_rules! hrtim_out_common {
-    ($TIMX:ident, $set_event:ident, $register:ident, $action:ident) => {{
+    ($TIMX:ident, $set_event:expr, $register:ident, $action:ident) => {{
         let tim = unsafe { &*$TIMX::ptr() };
 
         match $set_event {
-            EventSource::Cr1 => tim.$register.modify(|_r, w| w.cmp1().$action()),
-            EventSource::Cr2 => tim.$register.modify(|_r, w| w.cmp2().$action()),
-            EventSource::Cr3 => tim.$register.modify(|_r, w| w.cmp3().$action()),
-            EventSource::Cr4 => tim.$register.modify(|_r, w| w.cmp4().$action()),
-            EventSource::Period => tim.$register.modify(|_r, w| w.per().$action()),
+            EventSource::Cr1(..) => tim.$register.modify(|_r, w| w.cmp1().$action()),
+            EventSource::Cr2(..) => tim.$register.modify(|_r, w| w.cmp2().$action()),
+            EventSource::Cr3(..) => tim.$register.modify(|_r, w| w.cmp3().$action()),
+            EventSource::Cr4(..) => tim.$register.modify(|_r, w| w.cmp4().$action()),
+            EventSource::Period(..) => tim.$register.modify(|_r, w| w.per().$action()),
 
-            EventSource::MasterCr1 => tim.$register.modify(|_r, w| w.mstcmp1().$action()),
-            EventSource::MasterCr2 => tim.$register.modify(|_r, w| w.mstcmp2().$action()),
-            EventSource::MasterCr3 => tim.$register.modify(|_r, w| w.mstcmp3().$action()),
-            EventSource::MasterCr4 => tim.$register.modify(|_r, w| w.mstcmp4().$action()),
-            EventSource::MasterPeriod => tim.$register.modify(|_r, w| w.mstper().$action()),
+            EventSource::MasterCr1(..) => tim.$register.modify(|_r, w| w.mstcmp1().$action()),
+            EventSource::MasterCr2(..) => tim.$register.modify(|_r, w| w.mstcmp2().$action()),
+            EventSource::MasterCr3(..) => tim.$register.modify(|_r, w| w.mstcmp3().$action()),
+            EventSource::MasterCr4(..) => tim.$register.modify(|_r, w| w.mstcmp4().$action()),
+            EventSource::MasterPeriod(..) => tim.$register.modify(|_r, w| w.mstper().$action()),
+
+            EventSource::NeighborTimer(es) => match es {
+                NeighborTimerEventSource::TimEvent1(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt1().$action())
+                }
+                NeighborTimerEventSource::TimEvent2(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt2().$action())
+                }
+                NeighborTimerEventSource::TimEvent3(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt3().$action())
+                }
+                NeighborTimerEventSource::TimEvent4(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt4().$action())
+                }
+                NeighborTimerEventSource::TimEvent5(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt5().$action())
+                }
+                NeighborTimerEventSource::TimEvent6(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt6().$action())
+                }
+                NeighborTimerEventSource::TimEvent7(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt7().$action())
+                }
+                NeighborTimerEventSource::TimEvent8(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt8().$action())
+                }
+                NeighborTimerEventSource::TimEvent9(..) => {
+                    tim.$register.modify(|_r, w| w.timevnt9().$action())
+                }
+            },
         }
     }};
 }
 
 macro_rules! hrtim_out {
     ($($TIMX:ident: $out_type:ident: $tXYoen:ident, $tXYodis:ident, $tXYods:ident, $setXYr:ident, $rstXYr:ident,)+) => {$(
-        impl HrOutput for $out_type<$TIMX> {
+        impl<PSCL> HrOutput<PSCL, $TIMX> for $out_type<$TIMX, PSCL> {
             fn enable(&mut self) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
                 common.oenr.write(|w| { w.$tXYoen().set_bit() });
@@ -1343,18 +1687,18 @@ macro_rules! hrtim_out {
                 common.odisr.write(|w| { w.$tXYodis().set_bit() });
             }
 
-            fn enable_set_event(&mut self, set_event: EventSource) {
-                hrtim_out_common!($TIMX, set_event, $setXYr, set_bit)
+            fn enable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, $TIMX>>) {
+                hrtim_out_common!($TIMX, set_event.into(), $setXYr, set_bit)
             }
-            fn disable_set_event(&mut self, set_event: EventSource) {
-                hrtim_out_common!($TIMX, set_event, $setXYr, clear_bit)
+            fn disable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, $TIMX>>) {
+                hrtim_out_common!($TIMX, set_event.into(), $setXYr, clear_bit)
             }
 
-            fn enable_rst_event(&mut self, reset_event: EventSource) {
-                hrtim_out_common!($TIMX, reset_event, $rstXYr, set_bit)
+            fn enable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, $TIMX>>) {
+                hrtim_out_common!($TIMX, reset_event.into(), $rstXYr, set_bit)
             }
-            fn disable_rst_event(&mut self, reset_event: EventSource) {
-                hrtim_out_common!($TIMX, reset_event, $rstXYr, clear_bit)
+            fn disable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, $TIMX>>) {
+                hrtim_out_common!($TIMX, reset_event.into(), $rstXYr, clear_bit)
             }
 
             fn get_state(&self) -> State {
@@ -1399,7 +1743,7 @@ hrtim_out! {
 
 macro_rules! hrtim_cr_helper {
     ($TIMX:ident: $cr_type:ident: $cmpXYr:ident, $cmpYx:ident) => {
-        impl HrCompareRegister for $cr_type<$TIMX> {
+        impl<PSCL> HrCompareRegister for $cr_type<$TIMX, PSCL> {
             fn get_duty(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
 
@@ -1541,12 +1885,12 @@ hrtim_cr! {
 }
 
 hrtim_hal! {
-    HRTIM_TIMA: (timacr, timacr2, perar, tacen, repar, repx, timadier, repie, fltar, outar),
-    HRTIM_TIMB: (timbcr, timbcr2, perbr, tbcen, repbr, repx, timbdier, repie, fltbr, outbr),
-    HRTIM_TIMC: (timccr, timccr2, percr, tccen, repcr, repx, timcdier, repie, fltcr, outcr),
-    HRTIM_TIMD: (timdcr, timdcr2, perdr, tdcen, repdr, repx, timddier, repie, fltdr, outdr),
-    HRTIM_TIME: (timecr, timecr2, perer, tecen, reper, repx, timedier, repie, flter, outer),
-    HRTIM_TIMF: (timfcr, timfcr2, perfr, tfcen, repfr, repx, timfdier, repie, fltfr, outfr),
+    HRTIM_TIMA: (timacr, timacr2, perar, tacen, repar, repx, timadier, repie, fltar, outar, dtar),
+    HRTIM_TIMB: (timbcr, timbcr2, perbr, tbcen, repbr, repx, timbdier, repie, fltbr, outbr, dtbr),
+    HRTIM_TIMC: (timccr, timccr2, percr, tccen, repcr, repx, timcdier, repie, fltcr, outcr, dtcr),
+    HRTIM_TIMD: (timdcr, timdcr2, perdr, tdcen, repdr, repx, timddier, repie, fltdr, outdr, dtdr),
+    HRTIM_TIME: (timecr, timecr2, perer, tecen, reper, repx, timedier, repie, flter, outer, dter),
+    HRTIM_TIMF: (timfcr, timfcr2, perfr, tfcen, repfr, repx, timfdier, repie, fltfr, outfr, dtfr),
 }
 
 hrtim_hal_master! {
