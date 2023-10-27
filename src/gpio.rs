@@ -494,9 +494,9 @@ macro_rules! gpio {
                     pub fn set_speed(self, speed: Speed) -> Self {
                         let offset = 2 * $i;
                         unsafe {
-                            &(*$GPIOX::ptr()).ospeedr.modify(|r, w| {
+                            let _ = &(*$GPIOX::ptr()).ospeedr.modify(|r, w| {
                                 w.bits((r.bits() & !(0b11 << offset)) | ((speed as u32) << offset))
-                            })
+                            });
                         };
                         self
                     }
