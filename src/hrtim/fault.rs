@@ -1,13 +1,13 @@
 use core::marker::PhantomData;
 
-use crate::comparator::{COMP5, COMP1, COMP6, COMP4, COMP2, COMP3};
-use crate::gpio::{self, AF13, AF3};
+use crate::comparator::{COMP1, COMP2, COMP3, COMP4, COMP5, COMP6};
 use crate::gpio::gpioa::{PA12, PA15};
-use crate::gpio::gpiob::{PB0, PB11, PB10};
+use crate::gpio::gpiob::{PB0, PB10, PB11};
 use crate::gpio::gpioc::{PC10, PC7};
+use crate::gpio::{self, AF13, AF3};
+use crate::hrtim::control::HrPwmControl;
 use crate::pwm::FaultMonitor;
 use crate::stm32::HRTIM_COMMON;
-use super::calibration::HrPwmControl;
 
 pub enum FaultAction {
     /// Output never enters fault mode
@@ -59,7 +59,7 @@ macro_rules! impl_faults {
 
         // This should NOT be Copy/Clone
         pub struct $input {
-            _x: PhantomData<()>
+            pub(crate) _x: PhantomData<()>
         }
 
         #[derive(Copy, Clone)]
@@ -215,7 +215,7 @@ pub enum FaultSamplingFilter {
 macro_rules! impl_flt_monitor {
     ($($t:ident: ($fltx:ident, $fltxc:ident),)+) => {$(
         pub struct $t {
-            _x: PhantomData<()>
+            pub(crate) _x: PhantomData<()>
         }
 
         impl FaultMonitor for $t {
