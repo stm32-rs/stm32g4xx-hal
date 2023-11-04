@@ -81,6 +81,9 @@ pub mod dma;
 pub mod exti;
 pub mod flash;
 pub mod gpio;
+
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
+pub mod hrtim;
 pub mod i2c;
 pub mod opamp;
 pub mod prelude;
