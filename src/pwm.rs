@@ -169,9 +169,6 @@
 //! This code has been taken from the stm32h7xx-hal project and modified slightly to support
 //! STM32G4xx MCUs. It has originally been licensed under the 0-clause BSD license.
 
-#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
-pub mod hrtim;
-
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
@@ -1031,13 +1028,13 @@ pins! {
         ]
 }
 
-trait TimerType {
+pub(crate) trait TimerType {
     /// Returns (arr, psc) bits
     fn calculate_frequency(base_freq: HertzU64, freq: Hertz, alignment: Alignment) -> (u32, u16);
 }
 
 /// Any 32-bit timer
-struct Timer32Bit;
+pub(crate) struct Timer32Bit;
 
 impl TimerType for Timer32Bit {
     // Period and prescaler calculator for 32-bit timers

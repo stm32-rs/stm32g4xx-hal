@@ -1,6 +1,15 @@
-use crate::stm32::{HRTIM_COMMON, RCC};
+use core::marker::PhantomData;
 
-use super::HrControltExt;
+use crate::{
+    hrtim::fault::{
+        FaultInput1, FaultInput2, FaultInput3, FaultInput4, FaultInput5, FaultInput6, FltMonitor1,
+        FltMonitor2, FltMonitor3, FltMonitor4, FltMonitor5, FltMonitor6, FltMonitorSys,
+    },
+    rcc::{Enable, Rcc, Reset},
+    stm32::{HRTIM_COMMON, RCC},
+};
+
+use super::fault::FaultInputs;
 
 pub trait HrControltExt {
     fn hr_control(self, _rcc: &mut Rcc) -> HrTimOngoingCalibration;
@@ -84,7 +93,7 @@ pub struct HrTimOngoingCalibration {
 
 impl HrTimOngoingCalibration {
     /// SAFETY: Calibration needs to be done before calling this
-    unsafe fn init(self) -> (HrPwmControl, FaultInputs) {
+    unsafe fn init(self) {
         use Adc13Trigger as Ad13T;
         use Adc24Trigger as Ad24T;
 
@@ -410,37 +419,18 @@ impl HrTimOngoingCalibration {
 
             // TODO: Adc trigger 5-10
         }
-
-        (
-            HrPwmControl {
-                _x: PhantomData,
-                fault_sys: FltMonitorSys { _x: PhantomData },
-                fault_1: FltMonitor1 { _x: PhantomData },
-                fault_2: FltMonitor2 { _x: PhantomData },
-                fault_3: FltMonitor3 { _x: PhantomData },
-                fault_4: FltMonitor4 { _x: PhantomData },
-                fault_5: FltMonitor5 { _x: PhantomData },
-                fault_6: FltMonitor6 { _x: PhantomData },
-            },
-            FaultInputs {
-                fault_input1: FaultInput1 { _x: PhantomData },
-                fault_input2: FaultInput2 { _x: PhantomData },
-                fault_input3: FaultInput3 { _x: PhantomData },
-                fault_input4: FaultInput4 { _x: PhantomData },
-                fault_input5: FaultInput5 { _x: PhantomData },
-                fault_input6: FaultInput6 { _x: PhantomData },
-            },
-        )
     }
 
-    pub fn wait_for_calibration(self) -> (HrPwmControl, FaultInputs) {
+    pub fn wait_for_calibration(self) -> HrTimCalibrated {
         let common = unsafe { &*HRTIM_COMMON::ptr() };
         while common.isr.read().dllrdy().bit_is_clear() {
             // Wait until ready
         }
 
         // Calibration is now done, it is safe to continue
-        unsafe { self.init() }
+        unsafe { self.init() };
+
+        HrTimCalibrated { _x: PhantomData }
     }
 
     pub fn enable_adc_trigger1_source(mut self, trigger: Adc13Trigger) -> Self {
@@ -524,6 +514,38 @@ impl HrTimOngoingCalibration {
     }
 
     // TODO: Adc trigger 5-10
+}
+
+/// This object may be used for things that needs to be done before any timers have been started but after the calibration has been completed. Its existence is proof that no timers have started.
+///
+/// Once done with setup, use the `constrain` to get a `HrPwmControl` which can be used to start the timers.
+pub struct HrTimCalibrated {
+    _x: PhantomData<()>,
+}
+
+impl HrTimCalibrated {
+    pub fn constrain(self) -> (HrPwmControl, FaultInputs) {
+        (
+            HrPwmControl {
+                _x: PhantomData,
+                fault_sys: FltMonitorSys { _x: PhantomData },
+                fault_1: FltMonitor1 { _x: PhantomData },
+                fault_2: FltMonitor2 { _x: PhantomData },
+                fault_3: FltMonitor3 { _x: PhantomData },
+                fault_4: FltMonitor4 { _x: PhantomData },
+                fault_5: FltMonitor5 { _x: PhantomData },
+                fault_6: FltMonitor6 { _x: PhantomData },
+            },
+            FaultInputs {
+                fault_input1: FaultInput1 { _x: PhantomData },
+                fault_input2: FaultInput2 { _x: PhantomData },
+                fault_input3: FaultInput3 { _x: PhantomData },
+                fault_input4: FaultInput4 { _x: PhantomData },
+                fault_input5: FaultInput5 { _x: PhantomData },
+                fault_input6: FaultInput6 { _x: PhantomData },
+            },
+        )
+    }
 }
 
 pub struct HrPwmControl {
