@@ -6,6 +6,7 @@ pub mod external_event;
 pub mod fault;
 pub mod output;
 pub mod timer;
+pub mod timer_eev_cfg;
 
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
@@ -195,6 +196,7 @@ pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
     repetition_counter: u8,
     deadtime: Option<DeadtimeConfig>,
     enable_repetition_interrupt: bool,
+    eev_cfg: EevCfg,
     out1_polarity: Polarity,
     out2_polarity: Polarity,
 }
@@ -413,6 +415,7 @@ macro_rules! hrtim_common_methods {
                 repetition_counter,
                 deadtime,
                 enable_repetition_interrupt,
+                eev_cfg,
                 out1_polarity,
                 out2_polarity,
             } = self;
@@ -441,6 +444,7 @@ macro_rules! hrtim_common_methods {
                 repetition_counter,
                 deadtime,
                 enable_repetition_interrupt,
+                eev_cfg,
                 out1_polarity,
                 out2_polarity,
             }
@@ -476,6 +480,12 @@ macro_rules! hrtim_common_methods {
 
         pub fn enable_repetition_interrupt(mut self) -> Self {
             self.enable_repetition_interrupt = true;
+
+            self
+        }
+
+        pub fn eev_cfg(mut self, eev_cfg: Stuff) -> Self {
+            self.eev_cfg = eev_cfg;
 
             self
         }
@@ -554,7 +564,10 @@ macro_rules! hrtim_hal {
                 OUT: ToHrOut,
             {
                 pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX, PSCL>, HrCr2<$TIMX, PSCL>, HrCr3<$TIMX, PSCL>, HrCr4<$TIMX, PSCL>), OUT) {
-                    hrtim_finalize_body!(self, PreloadSource, $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $outXr, $dtXr),)
+                    hrtim_finalize_body!(
+                        self, PreloadSource,
+                        $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $outXr, $dtXr),
+                    )
                 }
 
                 hrtim_common_methods!($TIMX, PreloadSource);

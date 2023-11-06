@@ -227,22 +227,21 @@ where
     }
 }
 
-pub trait BuilderToEventSourceBuilder {
-    fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSourceBuilder<TIM>;
+pub trait ToExternalEventSource {
+    fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource;
 }
 
-This is something every (timerX, eevY) pair should have....
-struct ExternalEventSourceBuilder<TIM> {
-    filter: u8,
-    is_latching: bool,
+#[derive(Copy, Clone)]
+struct ExternalEventMuxOut<const N: u8> {
+    _x: PhantomData<()>,
 }
 
 macro_rules! impl_eev1_5_to_es {
     ($eev:ident, $N:literal, $eeXsrc:ident, $eeXpol:ident, $eeXsns:ident, $eeXfast:ident) => {
         impl<const IS_FAST: bool> ExternalEventBuilder1To5 for SourceBuilder<$N, IS_FAST> {}
 
-        impl<const IS_FAST: bool> BuilderToEventSourceBuilder for SourceBuilder<$N, IS_FAST> {
-            fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSourceBuilder {
+        impl<const IS_FAST: bool> ToExternalEventSource for SourceBuilder<$N, IS_FAST> {
+            fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource {
                 let SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,
@@ -277,7 +276,7 @@ macro_rules! impl_eev6_10_to_es {
     ($eev:ident, $N:literal, $eeXsrc:ident, $eeXpol:ident, $eeXsns:ident, $eeXf:ident) => {
         impl ExternalEventBuilder6To10 for SourceBuilder<$N, false> {}
 
-        impl ExternalEventToEventSource for SourceBuilder<$N, false> {
+        impl ToExternalEventSource for SourceBuilder<$N, false> {
             fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource {
                 let SourceBuilder {
                     src_bits,
