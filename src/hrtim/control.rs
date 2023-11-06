@@ -9,7 +9,7 @@ use crate::{
     stm32::{HRTIM_COMMON, RCC},
 };
 
-use super::fault::FaultInputs;
+use super::{fault::FaultInputs, external_event::EevInputs};
 
 pub trait HrControltExt {
     fn hr_control(self, _rcc: &mut Rcc) -> HrTimOngoingCalibration;
@@ -421,7 +421,7 @@ impl HrTimOngoingCalibration {
         }
     }
 
-    pub fn wait_for_calibration(self) -> HrTimCalibrated {
+    pub fn wait_for_calibration(self) -> (HrTimCalibrated, FaultInputs, EevInputs) {
         let common = unsafe { &*HRTIM_COMMON::ptr() };
         while common.isr.read().dllrdy().bit_is_clear() {
             // Wait until ready
@@ -430,7 +430,11 @@ impl HrTimOngoingCalibration {
         // Calibration is now done, it is safe to continue
         unsafe { self.init() };
 
-        HrTimCalibrated { _x: PhantomData }
+        (
+            HrTimCalibrated { _x: PhantomData },
+            unsafe { FaultInputs::new() },
+            unsafe { EevInputs::new() },
+        )
     }
 
     pub fn enable_adc_trigger1_source(mut self, trigger: Adc13Trigger) -> Self {
@@ -524,27 +528,17 @@ pub struct HrTimCalibrated {
 }
 
 impl HrTimCalibrated {
-    pub fn constrain(self) -> (HrPwmControl, FaultInputs) {
-        (
-            HrPwmControl {
-                _x: PhantomData,
-                fault_sys: FltMonitorSys { _x: PhantomData },
-                fault_1: FltMonitor1 { _x: PhantomData },
-                fault_2: FltMonitor2 { _x: PhantomData },
-                fault_3: FltMonitor3 { _x: PhantomData },
-                fault_4: FltMonitor4 { _x: PhantomData },
-                fault_5: FltMonitor5 { _x: PhantomData },
-                fault_6: FltMonitor6 { _x: PhantomData },
-            },
-            FaultInputs {
-                fault_input1: FaultInput1 { _x: PhantomData },
-                fault_input2: FaultInput2 { _x: PhantomData },
-                fault_input3: FaultInput3 { _x: PhantomData },
-                fault_input4: FaultInput4 { _x: PhantomData },
-                fault_input5: FaultInput5 { _x: PhantomData },
-                fault_input6: FaultInput6 { _x: PhantomData },
-            },
-        )
+    pub fn constrain(self) -> HrPwmControl {
+        HrPwmControl {
+            _x: PhantomData,
+            fault_sys: FltMonitorSys { _x: PhantomData },
+            fault_1: FltMonitor1 { _x: PhantomData },
+            fault_2: FltMonitor2 { _x: PhantomData },
+            fault_3: FltMonitor3 { _x: PhantomData },
+            fault_4: FltMonitor4 { _x: PhantomData },
+            fault_5: FltMonitor5 { _x: PhantomData },
+            fault_6: FltMonitor6 { _x: PhantomData },
+        }
     }
 }
 
