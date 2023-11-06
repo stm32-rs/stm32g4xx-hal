@@ -9,63 +9,53 @@ use crate::hrtim::control::HrPwmControl;
 use crate::pwm::FaultMonitor;
 use crate::stm32::HRTIM_COMMON;
 
-pub enum FaultAction {
-    /// Output never enters fault mode
-    None = 0b00,
-
-    /// Output forced to `active` level on fault
-    ForceActive = 0b01,
-
-    /// Output forced to `inactive` level on fault
-    ForceInactive = 0b10,
-
-    /// The output is floating/tri stated on fault
-    Floating = 0b11,
-}
-
-pub unsafe trait FaultSource: Copy {
-    const ENABLE_BITS: u8;
-}
-
-pub struct SourceBuilder<I> {
-    _input: I,
+pub struct SourceBuilder<const N: u8> {
+    /// EExSRC
     src_bits: u8,
 
-    /// FLTxP
-    is_active_high: bool,
+    /// EExSNS
+    edge_or_polarity_bits: u8,
 
-    /// FLTxF[3:0]
+    /// EExPOL
+    polarity_bit: bool,
+
+    /// EExF
     filter_bits: u8,
+
+    /// EExFAST
+    fast_bit: bool,
 }
 
-impl<I> SourceBuilder<I> {
-    unsafe fn new(input: I, src_bits: u8) -> Self {
+impl<const N: u8> SourceBuilder<N> {
+    unsafe fn new(src_bits: u8) -> Self {
         SourceBuilder {
-            _input: input,
             src_bits,
-            is_active_high: false,
-            filter_bits: 0b0000,
+            edge_or_polarity_bits: 0, // Polarity sensitive
+            polarity_bit: false,      // Active high
+            filter_bits: 0,           // No filter
+            fast_bit: false,          // Not fast
         }
     }
 }
 
-macro_rules! impl_faults {
+// This should NOT be Copy/Clone
+pub struct EevInput<const N: u8> {
+    pub(crate) _x: PhantomData<()>
+}
+
+#[derive(Copy, Clone)]
+pub struct EevSource<const N: u8> {
+    _x: PhantomData<()>
+}
+
+macro_rules! impl_eev {
     ($(
         $input:ident => $source:ident:
-            PINS=[($pin:ident, $af:ident) $(,($pin_b:ident, $af_b:ident))*],
+            PINS=[($pin:ident, $af:ident), $(($pin_b:ident, $af_b:ident),)*],
             COMP=$compX:ident, $enable_bits:literal,
             $fltinrZ:ident, $fltWsrc_0:ident, $fltWsrc_1:ident, $fltWp:ident, $fltWf:ident, $fltWe:ident, $fltWlck:ident,
     )+) => {$(
-
-        // This should NOT be Copy/Clone
-        pub struct $input {
-            pub(crate) _x: PhantomData<()>
-        }
-
-        #[derive(Copy, Clone)]
-        pub struct $source {
-            _x: PhantomData<()>
-        }
+        
 
         impl $input {
             pub fn bind_pin<IM>(self, pin: $pin<gpio::Input<IM>>) -> SourceBuilder<$input> {
@@ -84,10 +74,6 @@ macro_rules! impl_faults {
             pub fn bind_comp(self, _comp: &crate::comparator::Comparator<$compX, crate::comparator::Enabled>) -> SourceBuilder<$input> {
                 unsafe { SourceBuilder::new(self, 0b01) }
             }
-
-            /*pub fn bind_external(?) {
-                SourceBuilder::new(self, 0b10);
-            }*/
         }
 
         impl SourceBuilder<$input> {
@@ -135,35 +121,32 @@ macro_rules! impl_faults {
     )+}
 }
 
+// TODO: Lookup to ensure the alternate function are the same for other devices than stm32g474
+#[cfg(feature = "stm32g474")]
 impl_faults!(
-    FaultInput1 => FaultSource1: PINS=[(PA12, AF13)], COMP=COMP2, 0b000001, fltinr1, flt1src, flt1src_1, flt1p, flt1f, flt1e, flt1lck,
-    FaultInput2 => FaultSource2: PINS=[(PA15, AF13)], COMP=COMP4, 0b000010, fltinr1, flt2src, flt2src_1, flt2p, flt2f, flt2e, flt2lck,
-    FaultInput3 => FaultSource3: PINS=[(PB10, AF13)], COMP=COMP6, 0b000100, fltinr1, flt3src, flt3src_1, flt3p, flt3f, flt3e, flt3lck,
-    FaultInput4 => FaultSource4: PINS=[(PB11, AF13)], COMP=COMP1, 0b001000, fltinr1, flt4src, flt4src_1, flt4p, flt4f, flt4e, flt4lck,
-    FaultInput5 => FaultSource5: PINS=[(PB0, AF13), (PC7, AF3)], COMP=COMP3, 0b010000, fltinr2, flt5src, flt5src_1, flt5p, flt5f, flt5e, flt5lck,
-    FaultInput6 => FaultSource6: PINS=[(PC10, AF13)], COMP=COMP5, 0b100000, fltinr2, flt6src_0, flt6src_1, flt6p, flt6f, flt6e, flt6lck,
+    FaultInput1 => FaultSource1: PINS=[(PA12, AF13),], COMP=COMP2, 0b000001, fltinr1, flt1src, flt1src_1, flt1p, flt1f, flt1e, flt1lck,
+    FaultInput2 => FaultSource2: PINS=[(PA15, AF13),], COMP=COMP4, 0b000010, fltinr1, flt2src, flt2src_1, flt2p, flt2f, flt2e, flt2lck,
+    FaultInput3 => FaultSource3: PINS=[(PB10, AF13),], COMP=COMP6, 0b000100, fltinr1, flt3src, flt3src_1, flt3p, flt3f, flt3e, flt3lck,
+    FaultInput4 => FaultSource4: PINS=[(PB11, AF13),], COMP=COMP1, 0b001000, fltinr1, flt4src, flt4src_1, flt4p, flt4f, flt4e, flt4lck,
+    FaultInput5 => FaultSource5: PINS=[(PB0, AF13), (PC7, AF3),], COMP=COMP3, 0b010000, fltinr2, flt5src, flt5src_1, flt5p, flt5f, flt5e, flt5lck,
+    FaultInput6 => FaultSource6: PINS=[(PC10, AF13),], COMP=COMP5, 0b100000, fltinr2, flt6src_0, flt6src_1, flt6p, flt6f, flt6e, flt6lck,
 );
 
-pub struct FaultInputs {
-    pub fault_input1: FaultInput1,
-    pub fault_input2: FaultInput2,
-    pub fault_input3: FaultInput3,
-    pub fault_input4: FaultInput4,
-    pub fault_input5: FaultInput5,
-    pub fault_input6: FaultInput6,
+pub struct EevInputs {
+    pub eev_input1: EevInput<1>,
+    pub eev_input2: EevInput<2>,
+    pub eev_input3: EevInput<3>,
+    pub eev_input4: EevInput<4>,
+    pub eev_input5: EevInput<5>,
+    pub eev_input6: EevInput<6>,
+    pub eev_input7: EevInput<7>,
+    pub eev_input8: EevInput<8>,
+    pub eev_input9: EevInput<9>,
+    pub eev_input10: EevInput<10>,
 }
 
-impl FaultInputs {
-    pub(crate) unsafe fn new() -> Self {
-        FaultInputs {
-            fault_input1: FaultInput1 { _x: PhantomData },
-            fault_input2: FaultInput2 { _x: PhantomData },
-            fault_input3: FaultInput3 { _x: PhantomData },
-            fault_input4: FaultInput4 { _x: PhantomData },
-            fault_input5: FaultInput5 { _x: PhantomData },
-            fault_input6: FaultInput6 { _x: PhantomData },
-        }
-    }
+impl EevInputs {
+    
 }
 
 pub enum FaultSamplingFilter {
