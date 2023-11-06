@@ -47,7 +47,8 @@ fn main() -> ! {
     let mut adc1 = dp.ADC1.claim_and_configure(
         hal::adc::ClockSource::SystemClock,
         &rcc,
-        hal::adc::config::AdcConfig::default().clock_mode(hal::adc::config::ClockMode::Synchronous_Div_4),
+        hal::adc::config::AdcConfig::default()
+            .clock_mode(hal::adc::config::ClockMode::Synchronous_Div_4),
         &mut delay,
         false,
     );
