@@ -4,6 +4,9 @@
 
 use cortex_m_rt::entry;
 use fugit::ExtU32;
+use hal::comparator;
+use hal::comparator::{Hysteresis, ComparatorSplit, ComparatorExt};
+use hal::dac::{self, DacExt, DacOut};
 use hal::gpio::gpioa::PA8;
 use hal::gpio::Alternate;
 use hal::gpio::AF13;
@@ -21,7 +24,6 @@ use hal::pwr::{self, PwrExt};
 use hal::rcc;
 use hal::stm32;
 use stm32g4xx_hal as hal;
-//mod utils;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
@@ -56,12 +58,36 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
 
+    let input = gpioa.pa1.into_analog();
+    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
+
+    let dac3ch1 = dp.DAC3.constrain(dac::Dac3IntSig1, &mut rcc);
+    let mut dac = dac3ch1.enable();
+
+    // Use dac to define the fault threshold
+    // 2^12 / 2 = 2^11 for about half of VCC
+    let fault_limit = 60;
+    dac.set_value(fault_limit);
+
+    let (comp1, ..) = dp.COMP.split(&mut rcc);
+
+    let comp1 = comp1
+        .comparator(
+            &input,
+            &dac,
+            comparator::Config::default()
+                .hysteresis(Hysteresis::None),
+                //.output_inverted(),
+            &rcc.clocks,
+        )
+        .enable();
+
     let (mut hr_control, _flt_inputs, eev_inputs) =
         dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
 
-    let eev_input3 = eev_inputs
-        .eev_input3
-        .bind_pin(gpiob.pb7.into_pull_down_input())
+    let eev_input4 = eev_inputs
+        .eev_input4
+        .bind(&comp1)
         .edge_or_polarity(external_event::EdgeOrPolarity::Polarity(
             pwm::Polarity::ActiveHigh,
         ))
@@ -73,20 +99,18 @@ fn main() -> ! {
     // With max the max period set, this would be 1.2GHz/2^16 ~= 18kHz...
     let prescaler = Pscl4;
 
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
-
     //        .               .  *            .
     //        .  33%          .  *            .               .               .
-    //        .-----.         .--*            .-----.         .-----.         .-----
-    //out1    |     |         |  |            |     |         |     |         |
-    //        |     |         |  *            |     |         |     |         |
-    //   ------     -----------  --------------     -----------     -----------
+    //        .-----.         .--*            .               .-----.         .-----
+    //out1    |     |         |  |            .               |     |         |
+    //        |     |         |  *            .               |     |         |
+    //   ------     -----------  ------------------------------     -----------
     //        .               .  *            .               .               .
     //        .               .  *            .               .               .
-    //        .               .  *--------*   .               .               .
-    //eev     .               .  |        |   .               .               .
-    //        .               .  |        |   .               .               .
-    //   -------------------------        ------------------------------------------
+    //        .               .  *-------------*              .               .
+    //eev     .               .  |            .|              .               .
+    //        .               .  |            .|              .               .
+    //   -------------------------            .--------------------------------------
     //        .               .  *            .               .               .
     //        .               .  *            .               .               .
     let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1) = dp
@@ -98,7 +122,7 @@ fn main() -> ! {
         .finalize(&mut hr_control);
 
     out1.enable_rst_event(&cr1); // Set low on compare match with cr1
-    out1.enable_rst_event(eev_input3);
+    out1.enable_rst_event(eev_input4);
     out1.enable_set_event(&timer); // Set high at new period
     cr1.set_duty(timer.get_period() / 3);
     //unsafe {((HRTIM_COMMON::ptr() as *mut u8).offset(0x14) as *mut u32).write_volatile(1); }
