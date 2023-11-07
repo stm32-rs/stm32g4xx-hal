@@ -24,6 +24,7 @@ use self::control::HrPwmControl;
 
 use self::deadtime::DeadtimeConfig;
 use self::output::{HrtimChannel, ToHrOut, CH1, CH2};
+use self::timer_eev_cfg::EevCfgs;
 
 use crate::pwm::{
     self, Alignment, ComplementaryImpossible, Pins, Polarity, Pwm, PwmPinEnable, TimerType,
@@ -196,7 +197,7 @@ pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
     repetition_counter: u8,
     deadtime: Option<DeadtimeConfig>,
     enable_repetition_interrupt: bool,
-    eev_cfg: EevCfg,
+    eev_cfg: EevCfgs<TIM>,
     out1_polarity: Polarity,
     out2_polarity: Polarity,
 }
@@ -219,7 +220,8 @@ pub enum MasterPreloadSource {
 
 macro_rules! hrtim_finalize_body {
     ($this:expr, $PreloadSource:ident, $TIMX:ident: (
-        $timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident $(, $timXcr2:ident, $fltXr:ident, $outXr:ident, $dtXr:ident)*),
+        $timXcr:ident, $ck_psc:ident, $perXr:ident, $perx:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident
+        $(, $timXcr2:ident, $fltXr:ident, $eefXr1:ident, $eefXr2:ident, $Xeefr3:ident, $outXr:ident, $dtXr:ident)*),
     ) => {{
         let tim = unsafe { &*$TIMX::ptr() };
         let (period, prescaler_bits) = match $this.count {
@@ -323,6 +325,31 @@ macro_rules! hrtim_finalize_body {
                 );
                 tim.$outXr.modify(|_r, w| w.dten().set_bit());
             }
+
+            // External event configs
+            let eev_cfg = $this.eev_cfg.clone();
+            tim.$eefXr1.write(|w| w
+                .ee1ltch().bit(eev_cfg.eev1.latch_bit).ee1fltr().bits(eev_cfg.eev1.filter_bits)
+                .ee2ltch().bit(eev_cfg.eev2.latch_bit).ee2fltr().bits(eev_cfg.eev2.filter_bits)
+                .ee3ltch().bit(eev_cfg.eev3.latch_bit).ee3fltr().bits(eev_cfg.eev3.filter_bits)
+                .ee4ltch().bit(eev_cfg.eev4.latch_bit).ee4fltr().bits(eev_cfg.eev4.filter_bits)
+                .ee5ltch().bit(eev_cfg.eev5.latch_bit).ee5fltr().bits(eev_cfg.eev5.filter_bits)
+            );
+            tim.$eefXr2.write(|w| w
+                .ee6ltch().bit(eev_cfg.eev6.latch_bit).ee6fltr().bits(eev_cfg.eev6.filter_bits)
+                .ee7ltch().bit(eev_cfg.eev7.latch_bit).ee7fltr().bits(eev_cfg.eev7.filter_bits)
+                .ee8ltch().bit(eev_cfg.eev8.latch_bit).ee8fltr().bits(eev_cfg.eev8.filter_bits)
+                .ee9ltch().bit(eev_cfg.eev9.latch_bit).ee9fltr().bits(eev_cfg.eev9.filter_bits)
+                .ee10ltch().bit(eev_cfg.eev10.latch_bit).ee10fltr().bits(eev_cfg.eev10.filter_bits)
+            );
+            tim.$Xeefr3.write(|w| w
+                .eevace().bit(eev_cfg.event_counter_enable_bit)
+                // External Event A Counter Reset"]
+                //.eevacres().bit()
+                .eevarstm().bit(eev_cfg.event_counter_reset_mode_bit)
+                .eevasel().bits(eev_cfg.event_counter_source_bits)
+                .eevacnt().bits(eev_cfg.event_counter_threshold_bits)
+            );
         })*
 
 
@@ -452,21 +479,18 @@ macro_rules! hrtim_common_methods {
 
         pub fn timer_mode(mut self, timer_mode: HrTimerMode) -> Self {
             self.timer_mode = timer_mode;
-
             self
         }
 
         // TODO: Allow setting multiple?
         pub fn preload(mut self, preload_source: $PS) -> Self {
             self.preload_source = Some(preload_source);
-
             self
         }
 
         /// Set the period; PWM count runs from 0 to period, repeating every (period+1) counts
         pub fn period(mut self, period: u16) -> Self {
             self.count = CountSettings::Period(period);
-
             self
         }
 
@@ -474,19 +498,16 @@ macro_rules! hrtim_common_methods {
         /// from timer by a factor (repetition_counter + 1)
         pub fn repetition_counter(mut self, repetition_counter: u8) -> Self {
             self.repetition_counter = repetition_counter;
-
             self
         }
 
         pub fn enable_repetition_interrupt(mut self) -> Self {
             self.enable_repetition_interrupt = true;
-
             self
         }
 
-        pub fn eev_cfg(mut self, eev_cfg: Stuff) -> Self {
+        pub fn eev_cfg(mut self, eev_cfg: EevCfgs<$TIMX>) -> Self {
             self.eev_cfg = eev_cfg;
-
             self
         }
     };
@@ -494,7 +515,8 @@ macro_rules! hrtim_common_methods {
 
 // Implement PWM configuration for timer
 macro_rules! hrtim_hal {
-    ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $fltXr:ident, $outXr:ident, $dtXr:ident),)+) => {
+    ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, 
+        $fltXr:ident, $eefXr1:ident, $eefXr2:ident, $Xeefr3:ident, $outXr:ident, $dtXr:ident),)+) => {
         $(
 
             // Implement HrPwmExt trait for hrtimer
@@ -551,6 +573,7 @@ macro_rules! hrtim_hal {
                         repetition_counter: 0,
                         deadtime: None,
                         enable_repetition_interrupt: false,
+                        eev_cfg: EevCfgs::default(),
                         out1_polarity: Polarity::ActiveHigh,
                         out2_polarity: Polarity::ActiveHigh,
                     }
@@ -566,7 +589,7 @@ macro_rules! hrtim_hal {
                 pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX, PSCL>, HrCr2<$TIMX, PSCL>, HrCr3<$TIMX, PSCL>, HrCr4<$TIMX, PSCL>), OUT) {
                     hrtim_finalize_body!(
                         self, PreloadSource,
-                        $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $outXr, $dtXr),
+                        $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $eefXr1, $eefXr2, $Xeefr3, $outXr, $dtXr),
                     )
                 }
 
@@ -694,6 +717,7 @@ macro_rules! hrtim_hal_master {
                     repetition_counter: 0,
                     deadtime: None,
                     enable_repetition_interrupt: false,
+                    eev_cfg: EevCfgs::default(),
                     out1_polarity: Polarity::ActiveHigh,
                     out2_polarity: Polarity::ActiveHigh,
                 }
@@ -807,12 +831,12 @@ macro_rules! hrtim_pin_hal {
 }
 
 hrtim_hal! {
-    HRTIM_TIMA: (timacr, timacr2, perar, tacen, repar, repx, timadier, repie, fltar, outar, dtar),
-    HRTIM_TIMB: (timbcr, timbcr2, perbr, tbcen, repbr, repx, timbdier, repie, fltbr, outbr, dtbr),
-    HRTIM_TIMC: (timccr, timccr2, percr, tccen, repcr, repx, timcdier, repie, fltcr, outcr, dtcr),
-    HRTIM_TIMD: (timdcr, timdcr2, perdr, tdcen, repdr, repx, timddier, repie, fltdr, outdr, dtdr),
-    HRTIM_TIME: (timecr, timecr2, perer, tecen, reper, repx, timedier, repie, flter, outer, dter),
-    HRTIM_TIMF: (timfcr, timfcr2, perfr, tfcen, repfr, repx, timfdier, repie, fltfr, outfr, dtfr),
+    HRTIM_TIMA: (timacr, timacr2, perar, tacen, repar, repx, timadier, repie, fltar, eefar1, eefar2, aeefr3, outar, dtar),
+    HRTIM_TIMB: (timbcr, timbcr2, perbr, tbcen, repbr, repx, timbdier, repie, fltbr, eefbr1, eefbr2, beefr3, outbr, dtbr),
+    HRTIM_TIMC: (timccr, timccr2, percr, tccen, repcr, repx, timcdier, repie, fltcr, eefcr1, eefcr2, ceefr3, outcr, dtcr),
+    HRTIM_TIMD: (timdcr, timdcr2, perdr, tdcen, repdr, repx, timddier, repie, fltdr, eefdr1, eefdr2, deefr3, outdr, dtdr),
+    HRTIM_TIME: (timecr, timecr2, perer, tecen, reper, repx, timedier, repie, flter, eefer1, eefer2, eeefr3, outer, dter),
+    HRTIM_TIMF: (timfcr, timfcr2, perfr, tfcen, repfr, repx, timfdier, repie, fltfr, eeffr1, eeffr2, feefr3, outfr, dtfr),
 }
 
 hrtim_hal_master! {
