@@ -2,14 +2,13 @@ use core::marker::PhantomData;
 
 use crate::{
     hrtim::fault::{
-        FaultInput1, FaultInput2, FaultInput3, FaultInput4, FaultInput5, FaultInput6, FltMonitor1,
-        FltMonitor2, FltMonitor3, FltMonitor4, FltMonitor5, FltMonitor6, FltMonitorSys,
+        FltMonitor1, FltMonitor2, FltMonitor3, FltMonitor4, FltMonitor5, FltMonitor6, FltMonitorSys,
     },
     rcc::{Enable, Rcc, Reset},
     stm32::{HRTIM_COMMON, RCC},
 };
 
-use super::{fault::FaultInputs, external_event::EevInputs};
+use super::{external_event::EevInputs, fault::FaultInputs};
 
 pub trait HrControltExt {
     fn hr_control(self, _rcc: &mut Rcc) -> HrTimOngoingCalibration;

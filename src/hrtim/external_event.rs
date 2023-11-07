@@ -1,15 +1,17 @@
 use core::marker::PhantomData;
 
-use crate::comparator::{self, Comparator, COMP1, COMP2, COMP3, COMP4, COMP5, COMP6, COMP7};
+use crate::comparator::{COMP1, COMP2, COMP3, COMP4, COMP5, COMP6, COMP7};
 use crate::gpio::gpiob::{PB3, PB4, PB5, PB6, PB7, PB8, PB9};
 use crate::gpio::gpioc::{PC11, PC12, PC5, PC6};
 use crate::gpio::{self, AF13, AF3};
 use crate::stm32::HRTIM_COMMON;
+use crate::pwm::Polarity;
 
+use super::event::EevFastOrNormal;
 use super::{control::HrTimCalibrated, event::EventSource};
 
 #[derive(Copy, Clone, PartialEq)]
-pub enum ExternalEventSource {
+pub enum ExternalEventSource<const IS_FAST: bool> {
     Eevnt1 { _x: PhantomData<()> },
     Eevnt2 { _x: PhantomData<()> },
     Eevnt3 { _x: PhantomData<()> },
@@ -20,6 +22,18 @@ pub enum ExternalEventSource {
     Eevnt8 { _x: PhantomData<()> },
     Eevnt9 { _x: PhantomData<()> },
     Eevnt10 { _x: PhantomData<()> },
+}
+
+impl<PSCL, DST> From<ExternalEventSource<true>> for EventSource<PSCL, DST> {
+    fn from(e: ExternalEventSource<true>) -> Self {
+        EventSource::ExternalEvent(EevFastOrNormal::Fast(e))
+    }
+}
+
+impl<PSCL, DST> From<ExternalEventSource<false>> for EventSource<PSCL, DST> {
+    fn from(e: ExternalEventSource<false>) -> Self {
+        EventSource::ExternalEvent(EevFastOrNormal::Normal(e))
+    }
 }
 
 pub struct EevInputs {
@@ -56,39 +70,51 @@ pub struct EevInput<const N: u8> {
     _x: PhantomData<()>,
 }
 
+pub unsafe trait EevSrcBits<const EEV_N: u8>: Sized {
+    const SRC_BITS: u8;
+    fn cfg(self) {}
+}
+
 macro_rules! impl_eev_input {
-    ($N:literal: $compX:ident, PINS=[($pin:ident, $af:ident) $(, ($pin_b:ident, $af_b:ident))*]) => {
-        impl EevInput<$N> {
-            pub fn bind_pin<const IS_FAST: bool, IM>(self, pin: $pin<gpio::Input<IM>>) -> SourceBuilder<$N, IS_FAST> {
-                pin.into_alternate::<$af>();
-                unsafe { SourceBuilder::new(0b00) }
+    ($N:literal: COMP=[$compX:ident $(, ($compY:ident, $compY_src_bits:literal))*], PINS=[$(($pin:ident, $af:ident)),*]) => {
+        $(unsafe impl<IM> EevSrcBits<$N> for $pin<gpio::Input<IM>>{
+            const SRC_BITS: u8 = 0b00;
+            fn cfg(self) {
+                self.into_alternate::<$af>();
             }
+        })*
 
-            $(
-                // TODO: Is there a nicer way to do this?
-                pub fn bind_pin_b<const IS_FAST: bool, IM>(self, pin: $pin_b<gpio::Input<IM>>) -> SourceBuilder<$N, IS_FAST> {
-                    pin.into_alternate::<$af_b>();
-                    unsafe { SourceBuilder::new(0b00) }
-                }
-            )*
-
-            pub fn bind_comp<const IS_FAST: bool>(self, _comp: &crate::comparator::Comparator<$compX, crate::comparator::Enabled>) -> SourceBuilder<$N, IS_FAST> {
-                unsafe { SourceBuilder::new(0b01) }
+        unsafe impl EevSrcBits<$N> for &crate::comparator::Comparator<$compX, crate::comparator::Enabled> {
+            const SRC_BITS: u8 = 0b01;
+        }
+        
+        $(
+            unsafe impl EevSrcBits<$N> for &crate::comparator::Comparator<$compY, crate::comparator::Enabled> {
+                const SRC_BITS: u8 = $compY_src_bits;
+            }
+        )*
+        
+        impl EevInput<$N> {
+            pub fn bind<const IS_FAST: bool, SRC>(self, src: SRC) -> SourceBuilder<$N, IS_FAST> 
+                where SRC: EevSrcBits<$N>
+            {
+                src.cfg();
+                unsafe { SourceBuilder::new(SRC::SRC_BITS) }
             }
         }
     };
 }
 
-impl_eev_input!(1: COMP2, PINS=[(PC12, AF3)]);
-impl_eev_input!(2: COMP4, PINS=[(PC11, AF3)]);
-impl_eev_input!(3: COMP6, PINS=[(PB7, AF13)]);
-impl_eev_input!(4: COMP1, PINS=[(PB6, AF13)]);
-impl_eev_input!(5: COMP3, PINS=[(PB9, AF13)]);
-impl_eev_input!(6: COMP2, PINS=[(PB5, AF13)]);
-impl_eev_input!(7: COMP4, PINS=[(PB4, AF13)]);
-impl_eev_input!(8: COMP6, PINS=[(PB8, AF13)]);
-impl_eev_input!(9: COMP5, PINS=[(PB3, AF13)]);
-impl_eev_input!(10: COMP7, PINS=[(PC5, AF13), (PC6, AF3)]);
+impl_eev_input!(1: COMP=[COMP2], PINS=[(PC12, AF3)]);
+impl_eev_input!(2: COMP=[COMP4], PINS=[(PC11, AF3)]);
+impl_eev_input!(3: COMP=[COMP6], PINS=[(PB7, AF13)]);
+impl_eev_input!(4: COMP=[COMP1, (COMP5, 0b10)], PINS=[(PB6, AF13)]);
+impl_eev_input!(5: COMP=[COMP3, (COMP7, 0b10)], PINS=[(PB9, AF13)]);
+impl_eev_input!(6: COMP=[COMP2, (COMP1, 0b10)], PINS=[(PB5, AF13)]);
+impl_eev_input!(7: COMP=[COMP4], PINS=[(PB4, AF13)]);
+impl_eev_input!(8: COMP=[COMP6, (COMP3, 0b10)], PINS=[(PB8, AF13)]);
+impl_eev_input!(9: COMP=[COMP5, (COMP4, 0b11)], PINS=[(PB3, AF13)]);
+impl_eev_input!(10: COMP=[COMP7], PINS=[(PC5, AF13), (PC6, AF3)]);
 
 pub enum EdgeOrPolarity {
     Edge(Edge),
@@ -101,10 +127,6 @@ pub enum Edge {
     Both = 0b11,
 }
 
-pub enum Polarity {
-    ActiveHigh,
-    ActiveLow,
-}
 
 pub enum EevSamplingFilter {
     /// No filtering, fault acts asynchronously
@@ -227,8 +249,8 @@ where
     }
 }
 
-pub trait ToExternalEventSource {
-    fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource;
+pub trait ToExternalEventSource<const IS_FAST: bool> {
+    fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<IS_FAST>;
 }
 
 #[derive(Copy, Clone)]
@@ -240,8 +262,26 @@ macro_rules! impl_eev1_5_to_es {
     ($eev:ident, $N:literal, $eeXsrc:ident, $eeXpol:ident, $eeXsns:ident, $eeXfast:ident) => {
         impl<const IS_FAST: bool> ExternalEventBuilder1To5 for SourceBuilder<$N, IS_FAST> {}
 
-        impl<const IS_FAST: bool> ToExternalEventSource for SourceBuilder<$N, IS_FAST> {
-            fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource {
+        impl SourceBuilder<$N, false> {
+            pub fn fast(self) -> SourceBuilder<$N, true> {
+                let SourceBuilder {
+                    src_bits,
+                    edge_or_polarity_bits,
+                    polarity_bit,
+                    filter_bits,
+                } = self;
+    
+                SourceBuilder {
+                    src_bits,
+                    edge_or_polarity_bits,
+                    polarity_bit,
+                    filter_bits,
+                }
+            }
+        }
+
+        impl<const IS_FAST: bool> ToExternalEventSource<IS_FAST> for SourceBuilder<$N, IS_FAST> {
+            fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<IS_FAST> {
                 let SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,
@@ -276,8 +316,8 @@ macro_rules! impl_eev6_10_to_es {
     ($eev:ident, $N:literal, $eeXsrc:ident, $eeXpol:ident, $eeXsns:ident, $eeXf:ident) => {
         impl ExternalEventBuilder6To10 for SourceBuilder<$N, false> {}
 
-        impl ToExternalEventSource for SourceBuilder<$N, false> {
-            fn finalize<PSCL, TIM>(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource {
+        impl ToExternalEventSource<false> for SourceBuilder<$N, false> {
+            fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<false> {
                 let SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,

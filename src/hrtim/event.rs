@@ -159,11 +159,16 @@ pub enum EventSource<PSCL, DST> {
     /// On complete master period
     MasterPeriod { _x: PhantomData<(PSCL, DST)> },
 
-    ExternalEvent(ExternalEventSource), // This is fine 
+    ExternalEvent(EevFastOrNormal), // This is fine 
 
     NeighborTimer {
         n: NeighborTimerEventSource<PSCL, DST>,
     },
+}
+
+pub enum EevFastOrNormal {
+    Fast(ExternalEventSource<true>),
+    Normal(ExternalEventSource<false>),
 }
 
 /// Compare events from neighbor timers
