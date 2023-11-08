@@ -4,7 +4,10 @@ use crate::stm32::{
     HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
 };
 
-use super::{compare_register::{HrCr1, HrCr2, HrCr3, HrCr4}, external_event::ExternalEventSource};
+use super::{
+    compare_register::{HrCr1, HrCr2, HrCr3, HrCr4},
+    external_event::ExternalEventSource,
+};
 use crate::hrtim::timer::HrTim;
 
 macro_rules! impl_into_es {
@@ -130,36 +133,56 @@ impl_into_neighbor_es! {
 
 pub enum EventSource<PSCL, DST> {
     /// Compare match with compare register 1 of this timer
-    Cr1 { _x: PhantomData<(PSCL, DST)> },
+    Cr1 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// Compare match with compare register 2 of this timer
-    Cr2 { _x: PhantomData<(PSCL, DST)> },
+    Cr2 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// Compare match with compare register 3 of this timer
-    Cr3 { _x: PhantomData<(PSCL, DST)> },
+    Cr3 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// Compare match with compare register 4 of this timer
-    Cr4 { _x: PhantomData<(PSCL, DST)> },
+    Cr4 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// On complete period
-    Period { _x: PhantomData<(PSCL, DST)> },
+    Period {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// Compare match with compare register 1 of master timer
-    MasterCr1 { _x: PhantomData<(PSCL, DST)> },
+    MasterCr1 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// Compare match with compare register 2 of master timer
-    MasterCr2 { _x: PhantomData<(PSCL, DST)> },
+    MasterCr2 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// Compare match with compare register 3 of master timer
-    MasterCr3 { _x: PhantomData<(PSCL, DST)> },
+    MasterCr3 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// Compare match with compare register 4 of master timer
-    MasterCr4 { _x: PhantomData<(PSCL, DST)> },
+    MasterCr4 {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
     /// On complete master period
-    MasterPeriod { _x: PhantomData<(PSCL, DST)> },
+    MasterPeriod {
+        _x: PhantomData<(PSCL, DST)>,
+    },
 
-    ExternalEvent(EevFastOrNormal), // This is fine 
+    ExternalEvent(EevFastOrNormal), // This is fine
 
     NeighborTimer {
         n: NeighborTimerEventSource<PSCL, DST>,

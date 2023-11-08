@@ -515,7 +515,7 @@ macro_rules! hrtim_common_methods {
 
 // Implement PWM configuration for timer
 macro_rules! hrtim_hal {
-    ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, 
+    ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident,
         $fltXr:ident, $eefXr1:ident, $eefXr2:ident, $Xeefr3:ident, $outXr:ident, $dtXr:ident),)+) => {
         $(
 
