@@ -9,6 +9,7 @@ use core::fmt::Write;
 
 use hal::dma::{config::DmaConfig, stream::DMAExt, TransferExt};
 use hal::prelude::*;
+use hal::pwr::PwrExt;
 use hal::serial::*;
 use hal::time::ExtU32;
 use hal::{rcc, stm32};
@@ -28,7 +29,8 @@ fn main() -> ! {
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(rcc::Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = rcc.freeze(rcc::Config::hsi(), pwr);
 
     let streams = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()

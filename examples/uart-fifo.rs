@@ -8,6 +8,7 @@ extern crate cortex_m_rt as rt;
 use core::fmt::Write;
 
 use hal::prelude::*;
+use hal::pwr::PwrExt;
 use hal::serial::*;
 use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
@@ -24,7 +25,8 @@ fn main() -> ! {
 
     info!("start");
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let mut rcc = dp.RCC.freeze(rcc::Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = dp.RCC.freeze(rcc::Config::hsi(), pwr);
 
     info!("Init UART");
     let gpioa = dp.GPIOA.split(&mut rcc);

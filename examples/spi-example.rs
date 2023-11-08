@@ -14,6 +14,7 @@ use crate::hal::{
     gpio::Alternate,
     gpio::AF5,
     prelude::*,
+    pwr::PwrExt,
     rcc::Config,
     spi,
     stm32::Peripherals,
@@ -34,7 +35,8 @@ fn main() -> ! {
 
     let dp = Peripherals::take().unwrap();
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = rcc.freeze(Config::hsi(), pwr);
     let timer2 = Timer::new(dp.TIM2, &rcc.clocks);
     let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.millis()));
 

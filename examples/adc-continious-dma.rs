@@ -11,6 +11,7 @@ use crate::hal::{
     delay::SYSTDelayExt,
     dma::{config::DmaConfig, stream::DMAExt, TransferExt},
     gpio::GpioExt,
+    pwr::PwrExt,
     rcc::{Config, RccExt},
     stm32::Peripherals,
 };
@@ -32,7 +33,8 @@ fn main() -> ! {
 
     info!("rcc");
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = rcc.freeze(Config::hsi(), pwr);
 
     let streams = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()

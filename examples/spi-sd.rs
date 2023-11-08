@@ -12,6 +12,7 @@ use hal::gpio::gpiof::PF9;
 use hal::gpio::Alternate;
 use hal::gpio::AF5;
 use hal::prelude::*;
+use hal::pwr::PwrExt;
 use hal::rcc::Config;
 use hal::spi;
 use hal::stm32;
@@ -35,7 +36,8 @@ mod utils;
 fn main() -> ! {
     let dp = Peripherals::take().unwrap();
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = rcc.freeze(Config::hsi(), pwr);
     let gpiob = dp.GPIOB.split(&mut rcc);
     let gpiof = dp.GPIOF.split(&mut rcc);
 

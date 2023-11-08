@@ -5,6 +5,7 @@ use crate::hal::{
     can::CanExt,
     gpio::{GpioExt as _, Speed},
     nb::block,
+    pwr::PwrExt,
     rcc::{Config, RccExt, SysClockSrc},
     stm32::Peripherals,
     time::RateExtU32,
@@ -46,8 +47,10 @@ fn main() -> ! {
 
     let dp = Peripherals::take().unwrap();
     let _cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+
+    let pwr = dp.PWR.constrain().freeze();
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::new(SysClockSrc::HSE(24.MHz())));
+    let mut rcc = rcc.freeze(Config::new(SysClockSrc::HSE(24.MHz())), pwr);
 
     info!("Split GPIO");
 
