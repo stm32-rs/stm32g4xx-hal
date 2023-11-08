@@ -25,7 +25,18 @@ use embedded_hal::{
     blocking::delay::DelayUs,
 };
 
-use self::config::{ExternalTrigger12, ExternalTrigger345};
+use self::config::ExternalTrigger12;
+
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
+))]
+use self::config::ExternalTrigger345;
 
 /// Vref internal signal, used for calibration
 pub struct Vref;
