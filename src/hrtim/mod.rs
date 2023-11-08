@@ -863,6 +863,8 @@ hrtim_pin_hal! {
     HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, tf2odis),
 }
 
+/// # Safety
+/// Only implement for valid prescalers with correct values
 pub unsafe trait HrtimPrescaler: Default {
     const BITS: u8;
     const VALUE: u8;
