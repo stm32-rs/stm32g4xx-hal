@@ -121,6 +121,7 @@ pub(crate) fn current_vos() -> VoltageScale {
 /// SAFETY: Caller has to ensure we are in a valid frequency range, wait states etc to enter the new voltage range
 /// and that the correct sequence is respected (see 'Dynamic voltage scaling management' in RM0440). Also ensure unique
 /// access of PWR peripheral
+#[allow(dead_code)]
 pub(crate) unsafe fn set_vos(vos: VoltageScale) {
     let pwr = unsafe { &*PWR::ptr() };
 
