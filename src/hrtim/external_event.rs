@@ -4,8 +4,8 @@ use crate::comparator::{COMP1, COMP2, COMP3, COMP4, COMP5, COMP6, COMP7};
 use crate::gpio::gpiob::{PB3, PB4, PB5, PB6, PB7, PB8, PB9};
 use crate::gpio::gpioc::{PC11, PC12, PC5, PC6};
 use crate::gpio::{self, AF13, AF3};
-use crate::stm32::HRTIM_COMMON;
 use crate::pwm::Polarity;
+use crate::stm32::HRTIM_COMMON;
 
 use super::event::EevFastOrNormal;
 use super::{control::HrTimCalibrated, event::EventSource};
@@ -84,18 +84,22 @@ macro_rules! impl_eev_input {
             }
         })*
 
-        unsafe impl EevSrcBits<$N> for &crate::comparator::Comparator<$compX, crate::comparator::Enabled> {
+        unsafe impl<ED> EevSrcBits<$N> for &crate::comparator::Comparator<$compX, ED>
+            where ED: crate::comparator::EnabledState
+        {
             const SRC_BITS: u8 = 0b01;
         }
-        
+
         $(
-            unsafe impl EevSrcBits<$N> for &crate::comparator::Comparator<$compY, crate::comparator::Enabled> {
+            unsafe impl<ED> EevSrcBits<$N> for &crate::comparator::Comparator<$compY, ED>
+                where ED: crate::comparator::EnabledState
+            {
                 const SRC_BITS: u8 = $compY_src_bits;
             }
         )*
-        
+
         impl EevInput<$N> {
-            pub fn bind<const IS_FAST: bool, SRC>(self, src: SRC) -> SourceBuilder<$N, IS_FAST> 
+            pub fn bind<const IS_FAST: bool, SRC>(self, src: SRC) -> SourceBuilder<$N, IS_FAST>
                 where SRC: EevSrcBits<$N>
             {
                 src.cfg();
@@ -126,7 +130,6 @@ pub enum Edge {
     Falling = 0b10,
     Both = 0b11,
 }
-
 
 pub enum EevSamplingFilter {
     /// No filtering, fault acts asynchronously
@@ -270,7 +273,7 @@ macro_rules! impl_eev1_5_to_es {
                     polarity_bit,
                     filter_bits,
                 } = self;
-    
+
                 SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,

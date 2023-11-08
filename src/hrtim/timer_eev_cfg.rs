@@ -22,6 +22,28 @@ pub struct EevCfgs<TIM> {
     pub(crate) event_counter_threshold_bits: u8,
 }
 
+macro_rules! impl_setter {
+    ($eevX:ident) => {
+        pub fn $eevX(mut self, cfg: EevCfg<TIM>) -> Self {
+            self.$eevX = cfg;
+            self
+        }
+    };
+}
+
+impl<TIM> EevCfgs<TIM> {
+    impl_setter!(eev1);
+    impl_setter!(eev2);
+    impl_setter!(eev3);
+    impl_setter!(eev4);
+    impl_setter!(eev5);
+    impl_setter!(eev6);
+    impl_setter!(eev7);
+    impl_setter!(eev8);
+    impl_setter!(eev9);
+    impl_setter!(eev10);
+}
+
 impl<TIM> Clone for EevCfgs<TIM> {
     fn clone(&self) -> Self {
         Self {
