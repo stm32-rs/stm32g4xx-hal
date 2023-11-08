@@ -1,8 +1,8 @@
 use crate::hrtim::external_event::ExternalEventSource;
-use core::marker::PhantomData;
-use stm32g4::stm32g474::{
+use crate::stm32::{
     HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
 };
+use core::marker::PhantomData;
 
 use super::event::{EevFastOrNormal, EventSource, NeighborTimerEventSource};
 use crate::{

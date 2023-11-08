@@ -3,30 +3,40 @@
 #![no_std]
 
 use cortex_m_rt::entry;
-use hal::gpio::gpioa::PA8;
-use hal::gpio::Alternate;
-use hal::gpio::AF13;
-use hal::hrtim::compare_register::HrCompareRegister;
-use hal::hrtim::external_event;
-use hal::hrtim::external_event::ToExternalEventSource;
-use hal::hrtim::timer::HrTimer;
-use hal::hrtim::timer_eev_cfg::EevCfgs;
-use hal::hrtim::HrPwmAdvExt;
-use hal::hrtim::Pscl4;
-use hal::hrtim::{control::HrControltExt, output::HrOutput};
-use hal::prelude::*;
-use hal::pwm;
-use hal::pwr::PwrExt;
-use hal::rcc;
-use hal::stm32;
-use stm32g4xx_hal as hal;
+
 //mod utils;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
 
+#[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
 #[entry]
 fn main() -> ! {
+    #[allow(clippy::empty_loop)]
+    loop {}
+}
+
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
+#[entry]
+fn main() -> ! {
+    use hal::gpio::gpioa::PA8;
+    use hal::gpio::Alternate;
+    use hal::gpio::AF13;
+    use hal::hrtim::compare_register::HrCompareRegister;
+    use hal::hrtim::external_event;
+    use hal::hrtim::external_event::ToExternalEventSource;
+    use hal::hrtim::timer::HrTimer;
+    use hal::hrtim::timer_eev_cfg::EevCfgs;
+    use hal::hrtim::HrPwmAdvExt;
+    use hal::hrtim::Pscl4;
+    use hal::hrtim::{control::HrControltExt, output::HrOutput};
+    use hal::prelude::*;
+    use hal::pwm;
+    use hal::pwr::PwrExt;
+    use hal::rcc;
+    use hal::stm32;
+    use stm32g4xx_hal as hal;
+
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     // Set system frequency to 16MHz * 75/4/2 = 150MHz
     // This would lead to HrTim running at 150MHz * 32 = 4.8GHz...
@@ -97,5 +107,7 @@ fn main() -> ! {
 
     defmt::info!("Started");
 
-    loop {}
+    loop {
+        cortex_m::asm::nop()
+    }
 }

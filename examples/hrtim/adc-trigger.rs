@@ -2,33 +2,41 @@
 #![no_main]
 
 use cortex_m_rt::entry;
-use hal::adc::{self, config::ExternalTrigger12};
-
-use crate::hal::{
-    adc::{
-        config::{Continuous, Dma as AdcDma, SampleTime, Sequence},
-        AdcClaim, ClockSource, Temperature, Vref,
-    },
-    delay::SYSTDelayExt,
-    dma::{self, config::DmaConfig, stream::DMAExt, TransferExt},
-    gpio::{gpioa::PA8, gpioa::PA9, Alternate, GpioExt, AF13},
-    hrtim::control::HrControltExt,
-    hrtim::output::HrOutput,
-    hrtim::HrPwmAdvExt,
-    hrtim::{control::Adc13Trigger, Pscl4},
-    pwr::PwrExt,
-    rcc::{self, RccExt},
-    stm32::Peripherals,
-};
-use stm32g4xx_hal as hal;
-
-use defmt::info;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
 
+#[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
 #[entry]
 fn main() -> ! {
+    #[allow(clippy::empty_loop)]
+    loop {}
+}
+
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
+#[entry]
+fn main() -> ! {
+    use hal::adc::{self, config::ExternalTrigger12};
+    use stm32g4xx_hal as hal;
+
+    use defmt::info;
+    use hal::{
+        adc::{
+            config::{Continuous, Dma as AdcDma, SampleTime, Sequence},
+            AdcClaim, ClockSource, Temperature, Vref,
+        },
+        delay::SYSTDelayExt,
+        dma::{self, config::DmaConfig, stream::DMAExt, TransferExt},
+        gpio::{gpioa::PA8, gpioa::PA9, Alternate, GpioExt, AF13},
+        hrtim::control::HrControltExt,
+        hrtim::output::HrOutput,
+        hrtim::HrPwmAdvExt,
+        hrtim::{control::Adc13Trigger, Pscl4},
+        pwr::PwrExt,
+        rcc::{self, RccExt},
+        stm32::Peripherals,
+    };
+
     info!("start");
 
     let dp = Peripherals::take().unwrap();

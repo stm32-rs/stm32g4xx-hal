@@ -3,31 +3,39 @@
 #![no_std]
 
 use cortex_m_rt::entry;
-use hal::comparator::{ComparatorExt, ComparatorSplit, Config, Hysteresis};
-use hal::dac::{Dac3IntSig1, DacExt, DacOut};
-use hal::gpio::gpioa::PA8;
-use hal::gpio::Alternate;
-use hal::gpio::AF13;
-use hal::hrtim::compare_register::HrCompareRegister;
-use hal::hrtim::fault::FaultAction;
-use hal::hrtim::timer::HrTimer;
-use hal::hrtim::HrPwmAdvExt;
-use hal::hrtim::Pscl4;
-use hal::hrtim::{control::HrControltExt, output::HrOutput};
-use hal::prelude::*;
-use hal::pwm::FaultMonitor;
-use hal::rcc;
-use hal::stm32;
-use stm32g4xx_hal as hal;
-use stm32g4xx_hal::pwr::PwrExt;
 //mod utils;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
 
+#[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
 #[entry]
 fn main() -> ! {
+    #[allow(clippy::empty_loop)]
+    loop {}
+}
+
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
+#[entry]
+fn main() -> ! {
+    use hal::comparator::{ComparatorExt, ComparatorSplit, Config, Hysteresis};
+    use hal::dac::{Dac3IntSig1, DacExt, DacOut};
+    use hal::gpio::gpioa::PA8;
+    use hal::gpio::Alternate;
+    use hal::gpio::AF13;
+    use hal::hrtim::compare_register::HrCompareRegister;
+    use hal::hrtim::fault::FaultAction;
+    use hal::hrtim::timer::HrTimer;
+    use hal::hrtim::HrPwmAdvExt;
+    use hal::hrtim::Pscl4;
+    use hal::hrtim::{control::HrControltExt, output::HrOutput};
+    use hal::prelude::*;
+    use hal::pwm::FaultMonitor;
+    use hal::rcc;
+    use hal::stm32;
+    use stm32g4xx_hal as hal;
     use stm32g4xx_hal::adc::AdcClaim;
+    use stm32g4xx_hal::pwr::PwrExt;
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let cp = stm32::CorePeripherals::take().expect("cannot take core");

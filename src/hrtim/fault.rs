@@ -23,6 +23,8 @@ pub enum FaultAction {
     Floating = 0b11,
 }
 
+/// # Safety
+/// Only implement for actual fault sources with correct `ENABLE_BITS`
 pub unsafe trait FaultSource: Copy {
     const ENABLE_BITS: u8;
 }

@@ -57,10 +57,10 @@ impl<TIM> Clone for EevCfgs<TIM> {
             eev8: self.eev8.clone(),
             eev9: self.eev9.clone(),
             eev10: self.eev10.clone(),
-            event_counter_enable_bit: self.event_counter_enable_bit.clone(),
-            event_counter_reset_mode_bit: self.event_counter_reset_mode_bit.clone(),
-            event_counter_source_bits: self.event_counter_source_bits.clone(),
-            event_counter_threshold_bits: self.event_counter_threshold_bits.clone(),
+            event_counter_enable_bit: self.event_counter_enable_bit,
+            event_counter_reset_mode_bit: self.event_counter_reset_mode_bit,
+            event_counter_source_bits: self.event_counter_source_bits,
+            event_counter_threshold_bits: self.event_counter_threshold_bits,
         }
     }
 }
@@ -75,8 +75,8 @@ impl<TIM> Clone for EevCfg<TIM> {
     fn clone(&self) -> Self {
         Self {
             _x: PhantomData,
-            filter_bits: self.filter_bits.clone(),
-            latch_bit: self.latch_bit.clone(),
+            filter_bits: self.filter_bits,
+            latch_bit: self.latch_bit,
         }
     }
 }
