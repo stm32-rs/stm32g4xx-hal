@@ -22,14 +22,14 @@ fn main() -> ! {
     use hal::gpio::gpioa::PA9;
     use hal::gpio::Alternate;
     use hal::gpio::AF13;
+    use hal::hrtim::compare_register::HrCompareRegister;
+    use hal::hrtim::control::HrControltExt;
+    use hal::hrtim::output::HrOutput;
+    use hal::hrtim::timer::HrTimer;
+    use hal::hrtim::HrPwmAdvExt;
+    use hal::hrtim::Pscl4;
     use hal::prelude::*;
-    use hal::pwm::hrtim::EventSource;
-    use hal::pwm::hrtim::HrCompareRegister;
-    use hal::pwm::hrtim::HrControltExt;
-    use hal::pwm::hrtim::HrOutput;
-    use hal::pwm::hrtim::HrPwmAdvExt;
-    use hal::pwm::hrtim::HrTimer;
-    use hal::pwm::hrtim::Pscl4;
+    use hal::pwr::PwrExt;
     use hal::rcc;
     use hal::stm32;
     use stm32g4xx_hal as hal;
@@ -39,14 +39,18 @@ fn main() -> ! {
     let cp = stm32::CorePeripherals::take().expect("cannot take core");
     // Set system frequency to 16MHz * 15/1/2 = 120MHz
     // This would lead to HrTim running at 120MHz * 32 = 3.84...
-    let mut rcc = dp.RCC.freeze(rcc::Config::pll().pll_cfg(rcc::PllConfig {
-        mux: rcc::PLLSrc::HSI,
-        n: rcc::PllNMul::MUL_15,
-        m: rcc::PllMDiv::DIV_1,
-        r: Some(rcc::PllRDiv::DIV_2),
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = dp.RCC.freeze(
+        rcc::Config::pll().pll_cfg(rcc::PllConfig {
+            mux: rcc::PLLSrc::HSI,
+            n: rcc::PllNMul::MUL_15,
+            m: rcc::PllMDiv::DIV_1,
+            r: Some(rcc::PllRDiv::DIV_2),
 
-        ..Default::default()
-    }));
+            ..Default::default()
+        }),
+        pwr,
+    );
 
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
@@ -70,7 +74,9 @@ fn main() -> ! {
     // ------------------------    ----------------------------    ----
     //        .               .               .               .
     //        .               .               .               .
-    let (mut fault_control, _) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
+    let (hr_control, ..) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
+    let mut hr_control = hr_control.constrain();
+
     let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
@@ -80,13 +86,13 @@ fn main() -> ! {
         // alternated every period with one being
         // inactive and the other getting to output its wave form
         // as normal
-        .finalize(&mut fault_control);
+        .finalize(&mut hr_control);
 
-    out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
-    out2.enable_rst_event(EventSource::Cr1);
+    out1.enable_rst_event(&cr1); // Set low on compare match with cr1
+    out2.enable_rst_event(&cr1);
 
-    out1.enable_set_event(EventSource::Period); // Set high at new period
-    out2.enable_set_event(EventSource::Period);
+    out1.enable_set_event(&timer); // Set high at new period
+    out2.enable_set_event(&timer);
 
     out1.enable();
     out2.enable();

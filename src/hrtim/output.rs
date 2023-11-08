@@ -1,10 +1,10 @@
+use crate::hrtim::external_event::ExternalEventSource;
 use core::marker::PhantomData;
 use stm32g4::stm32g474::{
     HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
 };
-use crate::hrtim::external_event::ExternalEventSource;
 
-use super::event::{EventSource, NeighborTimerEventSource, EevFastOrNormal};
+use super::event::{EevFastOrNormal, EventSource, NeighborTimerEventSource};
 use crate::{
     gpio::{
         gpioa::{PA10, PA11, PA8, PA9},
@@ -19,36 +19,18 @@ use crate::{
 macro_rules! hrtim_out_common {
     ($e:ident, $register:expr, $action:ident) => {
         match $e {
-            ExternalEventSource::Eevnt1 { .. } => {
-                $register.modify(|_r, w| w.extevnt1().$action())
-            },
-            ExternalEventSource::Eevnt2 { .. } => {
-                $register.modify(|_r, w| w.extevnt2().$action())
-            },
-            ExternalEventSource::Eevnt3 { .. } => {
-                $register.modify(|_r, w| w.extevnt3().$action())
-            },
-            ExternalEventSource::Eevnt4 { .. } => {
-                $register.modify(|_r, w| w.extevnt4().$action())
-            },
-            ExternalEventSource::Eevnt5 { .. } => {
-                $register.modify(|_r, w| w.extevnt5().$action())
-            },
-            ExternalEventSource::Eevnt6 { .. } => {
-                $register.modify(|_r, w| w.extevnt6().$action())
-            },
-            ExternalEventSource::Eevnt7 { .. } => {
-                $register.modify(|_r, w| w.extevnt7().$action())
-            },
-            ExternalEventSource::Eevnt8 { .. } => {
-                $register.modify(|_r, w| w.extevnt8().$action())
-            },
-            ExternalEventSource::Eevnt9 { .. } => {
-                $register.modify(|_r, w| w.extevnt9().$action())
-            },
+            ExternalEventSource::Eevnt1 { .. } => $register.modify(|_r, w| w.extevnt1().$action()),
+            ExternalEventSource::Eevnt2 { .. } => $register.modify(|_r, w| w.extevnt2().$action()),
+            ExternalEventSource::Eevnt3 { .. } => $register.modify(|_r, w| w.extevnt3().$action()),
+            ExternalEventSource::Eevnt4 { .. } => $register.modify(|_r, w| w.extevnt4().$action()),
+            ExternalEventSource::Eevnt5 { .. } => $register.modify(|_r, w| w.extevnt5().$action()),
+            ExternalEventSource::Eevnt6 { .. } => $register.modify(|_r, w| w.extevnt6().$action()),
+            ExternalEventSource::Eevnt7 { .. } => $register.modify(|_r, w| w.extevnt7().$action()),
+            ExternalEventSource::Eevnt8 { .. } => $register.modify(|_r, w| w.extevnt8().$action()),
+            ExternalEventSource::Eevnt9 { .. } => $register.modify(|_r, w| w.extevnt9().$action()),
             ExternalEventSource::Eevnt10 { .. } => {
                 $register.modify(|_r, w| w.extevnt10().$action())
-            },
+            }
         }
     };
 
@@ -68,8 +50,12 @@ macro_rules! hrtim_out_common {
             EventSource::MasterCr4 { .. } => tim.$register.modify(|_r, w| w.mstcmp4().$action()),
             EventSource::MasterPeriod { .. } => tim.$register.modify(|_r, w| w.mstper().$action()),
 
-            EventSource::ExternalEvent(EevFastOrNormal::Fast(e)) => hrtim_out_common!(e, tim.$register, $action),
-            EventSource::ExternalEvent(EevFastOrNormal::Normal(e)) => hrtim_out_common!(e, tim.$register, $action),
+            EventSource::ExternalEvent(EevFastOrNormal::Fast(e)) => {
+                hrtim_out_common!(e, tim.$register, $action)
+            }
+            EventSource::ExternalEvent(EevFastOrNormal::Normal(e)) => {
+                hrtim_out_common!(e, tim.$register, $action)
+            }
 
             EventSource::NeighborTimer { n } => match n {
                 NeighborTimerEventSource::TimEvent1 { .. } => {

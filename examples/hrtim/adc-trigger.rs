@@ -10,34 +10,51 @@ use crate::hal::{
         AdcClaim, ClockSource, Temperature, Vref,
     },
     delay::SYSTDelayExt,
-    dma::{config::DmaConfig, stream::DMAExt, TransferExt},
-    gpio::GpioExt,
-    rcc::{Config, RccExt},
+    dma::{self, config::DmaConfig, stream::DMAExt, TransferExt},
+    gpio::{gpioa::PA8, gpioa::PA9, Alternate, GpioExt, AF13},
+    hrtim::control::HrControltExt,
+    hrtim::output::HrOutput,
+    hrtim::HrPwmAdvExt,
+    hrtim::{control::Adc13Trigger, Pscl4},
+    pwr::PwrExt,
+    rcc::{self, RccExt},
     stm32::Peripherals,
 };
 use stm32g4xx_hal as hal;
 
-use log::info;
+use defmt::info;
 
-#[macro_use]
-mod utils;
+use defmt_rtt as _; // global logger
+use panic_probe as _;
 
 #[entry]
 fn main() -> ! {
-    utils::logger::init();
-
     info!("start");
 
     let dp = Peripherals::take().unwrap();
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
+    // Set system frequency to 16MHz * 15/1/2 = 120MHz
+    // This would lead to HrTim running at 120MHz * 32 = 3.84...
     info!("rcc");
-    let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = dp.RCC.freeze(
+        rcc::Config::pll().pll_cfg(rcc::PllConfig {
+            mux: rcc::PLLSrc::HSI,
+            n: rcc::PllNMul::MUL_15,
+            m: rcc::PllMDiv::DIV_1,
+            r: Some(rcc::PllRDiv::DIV_2),
 
-    let streams = dp.DMA1.split(&rcc);
+            ..Default::default()
+        }),
+        pwr,
+    );
+
+    let mut delay = cp.SYST.delay(&rcc.clocks);
+
+    let dma::stream::StreamsTuple(dma1ch1, ..) = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()
-        .transfer_complete_interrupt(false)
+        .transfer_complete_interrupt(true)
         .circular_buffer(true)
         .memory_increment(true);
 
@@ -46,7 +63,6 @@ fn main() -> ! {
     let pa0 = gpioa.pa0.into_analog();
 
     info!("Setup Adc1");
-    let mut delay = cp.SYST.delay(&rcc.clocks);
     let mut adc = dp
         .ADC1
         .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
@@ -63,7 +79,8 @@ fn main() -> ! {
 
     info!("Setup DMA");
     let first_buffer = cortex_m::singleton!(: [u16; 10] = [0; 10]).unwrap();
-    let mut transfer = streams.0.into_circ_peripheral_to_memory_transfer(
+
+    let mut transfer = dma1ch1.into_circ_peripheral_to_memory_transfer(
         adc.enable_dma(AdcDma::Continuous),
         &mut first_buffer[..],
         config,
@@ -71,18 +88,27 @@ fn main() -> ! {
 
     transfer.start(|adc| adc.start_conversion());
 
+    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
+    let pin_b: PA9<Alternate<AF13>> = gpioa.pa9.into_alternate();
+
+    // ...with a prescaler of 4 this gives us a HrTimer with a tick rate of 960MHz
+    // With max the max period set, this would be 960MHz/2^16 ~= 15kHz...
+    let prescaler = Pscl4;
+
     //        .               .
     //        .  50%          .
     //         ------          ------
     //out1    |      |        |      |
     //        |      |        |      |
     // --------      ----------      --------
-    let (mut fault_control, _) = dp
+    let (hr_control, ..) = dp
         .HRTIM_COMMON
         .hr_control(&mut rcc)
-        .set_adc_trigger1(Adc13Trigger::)
+        .enable_adc_trigger1_source(Adc13Trigger::TimACmp3)
+        .enable_adc_trigger1_source(Adc13Trigger::TimACmp4)
         .wait_for_calibration();
-    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
+    let mut hr_control = hr_control.constrain();
+    let (timer, (cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)
@@ -90,13 +116,13 @@ fn main() -> ! {
         // alternated every period with one being
         // inactive and the other getting to output its wave form
         // as normal
-        .finalize(&mut fault_control);
+        .finalize(&mut hr_control);
 
-    out1.enable_rst_event(EventSource::Cr1); // Set low on compare match with cr1
-    out2.enable_rst_event(EventSource::Cr1);
+    out1.enable_rst_event(&cr1); // Set low on compare match with cr1
+    out2.enable_rst_event(&cr1);
 
-    out1.enable_set_event(EventSource::Period); // Set high at new period
-    out2.enable_set_event(EventSource::Period);
+    out1.enable_set_event(&timer); // Set high at new period
+    out2.enable_set_event(&timer);
 
     out1.enable();
     out2.enable();
