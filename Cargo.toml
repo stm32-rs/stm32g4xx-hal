@@ -105,3 +105,35 @@ lto = true
 [[example]]
 name = "flash_with_rtic"
 required-features = ["stm32g474"]
+
+[[example]]
+name = "hrtim-adc-trigger"
+path = "examples/hrtim/adc-trigger.rs"
+
+[[example]]
+name = "hrtim-eev-comp"
+path = "examples/hrtim/eev-comp.rs"
+
+[[example]]
+name = "hrtim-eev"
+path = "examples/hrtim/eev.rs"
+
+[[example]]
+name = "hrtim-flt-comp"
+path = "examples/hrtim/flt-comp.rs"
+
+[[example]]
+name = "hrtim-flt"
+path = "examples/hrtim/flt.rs"
+
+[[example]]
+name = "hrtim"
+path = "examples/hrtim/hrtim.rs"
+
+[[example]]
+name = "hrtim-master"
+path = "examples/hrtim/master.rs"
+
+[[example]]
+name = "hrtim-simple"
+path = "examples/hrtim/simple.rs"
