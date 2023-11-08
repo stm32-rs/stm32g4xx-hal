@@ -70,6 +70,8 @@ pub struct EevInput<const N: u8> {
     _x: PhantomData<()>,
 }
 
+/// # Safety
+/// Only implement for types that can be used as sources to eev number `EEV_N` with src bits `SRC_BITS`
 pub unsafe trait EevSrcBits<const EEV_N: u8>: Sized {
     const SRC_BITS: u8;
     fn cfg(self) {}
@@ -109,16 +111,16 @@ macro_rules! impl_eev_input {
     };
 }
 
-impl_eev_input!(1: COMP=[COMP2], PINS=[(PC12, AF3)]);
-impl_eev_input!(2: COMP=[COMP4], PINS=[(PC11, AF3)]);
-impl_eev_input!(3: COMP=[COMP6], PINS=[(PB7, AF13)]);
-impl_eev_input!(4: COMP=[COMP1, (COMP5, 0b10)], PINS=[(PB6, AF13)]);
-impl_eev_input!(5: COMP=[COMP3, (COMP7, 0b10)], PINS=[(PB9, AF13)]);
-impl_eev_input!(6: COMP=[COMP2, (COMP1, 0b10)], PINS=[(PB5, AF13)]);
-impl_eev_input!(7: COMP=[COMP4], PINS=[(PB4, AF13)]);
-impl_eev_input!(8: COMP=[COMP6, (COMP3, 0b10)], PINS=[(PB8, AF13)]);
-impl_eev_input!(9: COMP=[COMP5, (COMP4, 0b11)], PINS=[(PB3, AF13)]);
-impl_eev_input!(10: COMP=[COMP7], PINS=[(PC5, AF13), (PC6, AF3)]);
+impl_eev_input!(1: COMP = [COMP2], PINS = [(PC12, AF3)]);
+impl_eev_input!(2: COMP = [COMP4], PINS = [(PC11, AF3)]);
+impl_eev_input!(3: COMP = [COMP6], PINS = [(PB7, AF13)]);
+impl_eev_input!(4: COMP = [COMP1, (COMP5, 0b10)], PINS = [(PB6, AF13)]);
+impl_eev_input!(5: COMP = [COMP3, (COMP7, 0b10)], PINS = [(PB9, AF13)]);
+impl_eev_input!(6: COMP = [COMP2, (COMP1, 0b10)], PINS = [(PB5, AF13)]);
+impl_eev_input!(7: COMP = [COMP4], PINS = [(PB4, AF13)]);
+impl_eev_input!(8: COMP = [COMP6, (COMP3, 0b10)], PINS = [(PB8, AF13)]);
+impl_eev_input!(9: COMP = [COMP5, (COMP4, 0b11)], PINS = [(PB3, AF13)]);
+impl_eev_input!(10: COMP = [COMP7], PINS = [(PC5, AF13), (PC6, AF3)]);
 
 pub enum EdgeOrPolarity {
     Edge(Edge),
