@@ -255,6 +255,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         // Unlock Flash
         self.unlock()?;
 
+        // According to RM0440 Rev 7, "It is only possible to program double word (2 x 32-bit data)"
         for idx in (0..data.len()).step_by(8) {
             // Check the starting address
             self.valid_address(offset + idx as u32)?;
@@ -264,8 +265,8 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
             let write_address1 = (FLASH_START + offset + idx as u32) as *mut u32;
             let write_address2 = (FLASH_START + offset + 4 + idx as u32) as *mut u32;
 
-            let mut word1: u32 = 0;
-            let mut word2: u32 = 0;
+            let word1: u32;
+            let word2: u32;
 
             // Check if there is enough data to make 2 words, if there isn't, pad the data with 0xFF
             if idx + 8 > data.len() {
