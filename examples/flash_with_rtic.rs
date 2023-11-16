@@ -87,29 +87,72 @@ mod app {
         ];
         let mut flash = dp.FLASH.constrain();
         let mut flash_writer = flash.writer::<2048>(FlashSize::Sz256K);
-        const FLASH_SPACING: usize = 16; // Separate flash writes by 16 bytes
+        const FLASH_SPACING: u32 = 16; // Separate flash writes by 16 bytes
 
         flash_writer.erase(0x1FC00, 128).unwrap(); // Erase entire page
 
         for i in 0..6 {
             match i {
-                0 => flash_writer
-                    .write(0x1FC00 + i * FLASH_SPACING, &one_byte)
-                    .unwrap(),
-                1 => flash_writer
-                    .write(0x1FC00 + i * FLASH_SPACING, &two_bytes)
-                    .unwrap(),
-                2 => flash_writer
-                    .write(0x1FC00 + i * FLASH_SPACING, &three_bytes)
-                    .unwrap(),
-                3 => flash_writer
-                    .write(0x1FC00 + i * FLASH_SPACING, &four_bytes)
-                    .unwrap(),
+                0 => {
+                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
+                    let result = flash_writer.write(0x1FC00 + i * FLASH_SPACING, &one_byte, false);
+                    assert!(result.is_err());
+                    assert_eq!(
+                        result.err().unwrap(),
+                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
+                    );
+
+                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
+                    let result = flash_writer.write(0x1FC00 + i * FLASH_SPACING, &one_byte, true);
+                    assert!(result.is_ok());
+                }
+                1 => {
+                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
+                    let result = flash_writer.write(0x1FC00 + i * FLASH_SPACING, &two_bytes, false);
+                    assert!(result.is_err());
+                    assert_eq!(
+                        result.err().unwrap(),
+                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
+                    );
+
+                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
+                    let result = flash_writer.write(0x1FC00 + i * FLASH_SPACING, &two_bytes, true);
+                    assert!(result.is_ok());
+                }
+                2 => {
+                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
+                    let result =
+                        flash_writer.write(0x1FC00 + i * FLASH_SPACING, &three_bytes, false);
+                    assert!(result.is_err());
+                    assert_eq!(
+                        result.err().unwrap(),
+                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
+                    );
+
+                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
+                    let result =
+                        flash_writer.write(0x1FC00 + i * FLASH_SPACING, &three_bytes, true);
+                    assert!(result.is_ok());
+                }
+                3 => {
+                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
+                    let result =
+                        flash_writer.write(0x1FC00 + i * FLASH_SPACING, &four_bytes, false);
+                    assert!(result.is_err());
+                    assert_eq!(
+                        result.err().unwrap(),
+                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
+                    );
+
+                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
+                    let result = flash_writer.write(0x1FC00 + i * FLASH_SPACING, &four_bytes, true);
+                    assert!(result.is_ok());
+                }
                 4 => flash_writer
-                    .write(0x1FC00 + i * FLASH_SPACING, &eight_bytes)
+                    .write(0x1FC00 + i * FLASH_SPACING, &eight_bytes, false)
                     .unwrap(),
                 5 => flash_writer
-                    .write(0x1FC00 + i * 16, &sixteen_bytes)
+                    .write(0x1FC00 + i * 16, &sixteen_bytes, false)
                     .unwrap(),
                 _ => (),
             }

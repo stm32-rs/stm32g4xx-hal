@@ -32,6 +32,7 @@ pub enum Error {
     OptUnlockError,
     LockError,
     OptLockError,
+    ArrayMustBeDivisibleBy8,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Ord, PartialOrd)]
@@ -137,16 +138,20 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         }
     }
 
-    fn valid_length(&self, offset: u32, length: usize) -> Result<()> {
+    fn valid_length(&self, offset: u32, length: usize, force_padding: bool) -> Result<()> {
         if offset
             .checked_add(length as u32)
             .ok_or(Error::LengthTooLong)?
             > self.flash_sz.kbytes() as u32
         {
-            Err(Error::LengthTooLong)
-        } else {
-            Ok(())
+            return Err(Error::LengthTooLong);
         }
+
+        if force_padding == false && length % 8 != 0 {
+            return Err(Error::ArrayMustBeDivisibleBy8);
+        }
+
+        Ok(())
     }
 
     /// Erase sector which contains `start_offset`
@@ -215,7 +220,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
 
     /// Erase the Flash Sectors from `FLASH_START + start_offset` to `length`
     pub fn erase(&mut self, start_offset: u32, length: usize) -> Result<()> {
-        self.valid_length(start_offset, length)?;
+        self.valid_length(start_offset, length, true)?;
 
         // Erase every sector touched by start_offset + length
         for offset in
@@ -248,9 +253,14 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         )
     }
 
-    /// Write data to `FLASH_START + offset`
-    pub fn write(&mut self, offset: u32, data: &[u8]) -> Result<()> {
-        self.valid_length(offset, data.len())?;
+    /// Write data to `FLASH_START + offset`.
+    ///
+    /// If `force_data_padding` is true, the incoming data will be padded with 0xFF
+    /// to satisfy the requirement that 2 words (8 bytes) must be written at a time.
+    /// If `force_data_padding` is false and `data.len()` is not divisible by 8,
+    /// the error `ArrayMustBeDivisibleBy8` will be returned.
+    pub fn write(&mut self, offset: u32, data: &[u8], force_data_padding: bool) -> Result<()> {
+        self.valid_length(offset, data.len(), force_data_padding)?;
 
         // Unlock Flash
         self.unlock()?;
