@@ -3,16 +3,17 @@
 //! Pins can be used for PWM output in both push-pull mode (`Alternate`) and open-drain mode
 //! (`AlternateOD`).
 
+use crate::delay::CountDown;
 use cast::{u16, u32};
 use cortex_m::peripheral::syst::SystClkSource;
 use cortex_m::peripheral::{DCB, DWT, SYST};
-use embedded_hal::timer::{Cancel, CountDown, Periodic};
+use embedded_hal::timer::{Cancel, CountDown as _, Periodic};
 use void::Void;
 
 use crate::stm32::RCC;
 
 use crate::rcc::{self, Clocks};
-use crate::time::Hertz;
+use crate::time::{Hertz, MicroSecond};
 
 /// Timer wrapper
 pub struct Timer<TIM> {
@@ -28,12 +29,12 @@ pub struct CountDownTimer<TIM> {
 
 impl<TIM> Timer<TIM>
 where
-    CountDownTimer<TIM>: CountDown<Time = Hertz>,
+    CountDownTimer<TIM>: CountDown<Time = MicroSecond>,
 {
     /// Starts timer in count down mode at a given frequency
     pub fn start_count_down<T>(self, timeout: T) -> CountDownTimer<TIM>
     where
-        T: Into<Hertz>,
+        T: Into<MicroSecond>,
     {
         let Self { tim, clk } = self;
         let mut timer = CountDownTimer { tim, clk };
@@ -87,14 +88,14 @@ impl CountDownTimer<SYST> {
     }
 }
 
-impl CountDown for CountDownTimer<SYST> {
-    type Time = Hertz;
+impl embedded_hal::timer::CountDown for CountDownTimer<SYST> {
+    type Time = MicroSecond;
 
     fn start<T>(&mut self, timeout: T)
     where
-        T: Into<Hertz>,
+        T: Into<MicroSecond>,
     {
-        let rvr = self.clk.0 / timeout.into().0 - 1;
+        let rvr = crate::time::cycles(timeout.into(), self.clk) - 1;
 
         assert!(rvr < (1 << 24));
 
@@ -109,6 +110,12 @@ impl CountDown for CountDownTimer<SYST> {
         } else {
             Err(nb::Error::WouldBlock)
         }
+    }
+}
+
+impl CountDown for CountDownTimer<SYST> {
+    fn max_period(&self) -> MicroSecond {
+        crate::time::duration(self.clk, (1 << 24) - 1)
     }
 }
 
@@ -158,7 +165,7 @@ impl MonoTimer {
     /// Returns an `Instant` corresponding to "now"
     pub fn now(self) -> Instant {
         Instant {
-            now: DWT::get_cycle_count(),
+            now: DWT::cycle_count(),
         }
     }
 }
@@ -172,7 +179,7 @@ pub struct Instant {
 impl Instant {
     /// Ticks elapsed since the `Instant` was created
     pub fn elapsed(self) -> u32 {
-        DWT::get_cycle_count().wrapping_sub(self.now)
+        DWT::cycle_count().wrapping_sub(self.now)
     }
 }
 
@@ -249,24 +256,24 @@ macro_rules! hal {
                 }
             }
 
-            impl CountDown for CountDownTimer<$TIM> {
-                type Time = Hertz;
+            impl embedded_hal::timer::CountDown for CountDownTimer<$TIM> {
+                type Time = MicroSecond;
 
                 fn start<T>(&mut self, timeout: T)
                 where
-                    T: Into<Hertz>,
+                    T: Into<MicroSecond>,
                 {
                     // pause
                     self.tim.cr1.modify(|_, w| w.cen().clear_bit());
                     // reset counter
                     self.tim.cnt.reset();
 
-                    let frequency = timeout.into().0;
-                    let ticks = self.clk.0 / frequency;
+                    let ticks = crate::time::cycles(timeout.into(), self.clk);
 
                     let psc = u16((ticks - 1) / (1 << 16)).unwrap();
                     self.tim.psc.write(|w| unsafe {w.psc().bits(psc)} );
 
+                    // TODO: TIM2 and TIM5 are 32 bit
                     let arr = u16(ticks / u32(psc + 1)).unwrap();
                     self.tim.arr.write(|w| unsafe { w.bits(u32(arr)) });
 
@@ -286,6 +293,13 @@ macro_rules! hal {
                         self.tim.sr.modify(|_, w| w.uif().clear_bit());
                         Ok(())
                     }
+                }
+            }
+
+            impl CountDown for CountDownTimer<$TIM> {
+                fn max_period(&self) -> MicroSecond {
+                    // TODO: TIM2 and TIM5 are 32 bit
+                    crate::time::duration(self.clk, u16::MAX as u32)
                 }
             }
 

@@ -16,6 +16,7 @@ use hal::rcc::Config;
 use hal::spi;
 use hal::stm32;
 use hal::stm32::Peripherals;
+use hal::time::RateExtU32;
 use hal::timer::Timer;
 use stm32g4xx_hal as hal;
 
@@ -50,7 +51,7 @@ fn main() -> ! {
 
     let mut spi = dp
         .SPI2
-        .spi((sck, miso, mosi), spi::MODE_0, 400.khz(), &mut rcc);
+        .spi((sck, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
 
     struct Clock;
 

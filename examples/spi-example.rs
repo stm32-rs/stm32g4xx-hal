@@ -6,8 +6,19 @@
 #![no_std]
 
 use crate::hal::{
-    block, delay::DelayFromCountDownTimer, gpio::gpioa::PA5, gpio::gpioa::PA6, gpio::gpioa::PA7,
-    gpio::Alternate, gpio::AF5, prelude::*, rcc::Config, spi, stm32::Peripherals, timer::Timer,
+    block,
+    delay::DelayFromCountDownTimer,
+    gpio::gpioa::PA5,
+    gpio::gpioa::PA6,
+    gpio::gpioa::PA7,
+    gpio::Alternate,
+    gpio::AF5,
+    prelude::*,
+    rcc::Config,
+    spi,
+    stm32::Peripherals,
+    time::{ExtU32, RateExtU32},
+    timer::Timer,
 };
 
 use cortex_m_rt::entry;
@@ -25,7 +36,7 @@ fn main() -> ! {
     let rcc = dp.RCC.constrain();
     let mut rcc = rcc.freeze(Config::hsi());
     let timer2 = Timer::new(dp.TIM2, &rcc.clocks);
-    let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.ms()));
+    let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.millis()));
 
     let gpioa = dp.GPIOA.split(&mut rcc);
     let sclk: PA5<Alternate<AF5>> = gpioa.pa5.into_alternate();
@@ -34,7 +45,7 @@ fn main() -> ! {
 
     let mut spi = dp
         .SPI1
-        .spi((sclk, miso, mosi), spi::MODE_0, 400.khz(), &mut rcc);
+        .spi((sclk, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
     let mut cs = gpioa.pa8.into_push_pull_output();
     cs.set_high().unwrap();
 

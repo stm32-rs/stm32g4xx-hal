@@ -10,6 +10,7 @@ use hal::delay::DelayFromCountDownTimer;
 use hal::i2c::Config;
 use hal::prelude::*;
 use hal::stm32;
+use hal::time::{ExtU32, RateExtU32};
 use hal::timer::Timer;
 use stm32g4xx_hal as hal;
 
@@ -32,11 +33,11 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let scl = gpiob.pb8.into_alternate_open_drain();
 
-    let i2c = dp.I2C1.i2c(sda, scl, Config::new(100.khz()), &mut rcc);
+    let i2c = dp.I2C1.i2c(sda, scl, Config::new(100.kHz()), &mut rcc);
 
     let mut delayer = cp.SYST.delay(&rcc.clocks);
     let timer2 = Timer::new(dp.TIM2, &rcc.clocks);
-    let mut delay = DelayFromCountDownTimer::new(timer2.start_count_down(100.ms()));
+    let mut delay = DelayFromCountDownTimer::new(timer2.start_count_down(100.millis()));
 
     let mut dev =
         Bme680::init(i2c, &mut delayer, I2CAddress::Secondary).expect("Init function failed");

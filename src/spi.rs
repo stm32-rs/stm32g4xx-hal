@@ -114,8 +114,8 @@ macro_rules! spi {
                 // disable SS output
                 spi.cr2.write(|w| w.ssoe().clear_bit());
 
-                let spi_freq = speed.into().0;
-                let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).0;
+                let spi_freq = speed.into().raw();
+                let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).raw();
                 let br = match bus_freq / spi_freq {
                     0 => unreachable!(),
                     1..=2 => 0b000,
