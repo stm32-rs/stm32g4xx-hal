@@ -42,11 +42,12 @@ pub use cortex_m::delay::*;
 use cortex_m::peripheral::SYST;
 
 use crate::nb::block;
-use crate::time::{Hertz, U32Ext};
-use embedded_hal::{
-    blocking::delay::{DelayMs, DelayUs},
-    timer::CountDown,
-};
+use crate::time::ExtU32;
+use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+
+pub trait CountDown: embedded_hal::timer::CountDown {
+    fn max_period(&self) -> MicroSecond;
+}
 
 pub trait SYSTDelayExt {
     fn delay(self, clocks: &Clocks) -> Delay;
@@ -54,7 +55,7 @@ pub trait SYSTDelayExt {
 
 impl SYSTDelayExt for SYST {
     fn delay(self, clocks: &Clocks) -> Delay {
-        Delay::new(self, clocks.ahb_clk.0)
+        Delay::new(self, clocks.ahb_clk.raw())
     }
 }
 
@@ -69,7 +70,7 @@ impl DelayExt for Delay {
     where
         T: Into<MicroSecond>,
     {
-        self.delay_us(delay.into().0)
+        self.delay_us(delay.into().ticks())
     }
 }
 
@@ -94,28 +95,33 @@ macro_rules! impl_delay_from_count_down_timer  {
 
             impl<T> $Delay<u32> for DelayFromCountDownTimer<T>
             where
-                T: CountDown<Time = Hertz>,
+                T: CountDown<Time = MicroSecond>,
             {
                 fn $delay(&mut self, t: u32) {
-                    let mut time_left = t;
+                    let mut time_left_us = t as u64 * $num;
 
-                    // Due to the LpTimer having only a 3 bit scaler, it is
-                    // possible that the max timeout we can set is
-                    // (128 * 65536) / clk_hz milliseconds.
-                    // Assuming the fastest clk_hz = 480Mhz this is roughly ~17ms,
-                    // or a frequency of ~57.2Hz. We use a 60Hz frequency for each
-                    // loop step here to ensure that we stay within these bounds.
-                    let looping_delay = $num / 60;
-                    let looping_delay_hz = Hertz($num / looping_delay);
+                    let max_sleep = self.0.max_period();
+                    let max_sleep_us = max_sleep.to_micros() as u64;
 
-                    self.0.start(looping_delay_hz);
-                    while time_left > looping_delay {
-                        block!(self.0.wait()).ok();
-                        time_left -= looping_delay;
+                    if time_left_us > max_sleep_us {
+                        self.0.start(max_sleep);
+
+                        // Process the time one max_sleep duration at a time
+                        // to avoid overflowing both u32 and the timer
+                        for _ in 0..(time_left_us / max_sleep_us) {
+                            block!(self.0.wait()).ok();
+                            time_left_us -= max_sleep_us;
+                        }
                     }
 
-                    if time_left > 0 {
-                        self.0.start(($num / time_left).hz());
+                    assert!(time_left_us <= u32::MAX as u64);
+                    assert!(time_left_us <= max_sleep_us);
+
+                    let time_left: MicroSecond = (time_left_us as u32).micros();
+
+                    // Only sleep
+                    if time_left.ticks() > 0 {
+                        self.0.start(time_left);
                         block!(self.0.wait()).ok();
                     }
                 }
@@ -123,7 +129,7 @@ macro_rules! impl_delay_from_count_down_timer  {
 
             impl<T> $Delay<u16> for DelayFromCountDownTimer<T>
             where
-                T: CountDown<Time = Hertz>,
+                T: CountDown<Time = MicroSecond>,
             {
                 fn $delay(&mut self, t: u16) {
                     self.$delay(t as u32);
@@ -132,7 +138,7 @@ macro_rules! impl_delay_from_count_down_timer  {
 
             impl<T> $Delay<u8> for DelayFromCountDownTimer<T>
             where
-                T: CountDown<Time = Hertz>,
+                T: CountDown<Time = MicroSecond>,
             {
                 fn $delay(&mut self, t: u8) {
                     self.$delay(t as u32);
@@ -144,5 +150,5 @@ macro_rules! impl_delay_from_count_down_timer  {
 
 impl_delay_from_count_down_timer! {
     (DelayMs, delay_ms, 1_000),
-    (DelayUs, delay_us, 1_000_000)
+    (DelayUs, delay_us, 1)
 }

@@ -383,6 +383,8 @@ impl FlashExt for FLASH {
     }
 }
 
+// TODO: Remove after ready to use flash write code
+#[allow(dead_code)]
 /// Constrained FLASH peripheral
 pub struct Parts {
     /// Opaque ACR register

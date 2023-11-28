@@ -195,7 +195,7 @@ use crate::stm32::TIM5;
 use crate::stm32::{TIM1, TIM15, TIM16, TIM17, TIM2, TIM3, TIM4, TIM8};
 
 use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
-use crate::time::{Hertz, NanoSecond, U32Ext};
+use crate::time::{ExtU32, Hertz, NanoSecond, RateExtU32};
 
 #[cfg(any(
     feature = "stm32g471",
@@ -1029,13 +1029,13 @@ pins! {
 // Returns (arr, psc)
 fn calculate_frequency_32bit(base_freq: Hertz, freq: Hertz, alignment: Alignment) -> (u32, u16) {
     let divisor = if let Alignment::Center = alignment {
-        freq.0 * 2
+        freq * 2
     } else {
-        freq.0
+        freq
     };
 
     // Round to the nearest period
-    let arr = (base_freq.0 + (divisor >> 1)) / divisor - 1;
+    let arr = (base_freq + (divisor / 2)) / divisor - 1;
 
     (arr, 0)
 }
@@ -1071,7 +1071,7 @@ fn calculate_deadtime(base_freq: Hertz, deadtime: NanoSecond) -> (u8, u8) {
     // Cortex-M7 has 32x32->64 multiply but no 64-bit divide
     // Divide by 100000 then 10000 by multiplying and shifting
     // This can't overflow because both values being multiplied are u32
-    let deadtime_ticks = deadtime.0 as u64 * base_freq.0 as u64;
+    let deadtime_ticks = deadtime.ticks() as u64 * base_freq.raw() as u64;
     // Make sure we won't overflow when multiplying; DTG is max 1008 ticks and CKD is max prescaler of 4
     // so deadtimes over 4032 ticks are impossible (4032*10^9 before dividing)
     assert!(deadtime_ticks <= 4_032_000_000_000u64);
@@ -1210,7 +1210,7 @@ macro_rules! tim_hal {
                         $TIMX::reset(rcc_ptr);
                     }
 
-                    let clk = $TIMX::get_timer_frequency(&rcc.clocks).0;
+                    let clk = $TIMX::get_timer_frequency(&rcc.clocks).raw();
 
                     PwmBuilder {
                         _tim: PhantomData,
@@ -1219,12 +1219,12 @@ macro_rules! tim_hal {
                         _fault: PhantomData,
                         _comp: PhantomData,
                         alignment: Alignment::Left,
-                        base_freq: clk.hz(),
+                        base_freq: clk.Hz(),
                         count: CountSettings::Explicit { period: 65535, prescaler: 0, },
                         bkin_enabled: false,
                         bkin2_enabled: false,
                         fault_polarity: Polarity::ActiveLow,
-                        deadtime: 0.ns(),
+                        deadtime: 0.nanos(),
                     }
                 }
             }
@@ -1786,8 +1786,7 @@ macro_rules! lptim_hal {
                     $TIMX::reset(rcc_ptr);
                 }
 
-                let clk = $TIMX::get_timer_frequency(&rcc.clocks).0;
-                let freq = freq.0;
+                let clk = $TIMX::get_timer_frequency(&rcc.clocks);
                 let reload = clk / freq;
                 assert!(reload < 128 * (1 << 16));
 

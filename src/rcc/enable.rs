@@ -18,6 +18,13 @@ macro_rules! bus_enable {
                     bb::clear(Self::Bus::enr(rcc), $bit);
                 }
             }
+
+            #[inline(always)]
+            fn enable_for_sleep_stop(rcc: &RccRB) {
+                unsafe {
+                    bb::set(Self::Bus::smenr(rcc), $bit);
+                }
+            }
         }
     };
 }

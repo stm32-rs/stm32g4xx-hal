@@ -18,6 +18,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::SPI4;
 use crate::stm32::{RCC, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
+use core::cell::UnsafeCell;
 use core::ptr;
 pub use hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
 
@@ -114,8 +115,8 @@ macro_rules! spi {
                 // disable SS output
                 spi.cr2.write(|w| w.ssoe().clear_bit());
 
-                let spi_freq = speed.into().0;
-                let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).0;
+                let spi_freq = speed.into().raw();
+                let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).raw();
                 let br = match bus_freq / spi_freq {
                     0 => unreachable!(),
                     1..=2 => 0b000,
@@ -210,8 +211,9 @@ macro_rules! spi {
                 } else if sr.crcerr().bit_is_set() {
                     nb::Error::Other(Error::Crc)
                 } else if sr.txe().bit_is_set() {
+                    let dr = &self.spi.dr as *const _ as *const UnsafeCell<u8>;
                     // NOTE(write_volatile) see note above
-                    unsafe { ptr::write_volatile(&self.spi.dr as *const _ as *mut u8, byte) }
+                    unsafe { ptr::write_volatile(UnsafeCell::raw_get(dr), byte) };
                     return Ok(());
                 } else {
                     nb::Error::WouldBlock
