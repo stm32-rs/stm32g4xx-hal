@@ -18,9 +18,9 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::SPI4;
 use crate::stm32::{RCC, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
+use core::cell::UnsafeCell;
 use core::ptr;
 pub use hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
-use core::cell::UnsafeCell;
 
 /// SPI error
 #[derive(Debug)]

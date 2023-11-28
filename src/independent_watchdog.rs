@@ -11,11 +11,11 @@
 //! - [IWDG Example](todo-insert-link-here)
 //!
 //! Originally from stm32h7-hal, adapted for stm32g4xx-hal
-use fugit::ExtU32;
 use crate::{
     stm32::{iwdg::pr::PR_A, IWDG},
-    time::{MicroSecond},
+    time::MicroSecond,
 };
+use fugit::ExtU32;
 
 /// The implementation of the hardware IWDG
 pub struct IndependentWatchdog {
