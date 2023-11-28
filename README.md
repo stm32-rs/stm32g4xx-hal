@@ -38,7 +38,7 @@ Examples can be built and run using `cargo run`. It is necessary to provide any
 required features followed by the name of the chip. 
 
 ```
-cargo run --example usb_serial --features stm32g473 --features usb_fs --release -- --chip STM32G473RETx
+cargo run --example blinky_delay --features stm32g474,log-rtt,defmt --release -- --chip STM32G474RBTx
 ```
 
 A list of chips supported by probe-rs can be found by running
