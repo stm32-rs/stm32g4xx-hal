@@ -280,7 +280,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
 
             // Check if there is enough data to make 2 words, if there isn't, pad the data with 0xFF
             if idx + 8 > data.len() {
-                let mut tmp_buffer = [255 as u8; 8];
+                let mut tmp_buffer = [255u8; 8];
                 for jdx in idx..data.len() {
                     tmp_buffer[jdx] = data[idx + jdx];
                 }
@@ -383,8 +383,6 @@ impl FlashExt for FLASH {
     }
 }
 
-// TODO: Remove after ready to use flash write code
-#[allow(dead_code)]
 /// Constrained FLASH peripheral
 pub struct Parts {
     /// Opaque ACR register
