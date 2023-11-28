@@ -33,6 +33,24 @@ pub enum Error {
     Crc,
 }
 
+/// Spi data size in bits
+#[derive(Debug)]
+pub enum SpiDataSize {
+    _4 = 0b0011,
+    _5 = 0b0100,
+    _6 = 0b0101,
+    _7 = 0b0110,
+    _8 = 0b0111,
+    _9 = 0b1000,
+    _10 = 0b1001,
+    _11 = 0b1010,
+    _12 = 0b1011,
+    _13 = 0b1100,
+    _14 = 0b1101,
+    _15 = 0b1110,
+    _16 = 0b1111,
+}
+
 /// A filler type for when the SCK pin is unnecessary
 pub struct NoSck;
 /// A filler type for when the Miso pin is unnecessary
@@ -63,7 +81,14 @@ pub struct Spi<SPI, PINS> {
 }
 
 pub trait SpiExt<SPI>: Sized {
-    fn spi<PINS, T>(self, pins: PINS, mode: Mode, freq: T, rcc: &mut Rcc) -> Spi<SPI, PINS>
+    fn spi<PINS, T>(
+        self,
+        pins: PINS,
+        mode: Mode,
+        freq: T,
+        rcc: &mut Rcc,
+        data_size: SpiDataSize,
+    ) -> Spi<SPI, PINS>
     where
         PINS: Pins<SPI>,
         T: Into<Hertz>;
@@ -100,7 +125,8 @@ macro_rules! spi {
                 pins: PINS,
                 mode: Mode,
                 speed: T,
-                rcc: &mut Rcc
+                rcc: &mut Rcc,
+                data_size: SpiDataSize,
             ) -> Self
             where
             T: Into<Hertz>
@@ -111,9 +137,6 @@ macro_rules! spi {
                     $SPIX::enable(rcc_ptr);
                     $SPIX::reset(rcc_ptr);
                 }
-
-                // disable SS output
-                spi.cr2.write(|w| w.ssoe().clear_bit());
 
                 let spi_freq = speed.into().raw();
                 let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).raw();
@@ -128,10 +151,6 @@ macro_rules! spi {
                     96..=191 => 0b110,
                     _ => 0b111,
                 };
-
-                spi.cr2.write(|w| unsafe {
-                    w.frxth().set_bit().ds().bits(0b111).ssoe().clear_bit()
-                });
 
                 spi.cr1.write(|w| unsafe {
                     w.cpha()
@@ -160,21 +179,42 @@ macro_rules! spi {
                         .set_bit()
                 });
 
+                spi.cr2.write(|w| unsafe {
+                    w.frxth().set_bit().ds().bits(data_size as u8).ssoe().clear_bit()
+                });
+
                 Spi { spi, pins }
             }
 
             pub fn release(self) -> ($SPIX, PINS) {
                 (self.spi, self.pins)
             }
+
+            /// Checks if the SPI bus is busy
+            pub fn is_busy(&self) -> bool {
+                self.spi.sr.read().bsy().bit_is_set()
+            }
+
+            /// Waits for the SPI bus to be ready and then writes a byte to data register
+            pub fn unchecked_send_u8(&self, data: u8) {
+                while self.is_busy() {}
+                self.spi.dr.write(|w| unsafe { w.dr().bits(data as u16) });
+            }
+
+            /// Waits for the SPI bus to be ready and then writes a u16 to data register
+            pub fn unchecked_send_u16(&self, data: u16) {
+                while self.is_busy() {}
+                self.spi.dr.write(|w| unsafe { w.dr().bits(data) });
+            }
         }
 
         impl SpiExt<$SPIX> for $SPIX {
-            fn spi<PINS, T>(self, pins: PINS, mode: Mode, freq: T, rcc: &mut Rcc) -> Spi<$SPIX, PINS>
+            fn spi<PINS, T>(self, pins: PINS, mode: Mode, freq: T, rcc: &mut Rcc, data_size: SpiDataSize) -> Spi<$SPIX, PINS>
             where
                 PINS: Pins<$SPIX>,
                 T: Into<Hertz>
                 {
-                    Spi::$spiX(self, pins, mode, freq, rcc)
+                    Spi::$spiX(self, pins, mode, freq, rcc, data_size)
                 }
         }
 
