@@ -434,6 +434,7 @@ pub trait RccBus: crate::Sealed {
 pub trait Enable: RccBus {
     fn enable(rcc: &RccRB);
     fn disable(rcc: &RccRB);
+    fn enable_for_sleep_stop(rcc: &RccRB);
 }
 
 /// Reset peripheral
