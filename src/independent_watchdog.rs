@@ -100,9 +100,9 @@ impl IndependentWatchdog {
             .write(|w| w.win().bits(Self::MAX_COUNTER_VALUE as u16));
 
         // Calculate the counter values
-        let reload_value = (max_window_time.ticks() / 1000) * (Self::CLOCK_SPEED / 1000)
+        let reload_value = max_window_time.to_millis() * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
-        let window_value = (min_window_time.ticks() / 1000) * (Self::CLOCK_SPEED / 1000)
+        let window_value = min_window_time.to_millis() * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
 
         // Set the reload value
