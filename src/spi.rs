@@ -18,6 +18,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::SPI4;
 use crate::stm32::{RCC, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
+use core::cell::UnsafeCell;
 use core::ptr;
 pub use hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
 
@@ -210,8 +211,9 @@ macro_rules! spi {
                 } else if sr.crcerr().bit_is_set() {
                     nb::Error::Other(Error::Crc)
                 } else if sr.txe().bit_is_set() {
+                    let dr = &self.spi.dr as *const _ as *const UnsafeCell<u8>;
                     // NOTE(write_volatile) see note above
-                    unsafe { ptr::write_volatile(&self.spi.dr as *const _ as *mut u8, byte) }
+                    unsafe { ptr::write_volatile(UnsafeCell::raw_get(dr), byte) };
                     return Ok(());
                 } else {
                     nb::Error::WouldBlock

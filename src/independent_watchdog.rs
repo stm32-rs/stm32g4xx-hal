@@ -13,8 +13,9 @@
 //! Originally from stm32h7-hal, adapted for stm32g4xx-hal
 use crate::{
     stm32::{iwdg::pr::PR_A, IWDG},
-    time::{MicroSecond, U32Ext},
+    time::MicroSecond,
 };
+use fugit::ExtU32;
 
 /// The implementation of the hardware IWDG
 pub struct IndependentWatchdog {
@@ -83,7 +84,7 @@ impl IndependentWatchdog {
         // Set the prescaler
         let (prescaler, _) = Self::MAX_MILLIS_FOR_PRESCALER
             .iter()
-            .find(|(_, max_millis)| *max_millis >= max_window_time.0 / 1000)
+            .find(|(_, max_millis)| *max_millis >= max_window_time.to_millis())
             .expect("IWDG max time is greater than is possible");
         while self.iwdg.sr.read().pvu().bit_is_set() {
             cortex_m::asm::nop();
@@ -99,9 +100,9 @@ impl IndependentWatchdog {
             .write(|w| w.win().bits(Self::MAX_COUNTER_VALUE as u16));
 
         // Calculate the counter values
-        let reload_value = (max_window_time.0 / 1000) * (Self::CLOCK_SPEED / 1000)
+        let reload_value = max_window_time.to_millis() * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
-        let window_value = (min_window_time.0 / 1000) * (Self::CLOCK_SPEED / 1000)
+        let window_value = min_window_time.to_millis() * (Self::CLOCK_SPEED / 1000)
             / Self::get_prescaler_divider(prescaler);
 
         // Set the reload value
@@ -132,7 +133,7 @@ impl IndependentWatchdog {
 
     /// Start the watchdog with the given max time and no minimal time
     pub fn start<T: Into<MicroSecond>>(&mut self, max_time: T) {
-        self.start_windowed(0_u32.ms(), max_time.into());
+        self.start_windowed(0_u32.millis(), max_time.into());
     }
 
     fn get_prescaler_divider(prescaler: &PR_A) -> u32 {
