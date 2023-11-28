@@ -5,15 +5,18 @@
 
 extern crate cortex_m;
 extern crate cortex_m_rt as rt;
-extern crate panic_semihosting;
 extern crate stm32g4xx_hal as hal;
 
-use cortex_m_semihosting::hprintln;
 use rt::entry;
+
+#[macro_use]
+mod utils;
+
+use utils::logger::println;
 
 #[entry]
 fn main() -> ! {
-    hprintln!("Hello, STM32G4!").unwrap();
+    let _ = println!("Hello, STM32G4!");
 
     #[allow(clippy::empty_loop)]
     loop {}
