@@ -13,6 +13,7 @@ pub use crate::time::U32Ext as _;
 use crate::{
     dma::{mux::DmaMuxResources, traits::TargetAddress, PeripheralToMemory},
     gpio::*,
+    opamp,
     rcc::{Enable, Rcc, Reset},
     signature::{VtempCal110, VtempCal30, VDDA_CALIB},
     stm32,
@@ -59,6 +60,17 @@ macro_rules! adc_pins {
     ($($pin:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
         $(
             impl Channel<stm32::$adc> for $pin {
+                type ID = u8;
+                fn channel() -> u8 { $chan }
+            }
+        )+
+    };
+}
+
+macro_rules! adc_op {
+    ($($opamp:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
+        $(
+            impl<A, B> Channel<stm32::$adc> for $opamp {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
@@ -2336,6 +2348,28 @@ adc_pins!(
     Vref => (ADC3, 18),
     Vref => (ADC4, 18),
     Vref => (ADC5, 18),
+);
+
+// See https://www.st.com/resource/en/reference_manual/rm0440-stm32g4-series-advanced-armbased-32bit-mcus-stmicroelectronics.pdf#page=782
+adc_op!(
+    // TODO: Add all opamp types: Follower, OpenLoop
+    // TODO: Should we restrict type parameters A and B?
+    // TODO: Also allow AD-channels shared by pins
+    opamp::opamp1::Pga<A, B> => (ADC1, 13),
+    opamp::opamp2::Pga<A, B> => (ADC2, 16),
+    opamp::opamp3::Pga<A, B> => (ADC2, 18),
+);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+))]
+adc_op!(
+    opamp::opamp4::Pga<A, B> => (ADC5, 5),
+    opamp::opamp5::Pga<A, B> => (ADC5, 3),
+    opamp::opamp6::Pga<A, B> => (ADC4, 17),
 );
 
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
