@@ -393,7 +393,7 @@ macro_rules! impl_comparator {
                 positive_input.setup(&self);
                 negative_input.setup(&self);
                 // Delay for scaler voltage bridge initialization for certain negative inputs
-                let voltage_scaler_delay = clocks.sys_clk.0 / (1_000_000 / 200); // 200us
+                let voltage_scaler_delay = clocks.sys_clk.raw() / (1_000_000 / 200); // 200us
                 cortex_m::asm::delay(voltage_scaler_delay);
                 self.csr().modify(|_, w| unsafe {
                     w.hyst()
