@@ -16,7 +16,7 @@ use utils::logger::println;
 
 #[entry]
 fn main() -> ! {
-    let _ = println!("Hello, STM32G4!");
+    println!("Hello, STM32G4!");
 
     #[allow(clippy::empty_loop)]
     loop {}

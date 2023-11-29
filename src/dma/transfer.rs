@@ -313,7 +313,7 @@ where
 {
     /// Return the number of elements available to read
     pub fn elements_available(&mut self) -> usize {
-        let blen = unsafe { self.transfer.buf.static_write_buffer().1 } as usize;
+        let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
         let ndtr = STREAM::get_number_of_transfers() as usize;
         let pos_at = self.r_pos;
 
@@ -341,7 +341,7 @@ where
         &mut self,
         dat: &mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
     ) -> usize {
-        let blen = unsafe { self.transfer.buf.static_write_buffer().1 } as usize;
+        let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
         let pos = self.r_pos;
         let read = dat.len();
 

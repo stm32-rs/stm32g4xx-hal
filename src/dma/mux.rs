@@ -1,3 +1,4 @@
+#[allow(clippy::upper_case_acronyms)]
 pub enum DmaMuxResources {
     DMAMUXReqG0 = 1,
     DMAMUXReqG1 = 2,

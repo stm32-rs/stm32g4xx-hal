@@ -120,7 +120,7 @@ fn main() -> ! {
 
     loop {
         if let Ok(rxheader) = block!(can.receive0(&mut buffer)) {
-            block!(can.transmit(rxheader.unwrap().to_tx_header(None), &mut buffer)).unwrap();
+            block!(can.transmit(rxheader.unwrap().to_tx_header(None), &buffer)).unwrap();
         }
     }
 }
