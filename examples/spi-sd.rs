@@ -5,6 +5,7 @@
 
 extern crate embedded_sdmmc;
 
+use fugit::RateExtU32;
 use hal::gpio::gpiob::PB14;
 use hal::gpio::gpiob::PB15;
 use hal::gpio::gpiof::PF9;

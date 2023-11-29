@@ -147,7 +147,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
             return Err(Error::LengthTooLong);
         }
 
-        if force_padding == false && length % 8 != 0 {
+        if !force_padding && length % 8 != 0 {
             return Err(Error::ArrayMustBeDivisibleBy8);
         }
 
@@ -281,9 +281,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
             // Check if there is enough data to make 2 words, if there isn't, pad the data with 0xFF
             if idx + 8 > data.len() {
                 let mut tmp_buffer = [255u8; 8];
-                for jdx in idx..data.len() {
-                    tmp_buffer[jdx] = data[idx + jdx];
-                }
+                tmp_buffer[idx..data.len()].copy_from_slice(&data[(idx + idx)..(data.len() + idx)]);
                 let tmp_dword = u64::from_le_bytes(tmp_buffer);
                 word1 = tmp_dword as u32;
                 word2 = (tmp_dword >> 32) as u32;

@@ -16,8 +16,6 @@ mod app {
 
     const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
-    use panic_halt as _; // you can put a breakpoint on `rust_begin_unwind` to catch panics
-
     // Resources shared between tasks
     #[shared]
     struct Shared {}
