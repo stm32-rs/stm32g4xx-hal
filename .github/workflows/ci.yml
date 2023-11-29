@@ -3,6 +3,10 @@ on:
   
 name: Continuous integration
 
+# Make sure CI fails on all warnings, including Clippy lints
+env:
+  RUSTFLAGS: "-Dwarnings"
+
 jobs:
   ci:
     runs-on: ubuntu-latest
