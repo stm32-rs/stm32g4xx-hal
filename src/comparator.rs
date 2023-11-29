@@ -124,20 +124,6 @@ impl Config {
         self.inverted = inverted;
         self
     }
-
-    /*
-    pub fn power_mode(mut self, power_mode: PowerMode) -> Self {
-        self.power_mode = power_mode;
-        self
-    }*/
-
-    /*
-    /// Sets the output to be Comparator 1 XOR Comparator 2.
-    /// Used to implement window comparator mode.
-    pub fn output_xor(mut self) -> Self {
-        self.output_xor = true;
-        self
-    }*/
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -151,12 +137,6 @@ pub enum Hysteresis {
     H60mV = 0b110,
     H70mV = 0b111,
 }
-
-/*#[derive(Copy, Clone, Eq, PartialEq)]
-pub enum PowerMode {
-    HighSpeed = 0b00,
-    MediumSpeed = 0b01,
-}*/
 
 /// Comparator positive input
 pub trait PositiveInput<C> {
@@ -177,32 +157,6 @@ pub trait NegativeInput<C> {
 
     fn setup(&self, comp: &C);
 }
-
-/*
-/// Comparator 1 positive input used as positive input for Comparator 2.
-/// Used to implement window comparator mode.
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Comp1InP;
-
-/// Comparator 2 positive input used as positive input for Comparator 1.
-/// Used to implement window comparator mode.
-#[derive(Copy, Clone, Eq, PartialEq)]
-pub struct Comp2InP;
-
-
-macro_rules! window_input_pin {
-    ($COMP:ident, $pin:ty) => {
-        impl PositiveInput<$COMP> for $pin {
-            fn setup(&self, comp: &$COMP) {
-                comp.csr().modify(|_, w| w.winmode().set_bit())
-            }
-        }
-    };
-}
-
-window_input_pin!(COMP1, Comp2InP);
-window_input_pin!(COMP2, Comp1InP);
-*/
 
 macro_rules! positive_input_pin {
     ($COMP:ident, $pin_0:ident, $pin_1:ident) => {
@@ -567,153 +521,6 @@ impl_comparator!(COMP6, comp2, ExtiEvent::COMP6);
     feature = "stm32g484"
 ))]
 impl_comparator!(COMP7, comp2, ExtiEvent::COMP7);
-
-/*
-/// Uses two comparators to implement a window comparator.
-/// See Figure 69 in RM0444 Rev 5.
-pub struct WindowComparator<U, L, ED> {
-    pub upper: Comparator<U, ED>,
-    pub lower: Comparator<L, ED>,
-}
-
-pub trait WindowComparatorExt<UC, LC> {
-    /// Uses two comparators to implement a window comparator
-    ///
-    /// See Figure 69 in RM0444 Rev 5. Ignores and overrides the `output_xor` setting in `config`.
-    fn window_comparator<I: PositiveInput<UC>, L: NegativeInput<LC>, U: NegativeInput<UC>>(
-        self,
-        input: I,
-        lower_threshold: L,
-        upper_threshold: U,
-        config: Config,
-        clocks: &Clocks,
-    ) -> WindowComparator<UC, LC, Disabled>;
-}
-
-macro_rules! impl_window_comparator {
-    ($UPPER:ident, $LOWER:ident, $LOTHR:expr) => {
-        impl WindowComparatorExt<$UPPER, $LOWER> for ($UPPER, $LOWER) {
-            fn window_comparator<
-                I: PositiveInput<$UPPER>,
-                L: NegativeInput<$LOWER>,
-                U: NegativeInput<$UPPER>,
-            >(
-                self,
-                input: I,
-                lower_threshold: L,
-                upper_threshold: U,
-                config: Config,
-                clocks: &Clocks,
-            ) -> WindowComparator<$UPPER, $LOWER, Disabled> {
-                let (upper, lower) = self;
-
-                let mut configu = config.clone();
-                configu.output_xor = true;
-                let upper = upper.comparator(input, upper_threshold, configu, clocks);
-
-                let mut configl = config;
-                configl.output_xor = false;
-                let lower = lower.comparator($LOTHR, lower_threshold, configl, clocks);
-
-                WindowComparator { upper, lower }
-            }
-        }
-
-        impl WindowComparator<$UPPER, $LOWER, Disabled> {
-            /// Enables the comparator
-            pub fn enable(self) -> WindowComparator<$UPPER, $LOWER, Enabled> {
-                WindowComparator {
-                    upper: self.upper.enable(),
-                    lower: self.lower.enable(),
-                }
-            }
-
-            /// Enables raising the `ADC_COMP` interrupt at the specified signal edge
-            pub fn listen(&self, edge: SignalEdge, exti: &mut EXTI) {
-                self.upper.listen(edge, exti)
-            }
-        }
-
-        impl WindowComparator<$UPPER, $LOWER, Enabled> {
-            /// Disables the comparator
-            pub fn disable(self) -> WindowComparator<$UPPER, $LOWER, Disabled> {
-                WindowComparator {
-                    upper: self.upper.disable(),
-                    lower: self.lower.disable(),
-                }
-            }
-
-            /// Returns the value of the output of the comparator
-            pub fn output(&self) -> bool {
-                self.upper.output()
-            }
-
-            /// Returns `true` if the input signal is above the lower threshold
-            pub fn above_lower(&self) -> bool {
-                self.lower.output()
-            }
-        }
-
-        impl<ED> WindowComparator<$UPPER, $LOWER, ED> {
-            /// Configures a GPIO pin to output the signal of the comparator
-            ///
-            /// Multiple GPIO pins may be configured as the output simultaneously.
-            pub fn output_pin<P: OutputPin<$UPPER>>(&self, pin: P) {
-                self.upper.output_pin(pin)
-            }
-
-            /// Disables raising interrupts for the output signal
-            pub fn unlisten(&self, exti: &mut EXTI) {
-                self.upper.unlisten(exti)
-            }
-
-            /// Returns `true` if the output signal interrupt is pending for the `edge`
-            pub fn is_pending(&self, edge: SignalEdge, exti: &EXTI) -> bool {
-                self.upper.is_pending(edge, exti)
-            }
-
-            /// Unpends the output signal interrupt
-            pub fn unpend(&self, exti: &EXTI) {
-                self.upper.unpend(exti)
-            }
-        }
-    };
-}
-
-impl_window_comparator!(COMP1, COMP2, Comp1InP);
-impl_window_comparator!(COMP2, COMP1, Comp2InP);
-
-pub fn window_comparator12<
-    I: PositiveInput<COMP1>,
-    L: NegativeInput<COMP2>,
-    U: NegativeInput<COMP1>,
->(
-    comp: COMP,
-    input: I,
-    lower_threshold: L,
-    upper_threshold: U,
-    config: Config,
-    rcc: &mut Rcc,
-) -> WindowComparator<COMP1, COMP2, Disabled> {
-    let (comp1, comp2) = comp.split(rcc);
-    (comp1, comp2).window_comparator(input, lower_threshold, upper_threshold, config, &rcc.clocks)
-}
-
-pub fn window_comparator21<
-    I: PositiveInput<COMP2>,
-    L: NegativeInput<COMP1>,
-    U: NegativeInput<COMP2>,
->(
-    comp: COMP,
-    input: I,
-    lower_threshold: L,
-    upper_threshold: U,
-    config: Config,
-    rcc: &mut Rcc,
-) -> WindowComparator<COMP2, COMP1, Disabled> {
-    let (comp1, comp2) = comp.split(rcc);
-    (comp2, comp1).window_comparator(input, lower_threshold, upper_threshold, config, &rcc.clocks)
-}*/
 
 #[cfg(not(any(
     feature = "stm32g473",

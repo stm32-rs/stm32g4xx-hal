@@ -191,17 +191,6 @@ macro_rules! dac_helper {
                     }
                 }
 
-                /*pub fn enable_unbuffered(self) -> $CX<MODE_BITS, EnabledUnbuffered> {
-                    let dac = unsafe { &(*<$DAC>::ptr()) };
-
-                    dac.dac_mcr.modify(|_, w| unsafe { w.$mode().bits(2) });
-                    dac.dac_cr.modify(|_, w| w.$en().set_bit());
-
-                    $CX {
-                        _enabled: PhantomData,
-                    }
-                }*/
-
                 pub fn enable_generator(self, config: GeneratorConfig) -> $CX<MODE_BITS, WaveGenerator> {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
 
