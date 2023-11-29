@@ -59,6 +59,7 @@ pub struct FlashWriter<'a, const SECTOR_SZ_KB: u32> {
     verify: bool,
 }
 impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
+    #[allow(unused)]
     fn unlock_options(&mut self) -> Result<()> {
         // Check if flash is busy
         while self.flash.sr.sr().read().bsy().bit_is_set() {}
