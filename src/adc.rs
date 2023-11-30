@@ -649,20 +649,47 @@ pub mod config {
     }
 
     /// Continuous mode enable/disable
-    #[derive(Debug, Clone, Copy)]
+    #[derive(Debug, Clone, Copy, PartialEq)]
     pub enum Continuous {
         /// Single mode, continuous disabled
         Single,
         /// Continuous mode enabled
         Continuous,
+
+        /// Discontinuous mode enabled
+        ///
+        /// Will perform `subgroup_len` number samples per trigger
+        Discontinuous,
     }
-    impl From<Continuous> for bool {
-        fn from(c: Continuous) -> bool {
-            match c {
-                Continuous::Single => false,
-                Continuous::Continuous => true,
-            }
-        }
+
+    /// Number of channels to sample per trigger in discontinuous mode
+    ///
+    /// NOTE: This only applies to discontinuous
+    #[derive(Debug, Clone, Copy)]
+    pub enum SubGroupLength {
+        /// One single sample per trigger
+        One = 0b000,
+
+        /// Two samples per trigger
+        Two = 0b001,
+
+        /// Three samples per trigger
+        Three = 0b010,
+
+        /// Four samples per trigger
+        Four = 0b011,
+
+        /// Five samples per trigger
+        Five = 0b100,
+
+        /// Six samples per trigger
+        Six = 0b101,
+
+        /// Seven samples per trigger
+        Seven = 0b110,
+
+        /// Eight samples per trigger
+        Eight = 0b111,
     }
 
     /// DMA mode
@@ -765,6 +792,7 @@ pub mod config {
         pub(crate) align: Align,
         pub(crate) external_trigger: (TriggerMode, ET),
         pub(crate) continuous: Continuous,
+        pub(crate) subgroup_len: SubGroupLength,
         pub(crate) dma: Dma,
         pub(crate) end_of_conversion_interrupt: Eoc,
         pub(crate) default_sample_time: SampleTime,
@@ -806,6 +834,13 @@ pub mod config {
             self.continuous = continuous;
             self
         }
+
+        /// change the subgroup_len field, only relevant in discontinous mode
+        pub fn subgroup_len(mut self, subgroup_len: SubGroupLength) -> Self {
+            self.subgroup_len = subgroup_len;
+            self
+        }
+
         /// change the dma field
         #[inline(always)]
         pub fn dma(mut self, dma: Dma) -> Self {
@@ -894,6 +929,7 @@ pub mod config {
                 align: Align::Right,
                 external_trigger: (TriggerMode::Disabled, ET::default()),
                 continuous: Continuous::Single,
+                subgroup_len: SubGroupLength::One,
                 dma: Dma::Disabled,
                 end_of_conversion_interrupt: Eoc::Disabled,
                 default_sample_time: SampleTime::Cycles_640_5,
@@ -1548,11 +1584,14 @@ macro_rules! adc {
                     self.adc_reg.cfgr.modify(|_, w| w.autdly().bit(delay) );
                 }
 
-                /// Enables and disables continuous mode
+                /// Enables and disables dis-/continuous mode
                 #[inline(always)]
                 pub fn set_continuous(&mut self, continuous: config::Continuous) {
                     self.config.continuous = continuous;
-                    self.adc_reg.cfgr.modify(|_, w| w.cont().bit(continuous.into()));
+                    self.adc_reg.cfgr.modify(|_, w| w
+                        .cont().bit(continuous == config::Continuous::Continuous)
+                        .discen().bit(continuous == config::Continuous::Discontinuous)
+                    );
                 }
 
                 /// Sets DMA to disabled, single or continuous
