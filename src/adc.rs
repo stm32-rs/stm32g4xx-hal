@@ -25,6 +25,8 @@ use embedded_hal::{
     blocking::delay::DelayUs,
 };
 
+use self::config::{ExternalTrigger12, ExternalTrigger345};
+
 /// Vref internal signal, used for calibration
 pub struct Vref;
 impl Vref {
@@ -370,9 +372,12 @@ pub mod config {
     }
 
     /// Possible external triggers the ADC can listen to
-    #[derive(Debug, Clone, Copy)]
-    pub enum ExternalTrigger {
+    ///
+    /// This applies to ADC3, ADC4 and ADC5
+    #[derive(Debug, Clone, Copy, Default)]
+    pub enum ExternalTrigger12 {
         /// TIM1 compare channel 1
+        #[default]
         Tim_1_cc_1,
         /// TIM1 compare channel 2
         Tim_1_cc_2,
@@ -435,40 +440,169 @@ pub mod config {
         /// TIM7 trigger out
         Tim_7_trgo,
     }
-    impl From<ExternalTrigger> for u8 {
-        fn from(et: ExternalTrigger) -> u8 {
+
+    /// Possible external triggers the ADC can listen to
+    ///
+    /// This applies to ADC3, ADC4 and ADC5
+    ///
+    #[cfg(any(
+        feature = "stm32g471",
+        feature = "stm32g473",
+        feature = "stm32g474",
+        feature = "stm32g483",
+        feature = "stm32g484",
+        feature = "stm32g491",
+        feature = "stm32g4a1",
+    ))]
+    #[derive(Debug, Clone, Copy, Default)]
+    pub enum ExternalTrigger345 {
+        /// TIM3 compare channel 1
+        #[default]
+        Tim_3_cc_1,
+        /// TIM2 compare channel 3
+        Tim_2_cc_3,
+        /// TIM1 compare channel 3
+        Tim_1_cc_3,
+        /// TIM8 compare channel 1
+        Tim_8_cc_1,
+        /// TIM3 trigger out
+        Tim_3_trgo,
+        /// External interupt line 2
+        Exti_2,
+        /// TIM4 compare channel 1
+        Tim_4_cc_1,
+        /// TIM8 trigger out
+        Tim_8_trgo,
+        /// TIM8 trigger out 2
+        Tim_8_trgo_2,
+        /// TIM1 trigger out
+        Tim_1_trgo,
+        /// TIM1 trigger out 2
+        Tim_1_trgo_2,
+        /// TIM2 trigger out
+        Tim_2_trgo,
+        /// TIM4 trigger out
+        Tim_4_trgo,
+        /// TIM6 trigger out
+        Tim_6_trgo,
+        /// TIM15 trigger out
+        Tim_15_trgo,
+        /// TIM2 compare channel 1
+        Tim_2_cc_1,
+        /// TIM20 trigger out
+        Tim_20_trgo,
+        /// TIM20 trigger out 2
+        Tim_20_trgo_2,
+        /// TIM20 compare channel 1
+        Tim_20_cc_1,
+        /// hrtim_adc_trg2
+        Hrtim_adc_trg_2,
+        /// hrtim_adc_trg4
+        Hrtim_adc_trg_4,
+        /// hrtim_adc_trg1
+        Hrtim_adc_trg_1,
+        /// hrtim_adc_trg3
+        Hrtim_adc_trg_3,
+        /// hrtim_adc_trg5
+        Hrtim_adc_trg_5,
+        /// hrtim_adc_trg6
+        Hrtim_adc_trg_6,
+        /// hrtim_adc_trg7
+        Hrtim_adc_trg_7,
+        /// hrtim_adc_trg8
+        Hrtim_adc_trg_8,
+        /// hrtim_adc_trg9
+        Hrtim_adc_trg_9,
+        /// hrtim_adc_trg10
+        Hrtim_adc_trg_10,
+        /// LP_timeout
+        Lp_timeout,
+        /// TIM7 trigger out
+        Tim_7_trgo,
+    }
+
+    impl From<ExternalTrigger12> for u8 {
+        fn from(et: ExternalTrigger12) -> u8 {
             match et {
-                ExternalTrigger::Tim_1_cc_1 => 0b00000,
-                ExternalTrigger::Tim_1_cc_2 => 0b00001,
-                ExternalTrigger::Tim_1_cc_3 => 0b00010,
-                ExternalTrigger::Tim_2_cc_2 => 0b00011,
-                ExternalTrigger::Tim_3_trgo => 0b00100,
-                ExternalTrigger::Tim_4_cc_4 => 0b00101,
-                ExternalTrigger::Exti_11 => 0b00110,
-                ExternalTrigger::Tim_8_trgo => 0b00111,
-                ExternalTrigger::Tim_8_trgo_2 => 0b01000,
-                ExternalTrigger::Tim_1_trgo => 0b01001,
-                ExternalTrigger::Tim_1_trgo_2 => 0b01010,
-                ExternalTrigger::Tim_2_trgo => 0b01011,
-                ExternalTrigger::Tim_4_trgo => 0b01100,
-                ExternalTrigger::Tim_6_trgo => 0b01101,
-                ExternalTrigger::Tim_15_trgo => 0b01110,
-                ExternalTrigger::Tim_3_cc_4 => 0b01111,
-                ExternalTrigger::Tim_20_trgo => 0b10000,
-                ExternalTrigger::Tim_20_trgo_2 => 0b10001,
-                ExternalTrigger::Tim_20_cc_1 => 0b10010,
-                ExternalTrigger::Tim_20_cc_2 => 0b10011,
-                ExternalTrigger::Tim_20_cc_3 => 0b10100,
-                ExternalTrigger::Hrtim_adc_trg_1 => 0b10101,
-                ExternalTrigger::Hrtim_adc_trg_3 => 0b10110,
-                ExternalTrigger::Hrtim_adc_trg_5 => 0b10111,
-                ExternalTrigger::Hrtim_adc_trg_6 => 0b11000,
-                ExternalTrigger::Hrtim_adc_trg_7 => 0b11001,
-                ExternalTrigger::Hrtim_adc_trg_8 => 0b11010,
-                ExternalTrigger::Hrtim_adc_trg_9 => 0b11011,
-                ExternalTrigger::Hrtim_adc_trg_10 => 0b11100,
-                ExternalTrigger::Lp_timeout => 0b11101,
-                ExternalTrigger::Tim_7_trgo => 0b11110,
+                ExternalTrigger12::Tim_1_cc_1 => 0b00000,
+                ExternalTrigger12::Tim_1_cc_2 => 0b00001,
+                ExternalTrigger12::Tim_1_cc_3 => 0b00010,
+                ExternalTrigger12::Tim_2_cc_2 => 0b00011,
+                ExternalTrigger12::Tim_3_trgo => 0b00100,
+                ExternalTrigger12::Tim_4_cc_4 => 0b00101,
+                ExternalTrigger12::Exti_11 => 0b00110,
+                ExternalTrigger12::Tim_8_trgo => 0b00111,
+                ExternalTrigger12::Tim_8_trgo_2 => 0b01000,
+                ExternalTrigger12::Tim_1_trgo => 0b01001,
+                ExternalTrigger12::Tim_1_trgo_2 => 0b01010,
+                ExternalTrigger12::Tim_2_trgo => 0b01011,
+                ExternalTrigger12::Tim_4_trgo => 0b01100,
+                ExternalTrigger12::Tim_6_trgo => 0b01101,
+                ExternalTrigger12::Tim_15_trgo => 0b01110,
+                ExternalTrigger12::Tim_3_cc_4 => 0b01111,
+                ExternalTrigger12::Tim_20_trgo => 0b10000,
+                ExternalTrigger12::Tim_20_trgo_2 => 0b10001,
+                ExternalTrigger12::Tim_20_cc_1 => 0b10010,
+                ExternalTrigger12::Tim_20_cc_2 => 0b10011,
+                ExternalTrigger12::Tim_20_cc_3 => 0b10100,
+                ExternalTrigger12::Hrtim_adc_trg_1 => 0b10101,
+                ExternalTrigger12::Hrtim_adc_trg_3 => 0b10110,
+                ExternalTrigger12::Hrtim_adc_trg_5 => 0b10111,
+                ExternalTrigger12::Hrtim_adc_trg_6 => 0b11000,
+                ExternalTrigger12::Hrtim_adc_trg_7 => 0b11001,
+                ExternalTrigger12::Hrtim_adc_trg_8 => 0b11010,
+                ExternalTrigger12::Hrtim_adc_trg_9 => 0b11011,
+                ExternalTrigger12::Hrtim_adc_trg_10 => 0b11100,
+                ExternalTrigger12::Lp_timeout => 0b11101,
+                ExternalTrigger12::Tim_7_trgo => 0b11110,
+                // Reserved => 0b11111
+            }
+        }
+    }
+
+    #[cfg(any(
+        feature = "stm32g471",
+        feature = "stm32g473",
+        feature = "stm32g474",
+        feature = "stm32g483",
+        feature = "stm32g484",
+        feature = "stm32g491",
+        feature = "stm32g4a1",
+    ))]
+    impl From<ExternalTrigger345> for u8 {
+        fn from(et: ExternalTrigger345) -> u8 {
+            match et {
+                ExternalTrigger345::Tim_3_cc_1 => 0b00000,
+                ExternalTrigger345::Tim_2_cc_3 => 0b00001,
+                ExternalTrigger345::Tim_1_cc_3 => 0b00010,
+                ExternalTrigger345::Tim_8_cc_1 => 0b00011,
+                ExternalTrigger345::Tim_3_trgo => 0b00100,
+                ExternalTrigger345::Exti_2 => 0b00101,
+                ExternalTrigger345::Tim_4_cc_1 => 0b00110,
+                ExternalTrigger345::Tim_8_trgo => 0b00111,
+                ExternalTrigger345::Tim_8_trgo_2 => 0b01000,
+                ExternalTrigger345::Tim_1_trgo => 0b01001,
+                ExternalTrigger345::Tim_1_trgo_2 => 0b01010,
+                ExternalTrigger345::Tim_2_trgo => 0b01011,
+                ExternalTrigger345::Tim_4_trgo => 0b01100,
+                ExternalTrigger345::Tim_6_trgo => 0b01101,
+                ExternalTrigger345::Tim_15_trgo => 0b01110,
+                ExternalTrigger345::Tim_2_cc_1 => 0b01111,
+                ExternalTrigger345::Tim_20_trgo => 0b10000,
+                ExternalTrigger345::Tim_20_trgo_2 => 0b10001,
+                ExternalTrigger345::Tim_20_cc_1 => 0b10010,
+                ExternalTrigger345::Hrtim_adc_trg_2 => 0b10011,
+                ExternalTrigger345::Hrtim_adc_trg_4 => 0b10100,
+                ExternalTrigger345::Hrtim_adc_trg_1 => 0b10101,
+                ExternalTrigger345::Hrtim_adc_trg_3 => 0b10110,
+                ExternalTrigger345::Hrtim_adc_trg_5 => 0b10111,
+                ExternalTrigger345::Hrtim_adc_trg_6 => 0b11000,
+                ExternalTrigger345::Hrtim_adc_trg_7 => 0b11001,
+                ExternalTrigger345::Hrtim_adc_trg_8 => 0b11010,
+                ExternalTrigger345::Hrtim_adc_trg_9 => 0b11011,
+                ExternalTrigger345::Hrtim_adc_trg_10 => 0b11100,
+                ExternalTrigger345::Lp_timeout => 0b11101,
+                ExternalTrigger345::Tim_7_trgo => 0b11110,
                 // Reserved => 0b11111
             }
         }
@@ -624,12 +758,12 @@ pub mod config {
     /// There are some additional parameters on the adc peripheral that can be
     /// added here when needed but this covers several basic usecases.
     #[derive(Debug, Clone, Copy)]
-    pub struct AdcConfig {
+    pub struct AdcConfig<ET> {
         pub(crate) clock_mode: ClockMode,
         pub(crate) clock: Clock,
         pub(crate) resolution: Resolution,
         pub(crate) align: Align,
-        pub(crate) external_trigger: (TriggerMode, ExternalTrigger),
+        pub(crate) external_trigger: (TriggerMode, ET),
         pub(crate) continuous: Continuous,
         pub(crate) dma: Dma,
         pub(crate) end_of_conversion_interrupt: Eoc,
@@ -641,7 +775,7 @@ pub mod config {
         pub difsel: DifferentialSelection,
     }
 
-    impl AdcConfig {
+    impl<ET> AdcConfig<ET> {
         /// change the clock_mode field
         #[inline(always)]
         pub fn clock_mode(mut self, clock_mode: ClockMode) -> Self {
@@ -664,16 +798,6 @@ pub mod config {
         #[inline(always)]
         pub fn align(mut self, align: Align) -> Self {
             self.align = align;
-            self
-        }
-        /// change the external_trigger field
-        #[inline(always)]
-        pub fn external_trigger(
-            mut self,
-            trigger_mode: TriggerMode,
-            trigger: ExternalTrigger,
-        ) -> Self {
-            self.external_trigger = (trigger_mode, trigger);
             self
         }
         /// change the continuous field
@@ -726,14 +850,49 @@ pub mod config {
         }
     }
 
-    impl Default for AdcConfig {
+    impl AdcConfig<ExternalTrigger12> {
+        /// change the external_trigger field
+        #[inline(always)]
+        pub fn external_trigger(
+            mut self,
+            trigger_mode: TriggerMode,
+            trigger: ExternalTrigger12,
+        ) -> Self {
+            self.external_trigger = (trigger_mode, trigger);
+            self
+        }
+    }
+
+    #[cfg(any(
+        feature = "stm32g471",
+        feature = "stm32g473",
+        feature = "stm32g474",
+        feature = "stm32g483",
+        feature = "stm32g484",
+        feature = "stm32g491",
+        feature = "stm32g4a1",
+    ))]
+    impl AdcConfig<ExternalTrigger345> {
+        /// change the external_trigger field
+        #[inline(always)]
+        pub fn external_trigger(
+            mut self,
+            trigger_mode: TriggerMode,
+            trigger: ExternalTrigger345,
+        ) -> Self {
+            self.external_trigger = (trigger_mode, trigger);
+            self
+        }
+    }
+
+    impl<ET: Default> Default for AdcConfig<ET> {
         fn default() -> Self {
             Self {
                 clock_mode: ClockMode::Synchronous_Div_1,
                 clock: Clock::Div_2,
                 resolution: Resolution::Twelve,
                 align: Align::Right,
-                external_trigger: (TriggerMode::Disabled, ExternalTrigger::Tim_1_cc_1),
+                external_trigger: (TriggerMode::Disabled, ET::default()),
                 continuous: Continuous::Single,
                 dma: Dma::Disabled,
                 end_of_conversion_interrupt: Eoc::Disabled,
@@ -765,13 +924,13 @@ pub struct Active;
 /// Enum for the wait_for_conversion_sequence function,
 /// which can return either a stopped ADC typestate or a
 /// continuing ADC typestate.
-pub enum Conversion<ADC> {
+pub enum Conversion<ADC: TriggerType> {
     /// Contains an Active Conversion ADC
     Active(Adc<ADC, Active>),
     /// Contains an Stopped ADC
     Stopped(Adc<ADC, Configured>),
 }
-impl<ADC> Conversion<ADC> {
+impl<ADC: TriggerType> Conversion<ADC> {
     /// unwraps the enum and panics if the result is not an Active ADC
     #[inline(always)]
     pub fn unwrap_active(self) -> Adc<ADC, Active> {
@@ -961,15 +1120,15 @@ impl<ADC> Conversion<ADC> {
 /// }
 /// ```
 #[derive(Clone, Copy)]
-pub struct DynamicAdc<ADC> {
+pub struct DynamicAdc<ADC: TriggerType> {
     /// Current config of the ADC, kept up to date by the various set methods
-    config: config::AdcConfig,
+    config: config::AdcConfig<ADC::ExternalTrigger>,
     /// The adc peripheral
     adc_reg: ADC,
     /// VDDA in millivolts calculated from the factory calibration and vrefint
     calibrated_vdda: u32,
 }
-impl<ADC> fmt::Debug for DynamicAdc<ADC> {
+impl<ADC: TriggerType> fmt::Debug for DynamicAdc<ADC> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,
@@ -980,12 +1139,11 @@ impl<ADC> fmt::Debug for DynamicAdc<ADC> {
 }
 
 /// Typestate wrapper around DynamicAdc
-#[derive(Clone, Copy)]
-pub struct Adc<ADC, STATUS> {
+pub struct Adc<ADC: TriggerType, STATUS> {
     adc: DynamicAdc<ADC>,
     _status: PhantomData<STATUS>,
 }
-impl<ADC, STATUS> fmt::Debug for Adc<ADC, STATUS>
+impl<ADC: TriggerType, STATUS> fmt::Debug for Adc<ADC, STATUS>
 where
     STATUS: fmt::Debug,
 {
@@ -1017,7 +1175,7 @@ impl From<ClockSource> for u8 {
 }
 
 /// used to create an ADC instance from the stm32::Adc
-pub trait AdcClaim<TYPE> {
+pub trait AdcClaim<TYPE: TriggerType> {
     /// create a disabled ADC instance from the stm32::Adc
     fn claim(
         self,
@@ -1032,7 +1190,7 @@ pub trait AdcClaim<TYPE> {
         self,
         cs: ClockSource,
         rcc: &Rcc,
-        config: config::AdcConfig,
+        config: config::AdcConfig<TYPE::ExternalTrigger>,
         delay: &mut impl DelayUs<u8>,
         reset: bool,
     ) -> Adc<TYPE, Configured>;
@@ -1040,6 +1198,12 @@ pub trait AdcClaim<TYPE> {
 
 trait AdcConfig {
     fn configure_clock_source(cs: ClockSource, rcc: &Rcc);
+}
+
+/// Specifies what External trigger type the ADC uses
+pub trait TriggerType {
+    /// Specifies what External trigger type the ADC uses
+    type ExternalTrigger: fmt::Debug;
 }
 
 #[inline(always)]
@@ -1189,8 +1353,12 @@ macro_rules! adc {
     (additionals: $adc_type:ident => ($common_type:ident)) => {
     };
 
-    ($($adc_type:ident => ($configure_clocks_fn_name:ident, $mux:expr, ($common_type:ident) )),+ $(,)*) => {
+    ($($adc_type:ident => ($trigger_type:ident, $configure_clocks_fn_name:ident, $mux:expr, ($common_type:ident) )),+ $(,)*) => {
         $(
+            impl TriggerType for stm32::$adc_type {
+                type ExternalTrigger = $trigger_type;
+            }
+
             impl AdcConfig for stm32::$adc_type {
                 #[inline(always)]
                 fn configure_clock_source(cs: ClockSource, rcc: &Rcc) {
@@ -1274,8 +1442,15 @@ macro_rules! adc {
                 /// Disables the adc, since we don't know in what state we get it.
                 #[inline(always)]
                 pub fn disable(&mut self) {
+                    // Disable any ongoing conversions
+                    self.cancel_conversion();
+
+                    // Turn off ADC
                     self.adc_reg.cr.modify(|_, w| w.addis().set_bit());
                     while self.adc_reg.cr.read().addis().bit_is_set() {}
+
+                    // Wait until the ADC has turned off
+                    while self.adc_reg.cr.read().aden().bit_is_set() {}
                 }
 
                 /// Enables the adc
@@ -1284,7 +1459,14 @@ macro_rules! adc {
                     self.calibrate_all();
                     self.apply_config(self.config);
 
+                    self.adc_reg.isr.modify(|_, w| w.adrdy().set_bit());
                     self.adc_reg.cr.modify(|_, w| w.aden().set_bit());
+
+                    // Wait for adc to get ready
+                    while !self.adc_reg.isr.read().adrdy().bit_is_set() {}
+
+                    // Clear ready flag
+                    self.adc_reg.isr.modify(|_, w| w.adrdy().set_bit());
 
                     self.clear_end_of_conversion_flag();
                 }
@@ -1297,7 +1479,7 @@ macro_rules! adc {
 
                 /// Applies all fields in AdcConfig
                 #[inline(always)]
-                fn apply_config(&mut self, config: config::AdcConfig) {
+                fn apply_config(&mut self, config: config::AdcConfig<$trigger_type>) {
                     self.set_clock_mode(config.clock_mode);
                     self.set_clock(config.clock);
                     self.set_resolution(config.resolution);
@@ -1351,7 +1533,7 @@ macro_rules! adc {
 
                 /// Sets which external trigger to use and if it is disabled, rising, falling or both
                 #[inline(always)]
-                pub fn set_external_trigger(&mut self, (edge, extsel): (config::TriggerMode, config::ExternalTrigger)) {
+                pub fn set_external_trigger(&mut self, (edge, extsel): (config::TriggerMode, $trigger_type)) {
                     self.config.external_trigger = (edge, extsel);
                     self.adc_reg.cfgr.modify(|_, w| unsafe { w
                         .extsel().bits(extsel.into())
@@ -1570,10 +1752,9 @@ macro_rules! adc {
                         .eocie().clear_bit() //Disable end of conversion interrupt
                     );
 
+                    self.enable();
                     self.reset_sequence();
                     self.configure_channel(pin, config::Sequence::One, sample_time);
-                    self.enable();
-                    self.clear_end_of_conversion_flag();
                     self.start_conversion();
 
                     //Wait for the sequence to complete
@@ -1598,14 +1779,6 @@ macro_rules! adc {
                 /// Block until the conversion is completed and return to configured
                 pub fn wait_for_conversion_sequence(&mut self) {
                     while !self.adc_reg.isr.read().eoc().bit_is_set() {}
-
-                    // Do not clear the eoc bit when auto delay is on;
-                    // Doing so will trigger the next conversion
-                    // We should wait for the user to read the data (with self.current_sample() )
-                    if !self.config.auto_delay {
-                        //Clear the conversion started flag
-                        self.adc_reg.isr.modify(|_, w| w.eoc().set_bit());
-                    }
                 }
 
                 /// get current sample
@@ -1617,11 +1790,8 @@ macro_rules! adc {
                 /// Starts conversion sequence. Waits for the hardware to indicate it's actually started.
                 #[inline(always)]
                 pub fn start_conversion(&mut self) {
-                    self.adc_reg.isr.modify(|_, w| w.eoc().set_bit());
                     //Start conversion
                     self.adc_reg.cr.modify(|_, w| w.adstart().set_bit());
-
-                    while !self.adc_reg.cr.read().adstart().bit_is_set() {}
                 }
 
                 /// Cancels an ongoing conversion
@@ -1629,11 +1799,6 @@ macro_rules! adc {
                 pub fn cancel_conversion(&mut self) {
                     self.adc_reg.cr.modify(|_, w| w.adstp().set_bit());
                     while self.adc_reg.cr.read().adstart().bit_is_set() {}
-
-                    // Workaround for Errata 2.5.8
-                    self.adc_reg.cr.modify(|_, w| w.addis().set_bit());
-                    while self.adc_reg.cr.read().addis().bit_is_set() {}
-                    self.adc_reg.cr.modify(|_, w| w.aden().set_bit());
                 }
 
                 /// Returns if the Voltage Regulator is enabled
@@ -1743,7 +1908,7 @@ macro_rules! adc {
 
                 /// claims and configures the Adc
                 #[inline(always)]
-                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, config: config::AdcConfig, delay: &mut impl DelayUs<u8>, reset :bool) -> Adc<stm32::$adc_type, Configured> {
+                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, config: config::AdcConfig<$trigger_type>, delay: &mut impl DelayUs<u8>, reset :bool) -> Adc<stm32::$adc_type, Configured> {
                     let mut adc = self.claim(cs, rcc, delay, reset);
                     adc.adc.config = config;
 
@@ -1852,7 +2017,7 @@ macro_rules! adc {
 
                 /// Enables the adc
                 #[inline(always)]
-                pub fn configure_and_enable(mut self, config: config::AdcConfig) -> Adc<stm32::$adc_type, Configured> {
+                pub fn configure_and_enable(mut self, config: config::AdcConfig<$trigger_type>) -> Adc<stm32::$adc_type, Configured> {
                     self.adc.apply_config(config);
                     self.enable()
                 }
@@ -1910,7 +2075,7 @@ macro_rules! adc {
 
                 /// Sets which external trigger to use and if it is disabled, rising, falling or both
                 #[inline(always)]
-                pub fn set_external_trigger(&mut self, (edge, extsel): (config::TriggerMode, config::ExternalTrigger)) {
+                pub fn set_external_trigger(&mut self, (edge, extsel): (config::TriggerMode, $trigger_type)) {
                     self.adc.set_external_trigger( (edge, extsel) )
                 }
 
@@ -2032,6 +2197,23 @@ macro_rules! adc {
                 /// Returns the current sample stored in the ADC data register
                 #[inline(always)]
                 pub fn current_sample(&self) -> u16 {
+                    self.adc.current_sample()
+                }
+
+                /// Synchronously convert a single sample
+                /// Note that it reconfigures the adc sequence and doesn't restore it
+                #[inline(always)]
+                pub fn convert<PIN>(&mut self, pin: &PIN, sample_time: config::SampleTime) -> u16
+                where
+                    PIN: Channel<stm32::$adc_type, ID=u8>
+                {
+                    self.adc.reset_sequence();
+                    self.adc.configure_channel(pin, config::Sequence::One, sample_time);
+                    self.adc.start_conversion();
+
+                    //Wait for the sequence to complete
+                    self.adc.wait_for_conversion_sequence();
+
                     self.adc.current_sample()
                 }
             }
@@ -2171,7 +2353,7 @@ macro_rules! adc {
     feature = "stm32g491",
     feature = "stm32g4a1",
 ))]
-adc!(ADC1 => (configure_clock_source12, DmaMuxResources::ADC1, (ADC12_COMMON) ));
+adc!(ADC1 => (ExternalTrigger12, configure_clock_source12, DmaMuxResources::ADC1, (ADC12_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g431",
@@ -2184,7 +2366,7 @@ adc!(ADC1 => (configure_clock_source12, DmaMuxResources::ADC1, (ADC12_COMMON) ))
     feature = "stm32g491",
     feature = "stm32g4a1",
 ))]
-adc!(ADC2 => (configure_clock_source12, DmaMuxResources::ADC2, (ADC12_COMMON) ));
+adc!(ADC2 => (ExternalTrigger12, configure_clock_source12, DmaMuxResources::ADC2, (ADC12_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g471",
@@ -2195,7 +2377,7 @@ adc!(ADC2 => (configure_clock_source12, DmaMuxResources::ADC2, (ADC12_COMMON) ))
     feature = "stm32g491",
     feature = "stm32g4a1",
 ))]
-adc!(ADC3 => (configure_clock_source345, DmaMuxResources::ADC3, (ADC345_COMMON) ));
+adc!(ADC3 => (ExternalTrigger345, configure_clock_source345, DmaMuxResources::ADC3, (ADC345_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g473",
@@ -2203,7 +2385,7 @@ adc!(ADC3 => (configure_clock_source345, DmaMuxResources::ADC3, (ADC345_COMMON) 
     feature = "stm32g483",
     feature = "stm32g484",
 ))]
-adc!(ADC4 => (configure_clock_source345, DmaMuxResources::ADC4, (ADC345_COMMON) ));
+adc!(ADC4 => (ExternalTrigger345, configure_clock_source345, DmaMuxResources::ADC4, (ADC345_COMMON) ));
 
 #[cfg(any(
     feature = "stm32g473",
@@ -2211,7 +2393,7 @@ adc!(ADC4 => (configure_clock_source345, DmaMuxResources::ADC4, (ADC345_COMMON) 
     feature = "stm32g483",
     feature = "stm32g484",
 ))]
-adc!(ADC5 => (configure_clock_source345, DmaMuxResources::ADC5, (ADC345_COMMON) ));
+adc!(ADC5 => (ExternalTrigger345, configure_clock_source345, DmaMuxResources::ADC5, (ADC345_COMMON) ));
 
 #[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
 adc_pins!(
@@ -2357,6 +2539,7 @@ adc_op!(
     // TODO: Also allow AD-channels shared by pins
     opamp::opamp1::Pga<A, B> => (ADC1, 13),
     opamp::opamp2::Pga<A, B> => (ADC2, 16),
+
     opamp::opamp3::Pga<A, B> => (ADC2, 18),
 );
 
@@ -2365,11 +2548,19 @@ adc_op!(
     feature = "stm32g474",
     feature = "stm32g483",
     feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
 ))]
 adc_op!(
+    opamp::opamp3::Pga<A, B> => (ADC3, 13),
     opamp::opamp4::Pga<A, B> => (ADC5, 5),
     opamp::opamp5::Pga<A, B> => (ADC5, 3),
     opamp::opamp6::Pga<A, B> => (ADC4, 17),
+);
+
+#[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
+adc_op!(
+    opamp::opamp6::Pga<A, B> => (ADC3, 17),
 );
 
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
