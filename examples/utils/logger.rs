@@ -2,27 +2,21 @@
 cfg_if::cfg_if! {
     if #[cfg(all(feature = "log-rtt", feature = "defmt"))] {
         pub use defmt::{info, trace, warn, debug, error};
-        pub use defmt::println as println;
+
     } else {
         pub use log::{info, trace, warn, debug, error};
-
-        #[allow(unused_macros)]
-        macro_rules! println {
-            ($($tt:tt)*) => {
-                $crate::cortex_m_semihosting::hprintln!($($tt,)*).unwrap();
-            };
-        }
     }
 }
 
 cfg_if::cfg_if! {
-    if #[cfg(any(feature = "log-itm"))] {
+    if #[cfg(feature = "log-itm")] {
         use panic_itm as _;
 
         use lazy_static::lazy_static;
         use log::LevelFilter;
 
         pub use cortex_m_log::log::Logger;
+        pub use cortex_m_log::println;
 
         use cortex_m_log::{
             destination::Itm as ItmDest,
@@ -54,6 +48,7 @@ cfg_if::cfg_if! {
         use defmt_rtt as _; // global logger
         use panic_probe as _;
         pub use defmt::Logger;
+        pub use defmt::println;
 
         #[allow(dead_code)]
         pub fn init() {}
@@ -61,7 +56,7 @@ cfg_if::cfg_if! {
     else if #[cfg(all(feature = "log-rtt", not(feature = "defmt")))] {
         // TODO
     }
-    else if #[cfg(any(feature = "log-semihost"))] {
+    else if #[cfg(feature = "log-semihost")] {
         use panic_semihosting as _;
 
         use lazy_static::lazy_static;
@@ -79,6 +74,16 @@ cfg_if::cfg_if! {
                 inner: semihosting::InterruptOk::<_>::stdout().expect("Get Semihosting stdout"),
             };
         }
+
+        #[allow(unused_macros)]
+        macro_rules! println {
+            ($($tt:tt)*) => {
+                cortex_m_semihosting::hprintln!($($tt,)*).unwrap();
+            };
+        }
+
+        #[allow(unused_imports)]
+        pub(crate) use println;
 
         #[allow(dead_code)]
         pub fn init() {
