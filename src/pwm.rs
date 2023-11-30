@@ -1080,8 +1080,6 @@ fn calculate_deadtime(base_freq: Hertz, deadtime: NanoSecond) -> (u8, u8) {
     let deadtime_ticks = deadtime_ticks as u64 * 429497;
     let deadtime_ticks = (deadtime_ticks >> 32) as u32;
 
-    let deadtime_ticks = deadtime_ticks as u32;
-
     // Choose CR1 CKD divider of 1, 2, or 4 to determine tDTS
     let (deadtime_ticks, ckd) = match deadtime_ticks {
         t if t <= 1008 => (deadtime_ticks, 1),

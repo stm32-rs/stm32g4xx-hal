@@ -52,15 +52,15 @@ fn main() -> ! {
         .with_run_gas(true)
         .build();
 
-    let profile_dur = dev.get_profile_dur(&settings.0).unwrap();
+    let _profile_dur = dev.get_profile_dur(&settings.0).unwrap();
     dev.set_sensor_settings(&mut delayer, settings).unwrap();
     dev.set_sensor_mode(&mut delayer, PowerMode::ForcedMode)
         .unwrap();
-    let sensor_settings = dev.get_sensor_settings(settings.1);
+    let _sensor_settings = dev.get_sensor_settings(settings.1);
 
     loop {
         delay.delay_ms(500u32);
-        let power_mode = dev.get_sensor_mode();
+        let _power_mode = dev.get_sensor_mode();
         dev.set_sensor_mode(&mut delayer, PowerMode::ForcedMode)
             .unwrap();
         let (data, _state) = dev.get_sensor_data(&mut delayer).unwrap();

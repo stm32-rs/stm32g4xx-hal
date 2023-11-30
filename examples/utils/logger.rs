@@ -5,7 +5,13 @@ cfg_if::cfg_if! {
         pub use defmt::println as println;
     } else {
         pub use log::{info, trace, warn, debug, error};
-        pub use cortex_m_semihosting::hprintln as println;
+
+        #[allow(unused_macros)]
+        macro_rules! println {
+            ($($tt:tt)*) => {
+                $crate::cortex_m_semihosting::hprintln!($($tt,)*).unwrap();
+            };
+        }
     }
 }
 

@@ -71,11 +71,11 @@ pub enum PllMDiv {
 
 impl PllMDiv {
     pub fn divisor(&self) -> u32 {
-        (self.clone() as u32) + 1
+        (*self as u32) + 1
     }
 
     pub fn register_setting(&self) -> u8 {
-        self.clone() as u8
+        *self as u8
     }
 }
 
@@ -90,11 +90,11 @@ pub enum PllQDiv {
 
 impl PllQDiv {
     pub fn divisor(&self) -> u32 {
-        ((self.clone() as u32) + 1) * 2
+        ((*self as u32) + 1) * 2
     }
 
     pub fn register_setting(&self) -> u8 {
-        self.clone() as u8
+        *self as u8
     }
 }
 
@@ -109,11 +109,11 @@ pub enum PllRDiv {
 
 impl PllRDiv {
     pub fn divisor(&self) -> u32 {
-        ((self.clone() as u32) + 1) * 2
+        ((*self as u32) + 1) * 2
     }
 
     pub fn register_setting(&self) -> u8 {
-        self.clone() as u8
+        *self as u8
     }
 }
 
@@ -158,11 +158,11 @@ pub enum PllPDiv {
 
 impl PllPDiv {
     pub fn divisor(&self) -> u32 {
-        self.clone() as u32
+        *self as u32
     }
 
     pub fn register_setting(&self) -> u8 {
-        self.clone() as u8
+        *self as u8
     }
 }
 
@@ -293,11 +293,11 @@ pub enum PllNMul {
 
 impl PllNMul {
     pub fn multiplier(&self) -> u32 {
-        self.clone() as u32
+        *self as u32
     }
 
     pub fn register_setting(&self) -> u8 {
-        self.clone() as u8
+        *self as u8
     }
 }
 

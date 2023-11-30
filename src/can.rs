@@ -12,6 +12,7 @@ mod sealed {
 }
 
 /// Select an FDCAN Clock Source
+#[allow(clippy::upper_case_acronyms)]
 #[allow(dead_code)]
 enum FdCanClockSource {
     /// Select HSE as the FDCAN clock source

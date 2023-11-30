@@ -58,7 +58,7 @@ fn main() -> ! {
     );
 
     // Configure op with pa7 as non-inverting input and set gain to x4
-    let mut opamp2 = opamp2.pga(
+    let opamp2 = opamp2.pga(
         pa7,
         PgaModeInternal::gain(NonInvertingGain::Gain4),
         Option::<PA6<Analog>>::None, // Do not route output to any external pin, use internal AD instead
@@ -72,7 +72,7 @@ fn main() -> ! {
     loop {
         // Here we can sample the output of opamp2 as if it was a regular AD pin
         let sample = adc.convert(
-            &mut opamp2,
+            &opamp2,
             stm32g4xx_hal::adc::config::SampleTime::Cycles_640_5,
         );
 
@@ -87,6 +87,8 @@ fn main() -> ! {
         let (_opamp1, _pa1, _mode, _some_pa2) = _opamp1.disable();
         let (_opamp2, _pa7, _mode, _none) = opamp2.disable();
 
-        loop {}
+        loop {
+            delay.delay_ms(100);
+        }
     }
 }

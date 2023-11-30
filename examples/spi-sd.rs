@@ -5,34 +5,30 @@
 
 extern crate embedded_sdmmc;
 
+use fugit::RateExtU32;
 use hal::gpio::gpiob::PB14;
 use hal::gpio::gpiob::PB15;
-use hal::gpio::gpiof::PF8;
 use hal::gpio::gpiof::PF9;
 use hal::gpio::Alternate;
 use hal::gpio::AF5;
 use hal::prelude::*;
 use hal::rcc::Config;
 use hal::spi;
-use hal::stm32;
+
 use hal::stm32::Peripherals;
-use hal::time::RateExtU32;
-use hal::timer::Timer;
 use stm32g4xx_hal as hal;
 
-use embedded_sdmmc::{
-    Block, BlockCount, BlockDevice, BlockIdx, Controller, Error, Mode, TimeSource, Timestamp,
-    VolumeIdx,
-};
+use embedded_sdmmc::{TimeSource, Timestamp};
 
 use cortex_m_rt::entry;
-use log::info;
 
 #[macro_use]
 mod utils;
 
 #[entry]
 fn main() -> ! {
+    utils::logger::init();
+
     let dp = Peripherals::take().unwrap();
     let rcc = dp.RCC.constrain();
     let mut rcc = rcc.freeze(Config::hsi());
@@ -49,7 +45,7 @@ fn main() -> ! {
     let miso: PB14<Alternate<AF5>> = gpiob.pb14.into_alternate();
     let mosi: PB15<Alternate<AF5>> = gpiob.pb15.into_alternate();
 
-    let mut spi = dp
+    let spi = dp
         .SPI2
         .spi((sck, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
 
@@ -70,6 +66,8 @@ fn main() -> ! {
 
     let mut cont = embedded_sdmmc::Controller::new(embedded_sdmmc::SdMmcSpi::new(spi, cs), Clock);
 
-    cont.device().init();
+    cont.device().init().unwrap();
+
+    #[allow(clippy::empty_loop)]
     loop {}
 }
