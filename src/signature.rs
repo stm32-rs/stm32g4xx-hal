@@ -5,7 +5,7 @@
 use core::str::from_utf8_unchecked;
 
 /// This is the test voltage, in millivolts of the calibration done at the factory
-pub const VDDA_CALIB: u32 = 3300;
+pub const VDDA_CALIB: u32 = 3000;
 
 macro_rules! define_ptr_type {
     ($name: ident, $ptr: expr) => {
@@ -98,13 +98,13 @@ impl VtempCal30 {
     }
 }
 
-/// A temperature reading taken at 110°C stored at the factory
+/// A temperature reading taken at 130°C stored at the factory
 #[derive(Debug)]
 #[repr(C)]
-pub struct VtempCal110(u16);
-define_ptr_type!(VtempCal110, 0x1FFF_75CA);
+pub struct VtempCal130(u16);
+define_ptr_type!(VtempCal130, 0x1FFF_75CA);
 
-impl VtempCal110 {
+impl VtempCal130 {
     /// Read calibration value
     pub fn read(&self) -> u16 {
         self.0

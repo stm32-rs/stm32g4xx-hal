@@ -15,7 +15,7 @@ use crate::{
     gpio::*,
     opamp,
     rcc::{Enable, Rcc, Reset},
-    signature::{VtempCal110, VtempCal30, VDDA_CALIB},
+    signature::{VtempCal130, VtempCal30, VDDA_CALIB},
     stm32,
 };
 use core::fmt;
@@ -63,7 +63,7 @@ impl Temperature {
     /// Convert a raw sample from `Temperature` to deg C
     #[inline(always)]
     pub fn temperature_to_degrees_centigrade(sample: u16) -> f32 {
-        ((110.0 - 30.0) / (VtempCal110::get().read() as f32 - VtempCal30::get().read() as f32)
+        ((130.0 - 30.0) / (VtempCal130::get().read() as f32 - VtempCal30::get().read() as f32)
             * (sample as f32 - VtempCal30::get().read() as f32))
             + 30.0
     }
