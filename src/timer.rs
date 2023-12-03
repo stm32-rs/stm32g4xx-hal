@@ -51,6 +51,26 @@ pub enum Event {
     TimeOut,
 }
 
+/// Trigger output source
+pub enum TriggerSource {
+    /// Timer reset - UG as trigger output
+    Reset,
+    /// Timer enable - CNT_EN as trigger output
+    Enable = 0b001,
+    /// Update event - Update event as trigger output
+    Update = 0b010,
+    /// Compare Pulse - Positive pulse if CC1IF is setted
+    ComparePulse = 0b011,
+    /// Compare1 - OC1REFC as trigger output
+    Compare1 = 0b100,
+    /// Compare2 - OC2REFC as trigger output
+    Compare2 = 0b101,
+    /// Compare3 - OC3REFC as trigger output
+    Compare3 = 0b110,
+    /// Compare4 - OC4REFC as trigger output
+    Compare4 = 0b111,
+}
+
 #[derive(Debug, Eq, PartialEq, Copy, Clone)]
 pub enum Error {
     /// CountDownTimer is disabled
@@ -207,6 +227,18 @@ where
     }
 }
 
+macro_rules! hal_ext_trgo {
+    ($($TIM:ty: ($tim:ident, $mms:ident),)+) => {
+        $(
+            impl Timer<$TIM> {
+                pub fn set_trigger_source(&mut self, trigger_source: TriggerSource) {
+                    self.tim.cr2.modify(|_, w| unsafe {w.$mms().bits(trigger_source as u8)});
+                }
+            }
+        )+
+    }
+}
+
 macro_rules! hal {
     ($($TIM:ty: ($tim:ident),)+) => {
         $(
@@ -336,6 +368,18 @@ hal! {
     crate::stm32::TIM15: (tim15),
     crate::stm32::TIM16: (tim16),
     crate::stm32::TIM17: (tim17),
+}
+
+hal_ext_trgo! {
+    crate::stm32::TIM1: (tim1, mms2),
+    crate::stm32::TIM2: (tim2, mms2),
+    crate::stm32::TIM3: (tim3, mms2),
+    crate::stm32::TIM4: (tim4, mms2),
+    crate::stm32::TIM6: (tim6, mms),
+    crate::stm32::TIM7: (tim7, mms),
+    crate::stm32::TIM8: (tim8, mms2),
+
+    crate::stm32::TIM15: (tim15, mms),
 }
 
 #[cfg(any(
