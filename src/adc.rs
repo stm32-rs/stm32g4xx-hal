@@ -2390,6 +2390,12 @@ macro_rules! adc {
                 pub fn current_sample(&self) -> u16 {
                     self.adc.current_sample()
                 }
+
+                /// clear end conversion flag
+                #[inline(always)]
+                pub fn clear_end_conversion_flag(&mut self) {
+                    self.adc.clear_end_of_conversion_flag();
+                }
             }
 
             impl Adc<stm32::$adc_type, DMA> {
