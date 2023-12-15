@@ -142,5 +142,6 @@ pub(crate) unsafe fn set_vos(vos: VoltageScale) {
 /// access of PWR peripheral
 pub(crate) unsafe fn set_boost(enable_boost: bool) {
     let pwr = unsafe { &*PWR::ptr() };
-    pwr.cr5.modify(|_r, w| w.r1mode().bit(enable_boost));
+    let r1mode = !enable_boost;
+    pwr.cr5.modify(|_r, w| w.r1mode().bit(r1mode));
 }
