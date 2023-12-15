@@ -57,6 +57,7 @@ pub struct FlashWriter<'a, const SECTOR_SZ_KB: u32> {
     flash: &'a mut Parts,
     flash_sz: FlashSize,
     verify: bool,
+    is_dual_bank: bool,
 }
 impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
     #[allow(unused)]
@@ -140,10 +141,24 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
     }
 
     fn valid_length(&self, offset: u32, length: usize, force_padding: bool) -> Result<()> {
+        let offset = if offset >= 0x4_0000 && self.is_dual_bank {
+            defmt::info!("bank 2");
+            offset - 0x4_0000
+        } else {
+            offset
+        };
+
+        let bank_size = if self.is_dual_bank {
+            // Each bank is only half the size in dual bank mode
+            self.flash_sz.kbytes() / 2
+        } else {
+            self.flash_sz.kbytes()
+        };
+
         if offset
             .checked_add(length as u32)
             .ok_or(Error::LengthTooLong)?
-            > self.flash_sz.kbytes()
+            > bank_size
         {
             return Err(Error::LengthTooLong);
         }
@@ -172,6 +187,38 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         // The side-effect of this write is that the page will be erased when we
         // set the STRT bit in the CR below. The address is validated by the
         // call to self.valid_address() above.
+        // Category 3 device
+        #[cfg(any(
+            feature = "stm32g471",
+            feature = "stm32g473",
+            feature = "stm32g474",
+            feature = "stm32g483"
+        ))]
+        unsafe {
+            const PAGES_PER_BANK: u32 = 128;
+            let (is_bank2, page) = if self.is_dual_bank() && page > PAGES_PER_BANK {
+                // page 0 in bank 2 is at the same address as page 128 would have had been, assuming the same page size
+                (true, page - PAGES_PER_BANK)
+            } else {
+                (false, page)
+            };
+
+            self.flash.cr.cr().modify(
+                |_, w| {
+                    w.pnb()
+                        .bits(page.try_into().unwrap())
+                        .bits((is_bank2 as u32) << 11)
+                }, // BKER // TODO remove this once it's added to the PAC
+            );
+        }
+
+        // Not category 3 device
+        #[cfg(not(any(
+            feature = "stm32g471",
+            feature = "stm32g473",
+            feature = "stm32g474",
+            feature = "stm32g483"
+        )))]
         unsafe {
             self.flash
                 .cr
@@ -238,9 +285,9 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
     pub fn read(&self, offset: u32, length: usize) -> Result<&[u8]> {
         self.valid_address(offset)?;
 
-        if offset + length as u32 > self.flash_sz.kbytes() {
-            return Err(Error::LengthTooLong);
-        }
+        //if offset + length as u32 > self.flash_sz.kbytes() {
+        //    return Err(Error::LengthTooLong);
+        //}
 
         let address = (FLASH_START + offset) as *const _;
 
@@ -298,10 +345,10 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
                     | (data[idx + 7] as u32) << 24;
             }
 
+            while self.flash.sr.sr().read().bsy().bit_is_set() {}
+
             // Set Page Programming to 1
             self.flash.cr.cr().modify(|_, w| w.pg().set_bit());
-
-            while self.flash.sr.sr().read().bsy().bit_is_set() {}
 
             // NOTE(unsafe) Write to FLASH area with no side effects
             unsafe { core::ptr::write_volatile(write_address1, word1) };
@@ -353,6 +400,11 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
     /// assumed to have succeeded.
     pub fn change_verification(&mut self, verify: bool) {
         self.verify = verify;
+    }
+
+    #[inline(always)]
+    pub fn is_dual_bank(&mut self) -> bool {
+        self.is_dual_bank
     }
 }
 
@@ -448,11 +500,37 @@ impl Parts {
         &mut self,
         flash_sz: FlashSize,
     ) -> FlashWriter<PAGE_SIZE_KB> {
+        let is_dual_bank = self.is_dual_bank();
         FlashWriter {
+            is_dual_bank,
             flash: self,
             flash_sz,
             verify: true,
         }
+    }
+
+    pub fn is_dual_bank(&mut self) -> bool {
+        // TODO: use dbank() instead of `1 << 22` once it gets added to pac
+
+        // Category 3 device
+        #[cfg(any(
+            feature = "stm32g471",
+            feature = "stm32g473",
+            feature = "stm32g474",
+            feature = "stm32g483"
+        ))]
+        let dbank = self._optr.optr().read().bits() & (1 << 22) != 0;
+
+        // Not category 3 device
+        #[cfg(not(any(
+            feature = "stm32g471",
+            feature = "stm32g473",
+            feature = "stm32g474",
+            feature = "stm32g483"
+        )))]
+        let dbank = false;
+
+        dbank
     }
 }
 
