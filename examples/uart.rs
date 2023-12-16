@@ -12,7 +12,7 @@ use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use defmt::info;
+use utils::logger::info;
 use nb::block;
 
 #[macro_use]

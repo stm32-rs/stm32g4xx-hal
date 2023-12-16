@@ -13,6 +13,7 @@ mod app {
     use stm32g4xx_hal::flash::{FlashExt, FlashSize, FlashWriter, Parts};
     use stm32g4xx_hal::prelude::*;
     use stm32g4xx_hal::rcc::{PllConfig, RccExt};
+    use stm32g4xx_hal::pwr::PwrExt;
 
     const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 
@@ -67,7 +68,8 @@ mod app {
         // The ADC will ultimately be put into synchronous mode and will derive
         // its clock from the AHB bus clock, with a prescalar of 2 or 4.
 
-        let mut rcc = rcc.freeze(clock_config);
+        let pwr = dp.PWR.constrain().freeze();
+        let mut rcc = rcc.freeze(clock_config, pwr);
 
         unsafe {
             let mut flash = &(*stm32g4xx_hal::stm32::FLASH::ptr());
