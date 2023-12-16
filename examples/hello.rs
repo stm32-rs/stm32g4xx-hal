@@ -16,6 +16,8 @@ use utils::logger::println;
 
 #[entry]
 fn main() -> ! {
+    utils::logger::init();
+
     println!("Hello, STM32G4!");
 
     #[allow(clippy::empty_loop)]

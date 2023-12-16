@@ -3,6 +3,10 @@ on:
   
 name: Continuous integration
 
+# Make sure CI fails on all warnings, including Clippy lints
+env:
+  RUSTFLAGS: "-Dwarnings"
+
 jobs:
   ci:
     runs-on: ubuntu-latest
@@ -10,7 +14,7 @@ jobs:
       matrix:
         rust:
           - stable
-        feature:
+        device:
           - stm32g431
           - stm32g441
           - stm32g471
@@ -18,6 +22,13 @@ jobs:
           - stm32g474
           - stm32g483
           - stm32g484
+          #- stm32g491 # Does not seem ready yet
+          #- stm32g4a1 # Does not seem ready yet
+        features:
+          - log-rtt,defmt
+          # TODO: -log-rtt # log-rtt without defmt, more combos?
+          - log-itm
+          - log-semihost
 
     steps:
       - uses: actions/checkout@v2
@@ -29,4 +40,8 @@ jobs:
           override: true
 
       - name: Regular build
-        run: cargo check --features ${{ matrix.feature }}
+        run: cargo check --features ${{ matrix.device }} --features ${{ matrix.features }}
+      - name: Build examples
+        run: cargo check --examples --features ${{ matrix.device }} --features ${{ matrix.features }}
+      - name: Clippy
+        run: cargo clippy --examples --features ${{ matrix.device }} --features ${{ matrix.features }}

@@ -50,6 +50,8 @@ fn EXTI15_10() {
 
 #[entry]
 fn main() -> ! {
+    utils::logger::init();
+
     let mut dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let mut rcc = dp.RCC.constrain();
     let mut syscfg = dp.SYSCFG.constrain();
