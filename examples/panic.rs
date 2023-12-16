@@ -22,6 +22,8 @@ pub fn exit() -> ! {
 
 #[cortex_m_rt::entry]
 fn main() -> ! {
+    utils::logger::init();
+
     logger::info!("main");
 
     panic!("Something bad");

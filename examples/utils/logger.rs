@@ -16,7 +16,6 @@ cfg_if::cfg_if! {
         use log::LevelFilter;
 
         pub use cortex_m_log::log::Logger;
-        pub use cortex_m_log::println;
 
         use cortex_m_log::{
             destination::Itm as ItmDest,
@@ -26,7 +25,7 @@ cfg_if::cfg_if! {
         };
 
         lazy_static! {
-            static ref LOGGER: Logger<ItmSync<InterruptFree>> = Logger {
+            pub static ref LOGGER: Logger<ItmSync<InterruptFree>> = Logger {
                 level: LevelFilter::Info,
                 inner: unsafe {
                     InterruptSync::new(
@@ -37,6 +36,16 @@ cfg_if::cfg_if! {
                 },
             };
         }
+
+        #[allow(unused_macros)]
+        macro_rules! println {
+            ($($tt:tt)*) => {
+                log::info!($($tt,)*);
+            };
+        }
+
+        #[allow(unused_imports)]
+        pub(crate) use println;
 
         #[allow(dead_code)]
         pub fn init() {

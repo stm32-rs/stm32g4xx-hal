@@ -12,7 +12,7 @@ use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
-    //utils::logger::init();
+    utils::logger::init();
     let dp = Peripherals::take().unwrap();
 
     let mut watchdog = IndependentWatchdog::new(dp.IWDG);

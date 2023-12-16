@@ -38,6 +38,8 @@ mod app {
 
     #[init]
     fn init(cx: init::Context) -> (Shared, Local, init::Monotonics) {
+        crate::utils::logger::init();
+
         let dp = cx.device;
         let cp = cx.core;
 
