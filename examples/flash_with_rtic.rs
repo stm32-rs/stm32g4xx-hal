@@ -12,8 +12,8 @@ mod app {
     use crate::utils::logger;
     use stm32g4xx_hal::flash::{FlashExt, FlashSize, FlashWriter, Parts};
     use stm32g4xx_hal::prelude::*;
-    use stm32g4xx_hal::rcc::{PllConfig, RccExt};
     use stm32g4xx_hal::pwr::PwrExt;
+    use stm32g4xx_hal::rcc::{PllConfig, RccExt};
 
     const LOG_LEVEL: log::LevelFilter = log::LevelFilter::Info;
 

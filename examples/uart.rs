@@ -12,8 +12,8 @@ use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use utils::logger::info;
 use nb::block;
+use utils::logger::info;
 
 #[macro_use]
 mod utils;
