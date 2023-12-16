@@ -1301,7 +1301,7 @@ impl<ADC: TriggerType> Conversion<ADC> {
 ///
 ///     //Channel 1
 ///     //Disable the channel before configuring it
-///     tim.ccer.modify(|_, w| w.cc1e().clear_bit());
+///     tim.ccer().modify(|_, w| w.cc1e().clear_bit());
 ///
 ///     tim.ccmr1_output().modify(|_, w| w
 ///       //Preload enable for channel
@@ -1313,14 +1313,14 @@ impl<ADC: TriggerType> Conversion<ADC> {
 ///
 ///     //Set the duty cycle, 0 won't work in pwm mode but might be ok in
 ///     //toggle mode or match mode
-///     let max_duty = tim.arr.read().arr().bits() as u16;
-///     tim.ccr1.modify(|_, w| w.ccr().bits(max_duty / 2));
+///     let max_duty = tim.arr().read().arr().bits() as u16;
+///     tim.ccr1().modify(|_, w| w.ccr().bits(max_duty / 2));
 ///
 ///     //Enable the channel
-///     tim.ccer.modify(|_, w| w.cc1e().set_bit());
+///     tim.ccer().modify(|_, w| w.cc1e().set_bit());
 ///
 ///     //Enable the TIM main Output
-///     tim.bdtr.modify(|_, w| w.moe().set_bit());
+///     tim.bdtr().modify(|_, w| w.moe().set_bit());
 /// }
 /// ```
 #[derive(Clone, Copy)]
@@ -1413,7 +1413,7 @@ pub trait TriggerType {
 #[inline(always)]
 fn configure_clock_source12(cs: ClockSource, rcc: &Rcc) {
     // Select system clock as ADC clock source
-    rcc.rb.ccipr.modify(|_, w| {
+    rcc.rb.ccipr().modify(|_, w| {
         // This is sound, as `0b10` is a valid value for this field.
         unsafe {
             w.adc12sel().bits(cs.into());
@@ -1427,7 +1427,7 @@ fn configure_clock_source12(cs: ClockSource, rcc: &Rcc) {
 #[allow(dead_code)]
 fn configure_clock_source345(cs: ClockSource, rcc: &Rcc) {
     // Select system clock as ADC clock source
-    rcc.rb.ccipr.modify(|_, w| {
+    rcc.rb.ccipr().modify(|_, w| {
         // This is sound, as `0b10` is a valid value for this field.
         unsafe {
             w.adc345sel().bits(cs.into());
@@ -1608,21 +1608,21 @@ macro_rules! adc {
                 /// Enables the Deep Power Down Modus
                 #[inline(always)]
                 pub fn enable_deeppwd_down(&mut self) {
-                    self.adc_reg.cr.modify(|_, w| w.deeppwd().set_bit());
+                    self.adc_reg.cr().modify(|_, w| w.deeppwd().set_bit());
                 }
 
                 /// Disables the Deep Power Down Modus
                 #[inline(always)]
                 pub fn disable_deeppwd_down(&mut self) {
-                    self.adc_reg.cr.modify(|_, w| w.deeppwd().clear_bit());
+                    self.adc_reg.cr().modify(|_, w| w.deeppwd().clear_bit());
                 }
 
 
                 /// Enables the Voltage Regulator
                 #[inline(always)]
                 pub fn enable_vreg(&mut self, delay: &mut impl DelayUs<u8>) {
-                    self.adc_reg.cr.modify(|_, w| w.advregen().set_bit());
-                    while !self.adc_reg.cr.read().advregen().bit_is_set() {}
+                    self.adc_reg.cr().modify(|_, w| w.advregen().set_bit());
+                    while !self.adc_reg.cr().read().advregen().bit_is_set() {}
 
                     // According to the STM32G4xx Reference Manual, section 21.4.6, we need
                     // to wait for T_ADCVREG_STUP after enabling the internal voltage
@@ -1634,13 +1634,13 @@ macro_rules! adc {
                 /// Disables the Voltage Regulator
                 #[inline(always)]
                 pub fn disable_vreg(&mut self) {
-                    self.adc_reg.cr.modify(|_, w| w.advregen().clear_bit());
+                    self.adc_reg.cr().modify(|_, w| w.advregen().clear_bit());
                 }
 
                 /// Returns if the ADC is enabled (ADEN)
                 #[inline(always)]
                 pub fn is_enabled(&self) -> bool {
-                    self.adc_reg.cr.read().aden().bit_is_set()
+                    self.adc_reg.cr().read().aden().bit_is_set()
                 }
 
                 /// Disables the adc, since we don't know in what state we get it.
@@ -1650,11 +1650,11 @@ macro_rules! adc {
                     self.cancel_conversion();
 
                     // Turn off ADC
-                    self.adc_reg.cr.modify(|_, w| w.addis().set_bit());
-                    while self.adc_reg.cr.read().addis().bit_is_set() {}
+                    self.adc_reg.cr().modify(|_, w| w.addis().set_bit());
+                    while self.adc_reg.cr().read().addis().bit_is_set() {}
 
                     // Wait until the ADC has turned off
-                    while self.adc_reg.cr.read().aden().bit_is_set() {}
+                    while self.adc_reg.cr().read().aden().bit_is_set() {}
                 }
 
                 /// Enables the adc
@@ -1663,14 +1663,14 @@ macro_rules! adc {
                     self.calibrate_all();
                     self.apply_config(self.config);
 
-                    self.adc_reg.isr.modify(|_, w| w.adrdy().set_bit());
-                    self.adc_reg.cr.modify(|_, w| w.aden().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.adrdy().set_bit());
+                    self.adc_reg.cr().modify(|_, w| w.aden().set_bit());
 
                     // Wait for adc to get ready
-                    while !self.adc_reg.isr.read().adrdy().bit_is_set() {}
+                    while !self.adc_reg.isr().read().adrdy().bit_is_set() {}
 
                     // Clear ready flag
-                    self.adc_reg.isr.modify(|_, w| w.adrdy().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.adrdy().set_bit());
 
                     self.clear_end_of_conversion_flag();
                 }
@@ -1709,7 +1709,7 @@ macro_rules! adc {
                     self.config.clock_mode = clock_mode;
                     unsafe {
                         let common = &(*stm32::$common_type::ptr());
-                        common.ccr.modify(|_, w| w.ckmode().bits(clock_mode.into()));
+                        common.ccr().modify(|_, w| w.ckmode().bits(clock_mode.into()));
                     }
                 }
 
@@ -1719,7 +1719,7 @@ macro_rules! adc {
                     self.config.clock = clock;
                     unsafe {
                         let common = &(*stm32::$common_type::ptr());
-                        common.ccr.modify(|_, w| w.presc().bits(clock.into()));
+                        common.ccr().modify(|_, w| w.presc().bits(clock.into()));
                     }
                 }
 
@@ -1727,30 +1727,34 @@ macro_rules! adc {
                 #[inline(always)]
                 pub fn set_resolution(&mut self, resolution: config::Resolution) {
                     self.config.resolution = resolution;
-                    self.adc_reg.cfgr.modify(|_, w| w.res().bits(resolution.into()));
+                    unsafe {
+                        self.adc_reg.cfgr().modify(|_, w| w.res().bits(resolution.into()));
+                    }
                 }
 
 
                 /// Enable oversampling
                 #[inline(always)]
                 pub fn set_oversampling(&mut self, oversampling: config::OverSampling, shift: config::OverSamplingShift) {
-                    self.adc_reg.cfgr2.modify(|_, w| unsafe { w.ovsr().bits(oversampling.into())
-                                                      .ovss().bits(shift.into())
-                                                      .rovse().set_bit()});
+                    self.adc_reg.cfgr2().modify(|_, w| unsafe {
+                        w.ovsr().bits(oversampling.into())
+                            .ovss().bits(shift.into())
+                            .rovse().set_bit()
+                    });
                 }
 
                 /// Sets the DR register alignment to left or right
                 #[inline(always)]
                 pub fn set_align(&mut self, align: config::Align) {
                     self.config.align = align;
-                    self.adc_reg.cfgr.modify(|_, w| w.align().bit(align.into()));
+                    self.adc_reg.cfgr().modify(|_, w| w.align().bit(align.into()));
                 }
 
                 /// Sets which external trigger to use and if it is disabled, rising, falling or both
                 #[inline(always)]
                 pub fn set_external_trigger(&mut self, (edge, extsel): (config::TriggerMode, $trigger_type)) {
                     self.config.external_trigger = (edge, extsel);
-                    self.adc_reg.cfgr.modify(|_, w| unsafe { w
+                    self.adc_reg.cfgr().modify(|_, w| unsafe { w
                         .extsel().bits(extsel.into())
                         .exten().bits(edge.into())
                     });
@@ -1760,14 +1764,14 @@ macro_rules! adc {
                 #[inline(always)]
                 pub fn set_auto_delay(&mut self, delay: bool) {
                     self.config.auto_delay = delay;
-                    self.adc_reg.cfgr.modify(|_, w| w.autdly().bit(delay) );
+                    self.adc_reg.cfgr().modify(|_, w| w.autdly().bit(delay) );
                 }
 
                 /// Enables and disables dis-/continuous mode
                 #[inline(always)]
                 pub fn set_continuous(&mut self, continuous: config::Continuous) {
                     self.config.continuous = continuous;
-                    self.adc_reg.cfgr.modify(|_, w| w
+                    self.adc_reg.cfgr().modify(|_, w| w
                         .cont().bit(continuous == config::Continuous::Continuous)
                         .discen().bit(continuous == config::Continuous::Discontinuous)
                     );
@@ -1777,7 +1781,9 @@ macro_rules! adc {
                 // NOTE: The software is allowed to write these bits only when ADSTART = 0
                 fn set_subgroup_len(&mut self, subgroup_len: config::SubGroupLength) {
                     self.config.subgroup_len = subgroup_len;
-                    self.adc_reg.cfgr.modify(|_, w| w.discnum().bits(subgroup_len as u8))
+                    unsafe {
+                        self.adc_reg.cfgr().modify(|_, w| w.discnum().bits(subgroup_len as u8));
+                    }
                 }
 
                 /// Sets DMA to disabled, single or continuous
@@ -1789,7 +1795,7 @@ macro_rules! adc {
                         config::Dma::Single => (false, true),
                         config::Dma::Continuous => (true, true),
                     };
-                    self.adc_reg.cfgr.modify(|_, w| w
+                    self.adc_reg.cfgr().modify(|_, w| w
                         //DDS stands for "DMA disable selection"
                         //0 means do one DMA then stop
                         //1 means keep sending DMA requests as long as DMA=1
@@ -1808,7 +1814,7 @@ macro_rules! adc {
                         config::Eoc::Conversion => (true, true),
                         config::Eoc::Sequence => (true, false),
                     };
-                    self.adc_reg.ier.modify(|_, w|w
+                    self.adc_reg.ier().modify(|_, w|w
                         .eosie().bit(eocs)
                         .eocie().bit(en)
                     );
@@ -1818,7 +1824,7 @@ macro_rules! adc {
                 ///
                 /// This is triggered when the AD finishes a conversion before the last value was read by CPU/DMA
                 pub fn set_overrun_interrupt(&mut self, enable: bool) {
-                    self.adc_reg.ier.modify(|_, w| w.ovrie().bit(enable));
+                    self.adc_reg.ier().modify(|_, w| w.ovrie().bit(enable));
                 }
 
                 /// Sets the default sample time that is used for one-shot conversions.
@@ -1834,7 +1840,7 @@ macro_rules! adc {
                 pub fn set_channel_input_type(&mut self, df: config::DifferentialSelection) {
                     self.config.difsel = df;
 
-                    self.adc_reg.difsel.modify(|_, w| {w
+                    self.adc_reg.difsel().modify(|_, w| {w
                         .difsel_0().bit(df.get_channel(0).into() )
                         .difsel_1().bit(df.get_channel(1).into() )
                         .difsel_2().bit(df.get_channel(2).into() )
@@ -1861,19 +1867,19 @@ macro_rules! adc {
                 #[inline(always)]
                 pub fn reset_sequence(&mut self) {
                     //The reset state is One conversion selected
-                    self.adc_reg.sqr1.modify(|_, w| w.l().bits(config::Sequence::One.into()));
+                    self.adc_reg.sqr1().modify(|_, w| unsafe { w.l().bits(config::Sequence::One.into()) });
                 }
 
                 /// Returns the current sequence length. Primarily useful for configuring DMA.
                 #[inline(always)]
                 pub fn sequence_length(&mut self) -> u8 {
-                    self.adc_reg.sqr1.read().l().bits() + 1
+                    self.adc_reg.sqr1().read().l().bits() + 1
                 }
 
                 /// Returns the address of the ADC data register. Primarily useful for configuring DMA.
                 #[inline(always)]
                 pub fn data_register_address(&self) -> u32 {
-                    &self.adc_reg.dr as *const _ as u32
+                    &self.adc_reg.dr() as *const _ as u32
                 }
 
                 /// Calibrate the adc for <Input Type>
@@ -1881,15 +1887,15 @@ macro_rules! adc {
                 pub fn calibrate(&mut self, it: config::InputType) {
                     match it {
                         config::InputType::SingleEnded => {
-                            self.adc_reg.cr.modify(|_, w| w.adcaldif().clear_bit() );
+                            self.adc_reg.cr().modify(|_, w| w.adcaldif().clear_bit() );
                         },
                         config::InputType::Differential => {
-                            self.adc_reg.cr.modify(|_, w| w.adcaldif().set_bit() );
+                            self.adc_reg.cr().modify(|_, w| w.adcaldif().set_bit() );
                         },
                     }
 
-                    self.adc_reg.cr.modify(|_, w| w.adcal().set_bit() );
-                    while self.adc_reg.cr.read().adcal().bit_is_set() {}
+                    self.adc_reg.cr().modify(|_, w| w.adcal().set_bit() );
+                    while self.adc_reg.cr().read().adcal().bit_is_set() {}
                 }
 
                 /// Calibrate the Adc for all Input Types
@@ -1912,7 +1918,7 @@ macro_rules! adc {
                 {
 
                     //Check the sequence is long enough
-                    self.adc_reg.sqr1.modify(|r, w| {
+                    self.adc_reg.sqr1().modify(|r, w| unsafe {
                         let prev: config::Sequence = r.l().bits().into();
                         if prev < sequence {
                             w.l().bits(sequence.into())
@@ -1925,47 +1931,49 @@ macro_rules! adc {
 
                     //Set the channel in the right sequence field
                     match sequence {
-                        config::Sequence::One      => self.adc_reg.sqr1.modify(|_, w| unsafe {w.sq1().bits(channel) }),
-                        config::Sequence::Two      => self.adc_reg.sqr1.modify(|_, w| unsafe {w.sq2().bits(channel) }),
-                        config::Sequence::Three    => self.adc_reg.sqr1.modify(|_, w| unsafe {w.sq3().bits(channel) }),
-                        config::Sequence::Four     => self.adc_reg.sqr1.modify(|_, w| unsafe {w.sq4().bits(channel) }),
-                        config::Sequence::Five     => self.adc_reg.sqr2.modify(|_, w| unsafe {w.sq5().bits(channel) }),
-                        config::Sequence::Six      => self.adc_reg.sqr2.modify(|_, w| unsafe {w.sq6().bits(channel) }),
-                        config::Sequence::Seven    => self.adc_reg.sqr2.modify(|_, w| unsafe {w.sq7().bits(channel) }),
-                        config::Sequence::Eight    => self.adc_reg.sqr2.modify(|_, w| unsafe {w.sq8().bits(channel) }),
-                        config::Sequence::Nine     => self.adc_reg.sqr2.modify(|_, w| unsafe {w.sq9().bits(channel) }),
-                        config::Sequence::Ten      => self.adc_reg.sqr3.modify(|_, w| unsafe {w.sq10().bits(channel) }),
-                        config::Sequence::Eleven   => self.adc_reg.sqr3.modify(|_, w| unsafe {w.sq11().bits(channel) }),
-                        config::Sequence::Twelve   => self.adc_reg.sqr3.modify(|_, w| unsafe {w.sq12().bits(channel) }),
-                        config::Sequence::Thirteen => self.adc_reg.sqr3.modify(|_, w| unsafe {w.sq13().bits(channel) }),
-                        config::Sequence::Fourteen => self.adc_reg.sqr3.modify(|_, w| unsafe {w.sq14().bits(channel) }),
-                        config::Sequence::Fifteen  => self.adc_reg.sqr4.modify(|_, w| unsafe {w.sq15().bits(channel) }),
-                        config::Sequence::Sixteen  => self.adc_reg.sqr4.modify(|_, w| unsafe {w.sq16().bits(channel) }),
+                        config::Sequence::One      => self.adc_reg.sqr1().modify(|_, w| unsafe {w.sq1().bits(channel) }),
+                        config::Sequence::Two      => self.adc_reg.sqr1().modify(|_, w| unsafe {w.sq2().bits(channel) }),
+                        config::Sequence::Three    => self.adc_reg.sqr1().modify(|_, w| unsafe {w.sq3().bits(channel) }),
+                        config::Sequence::Four     => self.adc_reg.sqr1().modify(|_, w| unsafe {w.sq4().bits(channel) }),
+                        config::Sequence::Five     => self.adc_reg.sqr2().modify(|_, w| unsafe {w.sq5().bits(channel) }),
+                        config::Sequence::Six      => self.adc_reg.sqr2().modify(|_, w| unsafe {w.sq6().bits(channel) }),
+                        config::Sequence::Seven    => self.adc_reg.sqr2().modify(|_, w| unsafe {w.sq7().bits(channel) }),
+                        config::Sequence::Eight    => self.adc_reg.sqr2().modify(|_, w| unsafe {w.sq8().bits(channel) }),
+                        config::Sequence::Nine     => self.adc_reg.sqr2().modify(|_, w| unsafe {w.sq9().bits(channel) }),
+                        config::Sequence::Ten      => self.adc_reg.sqr3().modify(|_, w| unsafe {w.sq10().bits(channel) }),
+                        config::Sequence::Eleven   => self.adc_reg.sqr3().modify(|_, w| unsafe {w.sq11().bits(channel) }),
+                        config::Sequence::Twelve   => self.adc_reg.sqr3().modify(|_, w| unsafe {w.sq12().bits(channel) }),
+                        config::Sequence::Thirteen => self.adc_reg.sqr3().modify(|_, w| unsafe {w.sq13().bits(channel) }),
+                        config::Sequence::Fourteen => self.adc_reg.sqr3().modify(|_, w| unsafe {w.sq14().bits(channel) }),
+                        config::Sequence::Fifteen  => self.adc_reg.sqr4().modify(|_, w| unsafe {w.sq15().bits(channel) }),
+                        config::Sequence::Sixteen  => self.adc_reg.sqr4().modify(|_, w| unsafe {w.sq16().bits(channel) }),
                     }
 
                     //Set the sample time for the channel
                     let st = u8::from(sample_time);
-                    match channel {
-                        0 => self.adc_reg.smpr1.modify(|_, w| w.smp0().bits(st) ),
-                        1 => self.adc_reg.smpr1.modify(|_, w| w.smp1().bits(st) ),
-                        2 => self.adc_reg.smpr1.modify(|_, w| w.smp2().bits(st) ),
-                        3 => self.adc_reg.smpr1.modify(|_, w| w.smp3().bits(st) ),
-                        4 => self.adc_reg.smpr1.modify(|_, w| w.smp4().bits(st) ),
-                        5 => self.adc_reg.smpr1.modify(|_, w| w.smp5().bits(st) ),
-                        6 => self.adc_reg.smpr1.modify(|_, w| w.smp6().bits(st) ),
-                        7 => self.adc_reg.smpr1.modify(|_, w| w.smp7().bits(st) ),
-                        8 => self.adc_reg.smpr1.modify(|_, w| w.smp8().bits(st) ),
-                        9 => self.adc_reg.smpr1.modify(|_, w| w.smp9().bits(st) ),
-                        10 => self.adc_reg.smpr2.modify(|_, w| w.smp10().bits(st) ),
-                        11 => self.adc_reg.smpr2.modify(|_, w| w.smp11().bits(st) ),
-                        12 => self.adc_reg.smpr2.modify(|_, w| w.smp12().bits(st) ),
-                        13 => self.adc_reg.smpr2.modify(|_, w| w.smp13().bits(st) ),
-                        14 => self.adc_reg.smpr2.modify(|_, w| w.smp14().bits(st) ),
-                        15 => self.adc_reg.smpr2.modify(|_, w| w.smp15().bits(st) ),
-                        16 => self.adc_reg.smpr2.modify(|_, w| w.smp16().bits(st) ),
-                        17 => self.adc_reg.smpr2.modify(|_, w| w.smp17().bits(st) ),
-                        18 => self.adc_reg.smpr2.modify(|_, w| w.smp18().bits(st) ),
-                        _ => unimplemented!(),
+                    unsafe {
+                        match channel {
+                            0 => self.adc_reg.smpr1().modify(|_, w| w.smp0().bits(st) ),
+                            1 => self.adc_reg.smpr1().modify(|_, w| w.smp1().bits(st) ),
+                            2 => self.adc_reg.smpr1().modify(|_, w| w.smp2().bits(st) ),
+                            3 => self.adc_reg.smpr1().modify(|_, w| w.smp3().bits(st) ),
+                            4 => self.adc_reg.smpr1().modify(|_, w| w.smp4().bits(st) ),
+                            5 => self.adc_reg.smpr1().modify(|_, w| w.smp5().bits(st) ),
+                            6 => self.adc_reg.smpr1().modify(|_, w| w.smp6().bits(st) ),
+                            7 => self.adc_reg.smpr1().modify(|_, w| w.smp7().bits(st) ),
+                            8 => self.adc_reg.smpr1().modify(|_, w| w.smp8().bits(st) ),
+                            9 => self.adc_reg.smpr1().modify(|_, w| w.smp9().bits(st) ),
+                            10 => self.adc_reg.smpr2().modify(|_, w| w.smp10().bits(st) ),
+                            11 => self.adc_reg.smpr2().modify(|_, w| w.smp11().bits(st) ),
+                            12 => self.adc_reg.smpr2().modify(|_, w| w.smp12().bits(st) ),
+                            13 => self.adc_reg.smpr2().modify(|_, w| w.smp13().bits(st) ),
+                            14 => self.adc_reg.smpr2().modify(|_, w| w.smp14().bits(st) ),
+                            15 => self.adc_reg.smpr2().modify(|_, w| w.smp15().bits(st) ),
+                            16 => self.adc_reg.smpr2().modify(|_, w| w.smp16().bits(st) ),
+                            17 => self.adc_reg.smpr2().modify(|_, w| w.smp17().bits(st) ),
+                            18 => self.adc_reg.smpr2().modify(|_, w| w.smp18().bits(st) ),
+                            _ => unimplemented!(),
+                        }
                     }
                 }
                 /// Synchronously convert a single sample
@@ -1975,12 +1983,14 @@ macro_rules! adc {
                     PIN: Channel<stm32::$adc_type, ID=u8>
                 {
                     let saved_config = self.config;
-                    self.adc_reg.cfgr.modify(|_, w| w
-                        .dmaen().clear_bit() //Disable dma
-                        .cont().clear_bit() //Disable continuous mode
-                        .exten().bits(config::TriggerMode::Disabled.into()) //Disable trigger
-                    );
-                    self.adc_reg.ier.modify(|_, w| w
+                    unsafe {
+                        self.adc_reg.cfgr().modify(|_, w| w
+                            .dmaen().clear_bit() //Disable dma
+                            .cont().clear_bit() //Disable continuous mode
+                            .exten().bits(config::TriggerMode::Disabled.into()) //Disable trigger
+                        );
+                    }
+                    self.adc_reg.ier().modify(|_, w| w
                         .eocie().clear_bit() //Disable end of conversion interrupt
                     );
 
@@ -2005,116 +2015,116 @@ macro_rules! adc {
                 /// Resets the end-of-conversion flag
                 #[inline(always)]
                 pub fn clear_end_of_conversion_flag(&mut self) {
-                    self.adc_reg.isr.modify(|_, w| w.eoc().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.eoc().set_bit());
                 }
 
                 /// Block until the conversion is completed and return to configured
                 pub fn wait_for_conversion_sequence(&mut self) {
-                    while !self.adc_reg.isr.read().eoc().bit_is_set() {}
+                    while !self.adc_reg.isr().read().eoc().bit_is_set() {}
                 }
 
                 /// get current sample
                 #[inline(always)]
                 pub fn current_sample(&self) -> u16 {
-                    self.adc_reg.dr.read().rdata().bits()
+                    self.adc_reg.dr().read().rdata().bits()
                 }
 
                 /// Starts conversion sequence. Waits for the hardware to indicate it's actually started.
                 #[inline(always)]
                 pub fn start_conversion(&mut self) {
                     //Start conversion
-                    self.adc_reg.cr.modify(|_, w| w.adstart().set_bit());
+                    self.adc_reg.cr().modify(|_, w| w.adstart().set_bit());
                 }
 
                 /// Cancels an ongoing conversion
                 #[inline(always)]
                 pub fn cancel_conversion(&mut self) {
-                    self.adc_reg.cr.modify(|_, w| w.adstp().set_bit());
-                    while self.adc_reg.cr.read().adstart().bit_is_set() {}
+                    self.adc_reg.cr().modify(|_, w| w.adstp().set_bit());
+                    while self.adc_reg.cr().read().adstart().bit_is_set() {}
                 }
 
                 /// Returns if the Voltage Regulator is enabled
                 #[inline(always)]
                 pub fn is_vreg_enabled(&self) -> bool {
-                    self.adc_reg.cr.read().advregen().bit_is_set()
+                    self.adc_reg.cr().read().advregen().bit_is_set()
                 }
 
                 /// Returns if Deep Power Down is enabled
                 #[inline(always)]
                 pub fn is_deeppwd_enabled(&self) -> bool {
-                    self.adc_reg.cr.read().deeppwd().bit_is_set()
+                    self.adc_reg.cr().read().deeppwd().bit_is_set()
                 }
 
                 /// Returns if a conversion is active
                 #[inline(always)]
                 pub fn is_conversion_active(&self) -> bool {
-                    self.adc_reg.cr.read().adstart().bit_is_set()
+                    self.adc_reg.cr().read().adstart().bit_is_set()
                 }
 
                 /// Enables the vbat internal channel
                 #[inline(always)]
                 pub fn enable_vbat(&self, common: &stm32::$common_type) {
-                    common.ccr.modify(|_, w| w.vbatsel().set_bit());
+                    common.ccr().modify(|_, w| w.vbatsel().set_bit());
                 }
 
                 /// Enables the vbat internal channel
                 #[inline(always)]
                 pub fn disable_vbat(&self, common: &stm32::$common_type) {
-                    common.ccr.modify(|_, w| w.vbatsel().clear_bit());
+                    common.ccr().modify(|_, w| w.vbatsel().clear_bit());
                 }
 
                 /// Returns if the vbat internal channel is enabled
                 #[inline(always)]
                 pub fn is_vbat_enabled(&mut self, common: &stm32::$common_type) -> bool {
-                    common.ccr.read().vbatsel().bit_is_set()
+                    common.ccr().read().vbatsel().bit_is_set()
                 }
 
                 /// Enables the temp internal channel.
                 #[inline(always)]
                 pub fn enable_temperature(&mut self, common: &stm32::$common_type) {
-                    common.ccr.modify(|_, w| w.vsensesel().set_bit());
+                    common.ccr().modify(|_, w| w.vsensesel().set_bit());
                 }
 
                 /// Disables the temp internal channel
                 #[inline(always)]
                 pub fn disable_temperature(&mut self, common: &stm32::$common_type) {
-                    common.ccr.modify(|_, w| w.vsensesel().clear_bit());
+                    common.ccr().modify(|_, w| w.vsensesel().clear_bit());
                 }
 
                 /// Returns if the temp internal channel is enabled
                 #[inline(always)]
                 pub fn is_temperature_enabled(&mut self, common: &stm32::$common_type) -> bool {
-                    common.ccr.read().vsensesel().bit_is_set()
+                    common.ccr().read().vsensesel().bit_is_set()
                 }
 
                 /// Enables the vref internal channel.
                 #[inline(always)]
                 pub fn enable_vref(&mut self, common: &stm32::$common_type) {
-                    common.ccr.modify(|_, w| w.vrefen().set_bit());
+                    common.ccr().modify(|_, w| w.vrefen().set_bit());
                 }
 
                 /// Disables the vref internal channel
                 #[inline(always)]
                 pub fn disable_vref(&mut self, common: &stm32::$common_type) {
-                    common.ccr.modify(|_, w| w.vrefen().clear_bit());
+                    common.ccr().modify(|_, w| w.vrefen().clear_bit());
                 }
 
                 /// Returns if the vref internal channel is enabled
                 #[inline(always)]
                 pub fn is_vref_enabled(&mut self, common: &stm32::$common_type) -> bool {
-                    common.ccr.read().vrefen().bit_is_set()
+                    common.ccr().read().vrefen().bit_is_set()
                 }
 
                 /// Read overrun flag
                 #[inline(always)]
                 pub fn get_overrun_flag(&self) -> bool {
-                    self.adc_reg.isr.read().ovr().bit()
+                    self.adc_reg.isr().read().ovr().bit()
                 }
 
                 /// Resets the overrun flag
                 #[inline(always)]
                 pub fn clear_overrun_flag(&mut self) {
-                    self.adc_reg.isr.modify(|_, w| w.ovr().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.ovr().set_bit());
                 }
             }
 
