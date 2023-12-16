@@ -103,10 +103,10 @@ pub(crate) fn current_vos() -> VoltageScale {
     // NOTE(unsafe): Read-only access
     let pwr = unsafe { &*PWR::ptr() };
 
-    match pwr.cr1.read().vos().bits() {
+    match pwr.cr1().read().vos().bits() {
         0b00 => unreachable!(),
         0b01 => VoltageScale::Range1 {
-            enable_boost: pwr.cr5.read().r1mode().bit(),
+            enable_boost: pwr.cr5().read().r1mode().bit(),
         },
         0b10 => VoltageScale::Range2,
         0b11 => unreachable!(),
@@ -129,10 +129,10 @@ pub(crate) unsafe fn set_vos(vos: VoltageScale) {
         VoltageScale::Range1 { .. } => 0b01,
         VoltageScale::Range2 => 0b10,
     };
-    pwr.cr1.modify(|_r, w| w.vos().bits(vos));
+    pwr.cr1().modify(|_r, w| w.vos().bits(vos));
 
     // Wait for ready
-    while pwr.sr2.read().vosf().bit() {}
+    while pwr.sr2().read().vosf().bit() {}
 }
 
 /// Set new voltage scale
@@ -143,5 +143,5 @@ pub(crate) unsafe fn set_vos(vos: VoltageScale) {
 pub(crate) unsafe fn set_boost(enable_boost: bool) {
     let pwr = unsafe { &*PWR::ptr() };
     let r1mode = !enable_boost;
-    pwr.cr5.modify(|_r, w| w.r1mode().bit(r1mode));
+    pwr.cr5().modify(|_r, w| w.r1mode().bit(r1mode));
 }

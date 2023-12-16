@@ -21,7 +21,6 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::SPI4;
 use crate::stm32::{RCC, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
-use core::cell::UnsafeCell;
 use core::ptr;
 
 pub use hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
@@ -118,7 +117,7 @@ macro_rules! spi {
                 }
 
                 // disable SS output
-                spi.cr2.write(|w| w.ssoe().clear_bit());
+                spi.cr2().write(|w| w.ssoe().clear_bit());
 
                 let spi_freq = speed.into().raw();
                 let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).raw();
@@ -134,11 +133,11 @@ macro_rules! spi {
                     _ => 0b111,
                 };
 
-                spi.cr2.write(|w| unsafe {
+                spi.cr2().write(|w| unsafe {
                     w.frxth().set_bit().ds().bits(0b111).ssoe().clear_bit()
                 });
 
-                spi.cr1.write(|w| unsafe {
+                spi.cr1().write(|w| unsafe {
                     w.cpha()
                         .bit(mode.phase == Phase::CaptureOnSecondTransition)
                         .cpol()
@@ -173,7 +172,7 @@ macro_rules! spi {
             }
 
             pub fn enable_tx_dma(self) -> Spi<$SPIX, PINS> {
-                self.spi.cr2.modify(|_, w| w.txdmaen().set_bit());
+                self.spi.cr2().modify(|_, w| w.txdmaen().set_bit());
                 Spi {
                     spi: self.spi,
                     pins: self.pins,
@@ -195,7 +194,7 @@ macro_rules! spi {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
-                let sr = self.spi.sr.read();
+                let sr = self.spi.sr().read();
 
                 Err(if sr.ovr().bit_is_set() {
                     nb::Error::Other(Error::Overrun)
@@ -207,7 +206,7 @@ macro_rules! spi {
                     // NOTE(read_volatile) read only 1 byte (the svd2rust API only allows
                     // reading a half-word)
                     return Ok(unsafe {
-                        ptr::read_volatile(&self.spi.dr as *const _ as *const u8)
+                        ptr::read_volatile(&self.spi.dr() as *const _ as *const u8)
                     });
                 } else {
                     nb::Error::WouldBlock
@@ -215,7 +214,7 @@ macro_rules! spi {
             }
 
             fn send(&mut self, byte: u8) -> nb::Result<(), Error> {
-                let sr = self.spi.sr.read();
+                let sr = self.spi.sr().read();
 
                 Err(if sr.ovr().bit_is_set() {
                     nb::Error::Other(Error::Overrun)
@@ -224,9 +223,9 @@ macro_rules! spi {
                 } else if sr.crcerr().bit_is_set() {
                     nb::Error::Other(Error::Crc)
                 } else if sr.txe().bit_is_set() {
-                    let dr = &self.spi.dr as *const _ as *const UnsafeCell<u8>;
+                    let dr = self.spi.dr().as_ptr() as *mut u8;
                     // NOTE(write_volatile) see note above
-                    unsafe { ptr::write_volatile(UnsafeCell::raw_get(dr), byte) };
+                    unsafe { ptr::write_volatile(dr, byte) };
                     return Ok(());
                 } else {
                     nb::Error::WouldBlock
@@ -237,7 +236,7 @@ macro_rules! spi {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Tx part accesses the Tx register
-                &unsafe { &*<$SPIX>::ptr() }.dr as *const _ as u32
+                &unsafe { &*<$SPIX>::ptr() }.dr() as *const _ as u32
             }
 
             type MemSize = u8;

@@ -286,9 +286,9 @@ where
     fn enter_init_mode(&mut self) {
         let can = self.registers();
 
-        can.cccr.modify(|_, w| w.init().set_bit());
-        while can.cccr.read().init().bit_is_clear() {}
-        can.cccr.modify(|_, w| w.cce().set_bit());
+        can.cccr().modify(|_, w| w.init().set_bit());
+        while can.cccr().read().init().bit_is_clear() {}
+        can.cccr().modify(|_, w| w.cce().set_bit());
     }
 
     /// Returns the current FDCAN config settings
@@ -311,20 +311,20 @@ where
         self.set_bus_monitoring_mode(mon);
 
         let can = self.registers();
-        can.test.modify(|_, w| w.lbck().bit(lbck));
+        can.test().modify(|_, w| w.lbck().bit(lbck));
     }
 
     /// Enables or disables silent mode: Disconnects the TX signal from the pin.
     #[inline]
     fn set_bus_monitoring_mode(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.mon().bit(enabled));
+        can.cccr().modify(|_, w| w.mon().bit(enabled));
     }
 
     #[inline]
     fn set_restricted_operations(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.asm().bit(enabled));
+        can.cccr().modify(|_, w| w.asm().bit(enabled));
     }
 
     #[inline]
@@ -335,14 +335,14 @@ where
     #[inline]
     fn set_test_mode(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.test().bit(enabled));
+        can.cccr().modify(|_, w| w.test().bit(enabled));
     }
 
     #[inline]
     fn set_power_down_mode(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.csr().bit(enabled));
-        while can.cccr.read().csa().bit() != enabled {}
+        can.cccr().modify(|_, w| w.csr().bit(enabled));
+        while can.cccr().read().csa().bit() != enabled {}
     }
 
     /// Enable/Disable the specific Interrupt Line
@@ -350,8 +350,8 @@ where
     pub fn enable_interrupt_line(&mut self, line: InterruptLine, enabled: bool) {
         let can = self.registers();
         match line {
-            InterruptLine::_0 => can.ile.modify(|_, w| w.eint1().bit(enabled)),
-            InterruptLine::_1 => can.ile.modify(|_, w| w.eint0().bit(enabled)),
+            InterruptLine::_0 => can.ile().modify(|_, w| w.eint1().bit(enabled)),
+            InterruptLine::_1 => can.ile().modify(|_, w| w.eint0().bit(enabled)),
         }
     }
 
@@ -422,7 +422,7 @@ where
 
     /// Retrieve the current protocol status
     pub fn get_protocol_status(&self) -> ProtocolStatus {
-        let psr = self.registers().psr.read();
+        let psr = self.registers().psr().read();
         ProtocolStatus {
             activity: Activity::try_from(0 /*psr.act().bits()*/).unwrap(), //TODO: stm32g4 does not allow reading from this register
             transmitter_delay_comp: psr.tdcv().bits(),
@@ -526,9 +526,9 @@ where
     {
         I::enable(&rcc.rb);
 
-        if rcc.rb.ccipr.read().fdcansel().is_hse() {
+        if rcc.rb.ccipr().read().fdcansel().is_hse() {
             // Select P clock as FDCAN clock source
-            rcc.rb.ccipr.modify(|_, w| {
+            rcc.rb.ccipr().modify(|_, w| {
                 // This is sound, as `FdCanClockSource` only contains valid values for this field.
                 unsafe {
                     w.fdcansel().bits(FdCanClockSource::PCLK as u8);
@@ -541,7 +541,7 @@ where
 
         let can = Self::create_can(FdCanConfig::default(), can_instance);
         let reg = can.registers();
-        assert!(reg.endn.read().bits() == 0x87654321_u32);
+        assert!(reg.endn().read().bits() == 0x87654321_u32);
         can
     }
 
@@ -562,7 +562,7 @@ where
         TX: sealed::Tx<I>,
         RX: sealed::Rx<I>,
     {
-        rcc.rb.ccipr.modify(|_, w| {
+        rcc.rb.ccipr().modify(|_, w| {
             // This is sound, as `FdCanClockSource` only contains valid values for this field.
             unsafe {
                 w.fdcansel().bits(clock_source as u8);
@@ -588,17 +588,17 @@ where
 
         // set TxBuffer to Queue Mode;
         // TODO: don't require this.
-        // can.txbc.write(|w| w.tfqm().set_bit());
+        // can.txbc().write(|w| w.tfqm().set_bit());
         //FIXME: stm32g4 has the wrong layout here!
         //We should be able to use the above,
         //But right now, we just set the 24th bit.
-        can.txbc.write(|w| unsafe { w.bits(1_u32 << 24) });
+        can.txbc().write(|w| unsafe { w.bits(1_u32 << 24) });
 
         // set standard filters list size to 28
         // set extended filters list size to 8
         // REQUIRED: we use the memory map as if these settings are set
         // instead of re-calculating them.
-        can.rxgfc.modify(|_, w| unsafe {
+        can.rxgfc().modify(|_, w| unsafe {
             w.lse()
                 .bits(EXTENDED_FILTER_MAX)
                 .lss()
@@ -635,9 +635,9 @@ where
         self.apply_config(self.control.config);
 
         let can = self.registers();
-        can.cccr.modify(|_, w| w.cce().clear_bit());
-        can.cccr.modify(|_, w| w.init().clear_bit());
-        while can.cccr.read().init().bit_is_set() {}
+        can.cccr().modify(|_, w| w.cce().clear_bit());
+        can.cccr().modify(|_, w| w.init().clear_bit());
+        while can.cccr().read().init().bit_is_set() {}
     }
 
     /// Moves out of ConfigMode and into InternalLoopbackMode
@@ -736,7 +736,7 @@ where
         self.control.config.nbtr = btr;
 
         let can = self.registers();
-        can.nbtp.write(|w| unsafe {
+        can.nbtp().write(|w| unsafe {
             w.nbrp()
                 .bits(btr.nbrp() - 1)
                 .ntseg1()
@@ -755,7 +755,7 @@ where
         self.control.config.dbtr = btr;
 
         let can = self.registers();
-        can.dbtp.write(|w| unsafe {
+        can.dbtp().write(|w| unsafe {
             w.dbrp()
                 .bits(btr.dbrp() - 1)
                 .dtseg1()
@@ -776,7 +776,7 @@ where
     #[inline]
     pub fn set_automatic_retransmit(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.dar().bit(!enabled));
+        can.cccr().modify(|_, w| w.dar().bit(!enabled));
         self.control.config.automatic_retransmit = enabled;
     }
 
@@ -785,7 +785,7 @@ where
     #[inline]
     pub fn set_transmit_pause(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.dar().bit(!enabled));
+        can.cccr().modify(|_, w| w.dar().bit(!enabled));
         self.control.config.transmit_pause = enabled;
     }
 
@@ -794,7 +794,7 @@ where
     #[inline]
     pub fn set_non_iso_mode(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.niso().bit(enabled));
+        can.cccr().modify(|_, w| w.niso().bit(enabled));
         self.control.config.non_iso_mode = enabled;
     }
 
@@ -803,7 +803,7 @@ where
     #[inline]
     pub fn set_edge_filtering(&mut self, enabled: bool) {
         let can = self.registers();
-        can.cccr.modify(|_, w| w.efbi().bit(enabled));
+        can.cccr().modify(|_, w| w.efbi().bit(enabled));
         self.control.config.edge_filtering = enabled;
     }
 
@@ -818,7 +818,7 @@ where
         };
 
         let can = self.registers();
-        can.cccr.modify(|_, w| w.fdoe().bit(fdoe).brse().bit(brse));
+        can.cccr().modify(|_, w| w.fdoe().bit(fdoe).brse().bit(brse));
 
         self.control.config.frame_transmit = fts;
     }
@@ -829,7 +829,7 @@ where
     pub fn set_interrupt_line_config(&mut self, l0int: Interrupts) {
         let can = self.registers();
 
-        can.ils.modify(|_, w| unsafe { w.bits(l0int.bits()) });
+        can.ils().modify(|_, w| unsafe { w.bits(l0int.bits()) });
 
         self.control.config.interrupt_line_config = l0int;
     }
@@ -839,7 +839,7 @@ where
     pub fn set_protocol_exception_handling(&mut self, enabled: bool) {
         let can = self.registers();
 
-        can.cccr.modify(|_, w| w.pxhd().bit(!enabled));
+        can.cccr().modify(|_, w| w.pxhd().bit(!enabled));
 
         self.control.config.protocol_exception_handling = enabled;
     }
@@ -850,7 +850,7 @@ where
     pub fn set_clock_divider(&mut self, div: ClockDivider) {
         let can = self.registers();
 
-        can.ckdiv.write(|w| unsafe { w.pdiv().bits(div as u8) });
+        can.ckdiv().write(|w| unsafe { w.pdiv().bits(div as u8) });
 
         self.control.config.clock_divider = div;
     }
@@ -873,7 +873,7 @@ where
     /// Configures the global filter settings
     #[inline]
     pub fn set_global_filter(&mut self, filter: GlobalFilter) {
-        self.registers().rxgfc.modify(|_, w| {
+        self.registers().rxgfc().modify(|_, w| {
             unsafe {
                 w.anfs()
                     .bits(filter.handle_standard_frames as u8)
@@ -993,7 +993,7 @@ where
     pub fn get_receive_pin(&mut self) -> bool {
         let can = self.registers();
 
-        can.test.read().rx().bit_is_set()
+        can.test().read().rx().bit_is_set()
     }
 
     /// Sets the state of the transmit pin according to TestTransmitPinState
@@ -1001,7 +1001,7 @@ where
         let can = self.registers();
 
         //SAFE: state has all possible values, and this can only occur in TestMode
-        can.test.modify(|_, w| unsafe { w.tx().bits(state as u8) });
+        can.test().modify(|_, w| unsafe { w.tx().bits(state as u8) });
     }
 }
 
@@ -1159,10 +1159,10 @@ where
     #[inline]
     pub fn error_counters(&self) -> ErrorCounters {
         let can = self.registers();
-        let cel: u8 = can.ecr.read().cel().bits();
-        let rp: bool = can.ecr.read().rp().bit();
-        let rec: u8 = can.ecr.read().rec().bits();
-        let tec: u8 = can.ecr.read().tec().bits();
+        let cel: u8 = can.ecr().read().cel().bits();
+        let rp: bool = can.ecr().read().rp().bit();
+        let rec: u8 = can.ecr().read().rec().bits();
+        let tec: u8 = can.ecr().read().tec().bits();
 
         ErrorCounters {
             can_errors: cel,
@@ -1177,28 +1177,28 @@ where
     /// Returns the current FdCan Timestamp counter
     #[inline]
     pub fn timestamp(&self) -> u16 {
-        self.registers().tscv.read().tsc().bits()
+        self.registers().tscv().read().tsc().bits()
     }
 
     /// Check if the interrupt is triggered
     #[inline]
     pub fn has_interrupt(&mut self, interrupt: Interrupt) -> bool {
         let can = self.registers();
-        can.ir.read().bits() & (interrupt as u32) > 0
+        can.ir().read().bits() & (interrupt as u32) > 0
     }
 
     /// Clear specified interrupt
     #[inline]
     pub fn clear_interrupt(&mut self, interrupt: Interrupt) {
         let can = self.registers();
-        can.ir.write(|w| unsafe { w.bits(interrupt as u32) });
+        can.ir().write(|w| unsafe { w.bits(interrupt as u32) });
     }
 
     /// Clear specified interrupts
     #[inline]
     pub fn clear_interrupts(&mut self, interrupts: Interrupts) {
         let can = self.registers();
-        can.ir.write(|w| unsafe { w.bits(interrupts.bits()) });
+        can.ir().write(|w| unsafe { w.bits(interrupts.bits()) });
     }
 }
 
@@ -1310,7 +1310,7 @@ where
             }
         } else {
             // Read the Write Pointer
-            let idx = can.txfqs.read().tfqpi().bits();
+            let idx = can.txfqs().read().tfqpi().bits();
 
             (Mailbox::new(idx), None)
         };
@@ -1323,7 +1323,7 @@ where
     /// Returns if the tx queue is able to accept new messages without having to cancel an existing one
     #[inline]
     pub fn tx_queue_is_full(&self) -> bool {
-        self.registers().txfqs.read().tfqf().bit()
+        self.registers().txfqs().read().tfqf().bit()
     }
 
     /// Returns `Ok` when the mailbox is free or if it contains pending frame with a
@@ -1405,13 +1405,13 @@ where
             let idx = 1u8 << idx;
 
             // Abort Request
-            can.txbcr.write(|w| unsafe { w.cr().bits(idx) });
+            can.txbcr().write(|w| unsafe { w.cr().bits(idx) });
 
             // Wait for the abort request to be finished.
             loop {
-                if can.txbcf.read().cf().bits() & idx != 0 {
+                if can.txbcf().read().cf().bits() & idx != 0 {
                     // Return false when a transmission has occured
-                    break can.txbto.read().to().bits() & idx == 0;
+                    break can.txbto().read().to().bits() & idx == 0;
                 }
             }
         } else {
@@ -1425,28 +1425,28 @@ where
         let idx: u8 = idx.into();
         let idx = 1u8 << idx;
 
-        can.txbrp.read().trp().bits() & idx != 0
+        can.txbrp().read().trp().bits() & idx != 0
     }
 
     /// Returns `true` if no frame is pending for transmission.
     #[inline]
     pub fn is_idle(&self) -> bool {
         let can = self.registers();
-        can.txbrp.read().trp().bits() == 0x0
+        can.txbrp().read().trp().bits() == 0x0
     }
 
     /// Clears the transmission complete flag.
     #[inline]
     pub fn clear_transmission_completed_flag(&mut self) {
         let can = self.registers();
-        can.ir.write(|w| w.tc().set_bit());
+        can.ir().write(|w| w.tc().set_bit());
     }
 
     /// Clears the transmission cancelled flag.
     #[inline]
     pub fn clear_transmission_cancelled_flag(&mut self) {
         let can = self.registers();
-        can.ir.write(|w| w.tcf().set_bit());
+        can.ir().write(|w| w.tcf().set_bit());
     }
 }
 
@@ -1570,8 +1570,8 @@ where
     fn has_overrun(&self) -> bool {
         let can = self.registers();
         match FIFONR::NR {
-            0 => can.rxf0s.read().rf0l().bit(),
-            1 => can.rxf1s.read().rf1l().bit(),
+            0 => can.rxf0s().read().rf0l().bit(),
+            1 => can.rxf1s().read().rf1l().bit(),
             _ => unreachable!(),
         }
     }
@@ -1581,8 +1581,8 @@ where
     pub fn rx_fifo_is_empty(&self) -> bool {
         let can = self.registers();
         match FIFONR::NR {
-            0 => can.rxf0s.read().f0fl().bits() == 0,
-            1 => can.rxf1s.read().f1fl().bits() == 0,
+            0 => can.rxf0s().read().f0fl().bits() == 0,
+            1 => can.rxf1s().read().f1fl().bits() == 0,
             _ => unreachable!(),
         }
     }
@@ -1595,8 +1595,8 @@ where
 
         let can = self.registers();
         match FIFONR::NR {
-            0 => can.rxf0a.write(|w| unsafe { w.f0ai().bits(idx.into()) }),
-            1 => can.rxf1a.write(|w| unsafe { w.f1ai().bits(idx.into()) }),
+            0 => can.rxf0a().write(|w| unsafe { w.f0ai().bits(idx.into()) }),
+            1 => can.rxf1a().write(|w| unsafe { w.f1ai().bits(idx.into()) }),
             _ => unreachable!(),
         }
     }
@@ -1605,8 +1605,8 @@ where
     fn get_rx_mailbox(&self) -> Mailbox {
         let can = self.registers();
         let idx = match FIFONR::NR {
-            0 => can.rxf0s.read().f0gi().bits(),
-            1 => can.rxf1s.read().f1gi().bits(),
+            0 => can.rxf0s().read().f0gi().bits(),
+            1 => can.rxf1s().read().f1gi().bits(),
             _ => unreachable!(),
         };
         Mailbox::new(idx)

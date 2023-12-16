@@ -1174,21 +1174,21 @@ macro_rules! tim_hal {
                 };
 
                 // Write prescale
-                tim.psc.write(|w| { unsafe { w.psc().bits(prescale as u16) } });
+                tim.psc().write(|w| { unsafe { w.psc().bits(prescale as u16) } });
 
                 // Write period
-                tim.arr.write(|w| { unsafe { w.arr().bits(period.into()) } });
+                tim.arr().write(|w| { unsafe { w.arr().bits(period.into()) } });
 
                 // BDTR: Advanced-control timers
                 $(
                     // Set CCxP = OCxREF / CCxNP = !OCxREF
                     // Refer to RM0433 Rev 6 - Table 324.
-                    tim.$bdtr.write(|w|
+                    tim.$bdtr().write(|w|
                                    w.moe().$moe_set()
                     );
                 )*
 
-                tim.cr1.write(|w| w.cen().set_bit());
+                tim.cr1().write(|w| w.cen().set_bit());
 
                 unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
             }
@@ -1246,18 +1246,18 @@ macro_rules! tim_hal {
                     };
 
                     // Write prescaler
-                    tim.psc.write(|w| unsafe { w.psc().bits(prescaler as u16) });
+                    tim.psc().write(|w| unsafe { w.psc().bits(prescaler as u16) });
 
                     // Write period
-                    tim.arr.write(|w| unsafe { w.arr().bits(period.into()) });
+                    tim.arr().write(|w| unsafe { w.arr().bits(period.into()) });
 
                     $(
                         let (dtg, ckd) = calculate_deadtime(self.base_freq, self.deadtime);
 
                         match ckd {
-                            1 => tim.cr1.modify(|_, w| unsafe { w.ckd().bits(0) }),
-                            2 => tim.cr1.modify(|_, w| unsafe { w.ckd().bits(1) }),
-                            4 => tim.cr1.modify(|_, w| unsafe { w.ckd().bits(2) }),
+                            1 => tim.cr1().modify(|_, w| unsafe { w.ckd().bits(0) }),
+                            2 => tim.cr1().modify(|_, w| unsafe { w.ckd().bits(1) }),
+                            4 => tim.cr1().modify(|_, w| unsafe { w.ckd().bits(2) }),
                             _ => panic!("Should be unreachable, invalid deadtime prescaler"),
                         }
 
@@ -1273,12 +1273,12 @@ macro_rules! tim_hal {
                             //  BKE = 1 -> break is enabled
                             //  BKP = 0 for active low, 1 for active high
                             // Safety: bkf is set to a constant value (1) that is a valid value for the field per the reference manual
-                            unsafe { tim.$bdtr.write(|w| w.dtg().bits(dtg).bkf().bits(1).aoe().clear_bit().bke().set_bit().bkp().bit(bkp).moe().$moe_set()); }
+                            unsafe { tim.$bdtr().write(|w| w.dtg().bits(dtg).bkf().bits(1).aoe().clear_bit().bke().set_bit().bkp().bit(bkp).moe().$moe_set()); }
 
                             // AF1:
                             //  BKINE = 1 -> break input enabled
                             //  BKINP should make input active high (BDTR BKP will set polarity), bit value varies timer to timer
-                            tim.$af1.write(|w| w.bkine().set_bit().bkinp().$bkinp_setting());
+                            tim.$af1().write(|w| w.bkine().set_bit().bkinp().$bkinp_setting());
                         }
                         $(
                             // Not all timers that have break inputs have break2 inputs
@@ -1289,37 +1289,37 @@ macro_rules! tim_hal {
                                 //  BK2E = 1 -> break is enabled
                                 //  BK2P = 0 for active low, 1 for active high
                                 // Safety: bkf is set to a constant value (1) that is a valid value for the field per the reference manual
-                                unsafe { tim.$bdtr.write(|w| w.dtg().bits(dtg).bk2f().bits(1).aoe().clear_bit().bk2e().set_bit().bk2p().bit(bkp).moe().$moe_set()); }
+                                unsafe { tim.$bdtr().write(|w| w.dtg().bits(dtg).bk2f().bits(1).aoe().clear_bit().bk2e().set_bit().bk2p().bit(bkp).moe().$moe_set()); }
 
                                 // AF2:
                                 //  BKINE = 1 -> break input enabled
                                 //  BKINP should make input active high (BDTR BKP will set polarity), bit value varies timer to timer
-                                tim.af2.write(|w| w.bkine().set_bit().bk2inp().$bk2inp_setting());
+                                tim.af2().write(|w| w.bkine().set_bit().bk2inp().$bk2inp_setting());
                             }
                         )*
                         else {
                             // Safety: the DTG field of BDTR allows any 8-bit deadtime value and the dtg variable is u8
                             unsafe {
-                                tim.$bdtr.write(|w| w.dtg().bits(dtg).aoe().clear_bit().moe().$moe_set());
+                                tim.$bdtr().write(|w| w.dtg().bits(dtg).aoe().clear_bit().moe().$moe_set());
                             }
                         }
 
                         // BDTR: Advanced-control timers
                         // Set CCxP = OCxREF / CCxNP = !OCxREF
                         // Refer to RM0433 Rev 6 - Table 324.
-                        tim.$bdtr.modify(|_, w| w.moe().$moe_set());
+                        tim.$bdtr().modify(|_, w| w.moe().$moe_set());
                     )*
 
 
                     $(
                         match self.alignment {
                             Alignment::Left => { },
-                            Alignment::Right => { tim.cr1.modify(|_, w| w.dir().set_bit()); }, // Downcounter
-                            Alignment::Center => { tim.cr1.modify(|_, w| unsafe { w.$cms().bits(3) }); } // Center-aligned mode 3
+                            Alignment::Right => { tim.cr1().modify(|_, w| w.dir().set_bit()); }, // Downcounter
+                            Alignment::Center => { tim.cr1().modify(|_, w| unsafe { w.$cms().bits(3) }); } // Center-aligned mode 3
                         }
                     )*
 
-                    tim.cr1.modify(|_, w| w.cen().set_bit());
+                    tim.cr1().modify(|_, w| w.cen().set_bit());
 
                     unsafe {
                         MaybeUninit::<(PwmControl<$TIMX, FAULT>, PINS::Channel)>::uninit()
@@ -1427,19 +1427,19 @@ macro_rules! tim_hal {
                     fn is_fault_active(&self) -> bool {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        !tim.$bdtr.read().moe().bit()
+                        !tim.$bdtr().read().moe().bit()
                     }
 
                     fn clear_fault(&mut self) {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.$bdtr.modify(|_, w| w.moe().set_bit());
+                        tim.$bdtr().modify(|_, w| w.moe().set_bit());
                     }
 
                     fn set_fault(&mut self) {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.$bdtr.modify(|_, w| w.moe().clear_bit());
+                        tim.$bdtr().modify(|_, w| w.moe().clear_bit());
                     }
                 }
             )*
@@ -1532,7 +1532,7 @@ macro_rules! tim_pin_hal {
 
                     // Even though the field is 20 bits long for 16-bit counters, only 16 bits are
                     // valid, so we convert to the appropriate type.
-                    let arr = tim.arr.read().arr().bits() as $typ;
+                    let arr = tim.arr().read().arr().bits() as $typ;
 
                     // One PWM cycle is ARR+1 counts long
                     // Valid PWM duty cycles are 0 to ARR+1
@@ -1558,12 +1558,12 @@ macro_rules! tim_pin_hal {
                 fn ccer_enable(&mut self) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.ccer.modify(|_, w| w.$ccxe().set_bit());
+                    tim.ccer().modify(|_, w| w.$ccxe().set_bit());
                 }
                 fn ccer_disable(&mut self) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.ccer.modify(|_, w| w.$ccxe().clear_bit());
+                    tim.ccer().modify(|_, w| w.$ccxe().clear_bit());
                 }
             }
 
@@ -1571,7 +1571,7 @@ macro_rules! tim_pin_hal {
                 pub fn into_active_low(self) -> Pwm<$TIMX, $CH, COMP, ActiveLow, NPOL> {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.ccer.modify(|_, w| w.$ccxp().set_bit());
+                    tim.ccer().modify(|_, w| w.$ccxp().set_bit());
 
                     Pwm {
                         _channel: PhantomData,
@@ -1587,7 +1587,7 @@ macro_rules! tim_pin_hal {
                 pub fn into_active_high(self) -> Pwm<$TIMX, $CH, COMP, ActiveHigh, NPOL> {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.ccer.modify(|_, w| w.$ccxp().clear_bit());
+                    tim.ccer().modify(|_, w| w.$ccxp().clear_bit());
 
                     Pwm {
                         _channel: PhantomData,
@@ -1606,12 +1606,12 @@ macro_rules! tim_pin_hal {
                     fn ccer_enable(&mut self) {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.ccer.modify(|_, w| w.$ccxe().set_bit());
+                        tim.ccer().modify(|_, w| w.$ccxe().set_bit());
                     }
                     fn ccer_disable(&mut self) {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.ccer.modify(|_, w| w.$ccxe().clear_bit());
+                        tim.ccer().modify(|_, w| w.$ccxe().clear_bit());
                     }
                 }
 
@@ -1620,12 +1620,12 @@ macro_rules! tim_pin_hal {
                     fn ccer_enable(&mut self) {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.ccer.modify(|_, w| w.$ccxe().set_bit().$ccxne().set_bit());
+                        tim.ccer().modify(|_, w| w.$ccxe().set_bit().$ccxne().set_bit());
                     }
                     fn ccer_disable(&mut self) {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.ccer.modify(|_, w| w.$ccxe().clear_bit().$ccxne().clear_bit());
+                        tim.ccer().modify(|_, w| w.$ccxe().clear_bit().$ccxne().clear_bit());
                     }
                 }
 
@@ -1635,7 +1635,7 @@ macro_rules! tim_pin_hal {
                         // Make sure we aren't switching to complementary after we enable the channel
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        let enabled = tim.ccer.read().$ccxe().bit();
+                        let enabled = tim.ccer().read().$ccxe().bit();
 
                         assert!(!enabled);
 
@@ -1653,7 +1653,7 @@ macro_rules! tim_pin_hal {
                     pub fn into_comp_active_low(self) -> Pwm<$TIMX, $CH, ComplementaryEnabled, POL, ActiveLow> {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.ccer.modify(|_, w| w.$ccxnp().set_bit());
+                        tim.ccer().modify(|_, w| w.$ccxnp().set_bit());
 
                         Pwm {
                             _channel: PhantomData,
@@ -1669,7 +1669,7 @@ macro_rules! tim_pin_hal {
                     pub fn into_comp_active_high(self) -> Pwm<$TIMX, $CH, ComplementaryEnabled, POL, ActiveHigh> {
                         let tim = unsafe { &*$TIMX::ptr() };
 
-                        tim.ccer.modify(|_, w| w.$ccxnp().clear_bit());
+                        tim.ccer().modify(|_, w| w.$ccxnp().clear_bit());
 
                         Pwm {
                             _channel: PhantomData,
@@ -1806,19 +1806,19 @@ macro_rules! lptim_hal {
                 assert!(arr > 0);
 
                 // CFGR
-                tim.cfgr.modify(|_, w| unsafe { w.presc().bits(prescale) });
+                tim.cfgr().modify(|_, w| unsafe { w.presc().bits(prescale) });
 
                 // Enable
-                tim.cr.modify(|_, w| w.enable().set_bit());
+                tim.cr().modify(|_, w| w.enable().set_bit());
 
                 // Write ARR: LPTIM must be enabled
-                tim.arr.write(|w| unsafe { w.arr().bits(arr as u16) });
-                while !tim.isr.read().arrok().bit_is_set() {}
-                tim.icr.write(|w| w.arrokcf().set_bit());
+                tim.arr().write(|w| unsafe { w.arr().bits(arr as u16) });
+                while !tim.isr().read().arrok().bit_is_set() {}
+                tim.icr().write(|w| w.arrokcf().set_bit());
 
                 // PWM output is disabled by default, disable the
                 // entire timer
-                tim.cr.modify(|_, w| w.enable().clear_bit());
+                tim.cr().modify(|_, w| w.enable().clear_bit());
 
                 unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
             }
@@ -1834,33 +1834,33 @@ macro_rules! lptim_hal {
 
                     // LPTIM only has one output, so we disable the
                     // entire timer
-                    tim.cr.modify(|_, w| w.enable().clear_bit());
+                    tim.cr().modify(|_, w| w.enable().clear_bit());
                 }
 
                 fn enable(&mut self) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.cr.modify(|_, w| w.cntstrt().set_bit().enable().set_bit());
+                    tim.cr().modify(|_, w| w.cntstrt().set_bit().enable().set_bit());
                 }
 
                 fn get_duty(&self) -> u16 {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.cmp.read().cmp().bits()
+                    tim.cmp().read().cmp().bits()
                 }
 
                 fn get_max_duty(&self) -> u16 {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.arr.read().arr().bits()
+                    tim.arr().read().arr().bits()
                 }
 
                 fn set_duty(&mut self, duty: u16) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    tim.cmp.write(|w| unsafe { w.cmp().bits(duty) });
-                    while !tim.isr.read().cmpok().bit_is_set() {}
-                    tim.icr.write(|w| w.cmpokcf().set_bit());
+                    tim.cmp().write(|w| unsafe { w.cmp().bits(duty) });
+                    while !tim.isr().read().cmpok().bit_is_set() {}
+                    tim.icr().write(|w| w.cmpokcf().set_bit());
                 }
             }
         )+
