@@ -465,7 +465,7 @@ pub struct ACR {
 impl ACR {
     pub(crate) fn acr(&mut self) -> &flash::ACR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).acr }
+        unsafe { &(*FLASH::ptr()).acr() }
     }
 }
 
@@ -478,7 +478,7 @@ pub struct CR {
 impl CR {
     pub(crate) fn cr(&mut self) -> &flash::CR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).cr }
+        unsafe { &(*FLASH::ptr()).cr() }
     }
 }
 
@@ -491,7 +491,7 @@ pub struct ECCR {
 impl ECCR {
     pub(crate) fn eccr(&mut self) -> &flash::ECCR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).eccr }
+        unsafe { &(*FLASH::ptr()).eccr() }
     }
 }
 
@@ -504,7 +504,7 @@ pub struct KEYR {
 impl KEYR {
     pub(crate) fn keyr(&mut self) -> &flash::KEYR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).keyr }
+        unsafe { &(*FLASH::ptr()).keyr() }
     }
 }
 
@@ -517,7 +517,7 @@ pub struct OPTKEYR {
 impl OPTKEYR {
     pub(crate) fn optkeyr(&mut self) -> &flash::OPTKEYR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).optkeyr }
+        unsafe { &(*FLASH::ptr()).optkeyr() }
     }
 }
 
@@ -530,7 +530,7 @@ pub struct OPTR {
 impl OPTR {
     pub(crate) fn optr(&mut self) -> &flash::OPTR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).optr }
+        unsafe { &(*FLASH::ptr()).optr() }
     }
 }
 
@@ -543,7 +543,7 @@ pub struct PCROP1SR {
 impl PCROP1SR {
     pub(crate) fn pcrop1sr(&mut self) -> &flash::PCROP1SR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).pcrop1sr }
+        unsafe { &(*FLASH::ptr()).pcrop1sr() }
     }
 }
 
@@ -556,7 +556,7 @@ pub struct PCROP1ER {
 impl PCROP1ER {
     pub(crate) fn pcrop1er(&mut self) -> &flash::PCROP1ER {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).pcrop1er }
+        unsafe { &(*FLASH::ptr()).pcrop1er() }
     }
 }
 
@@ -569,7 +569,7 @@ pub struct PDKEYR {
 impl PDKEYR {
     pub(crate) fn pdkeyr(&mut self) -> &flash::PDKEYR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).pdkeyr }
+        unsafe { &(*FLASH::ptr()).pdkeyr() }
     }
 }
 
@@ -582,7 +582,7 @@ pub struct SEC1R {
 impl SEC1R {
     pub(crate) fn sec1r(&mut self) -> &flash::SEC1R {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).sec1r }
+        unsafe { &(*FLASH::ptr()).sec1r() }
     }
 }
 
@@ -595,7 +595,7 @@ pub struct SR {
 impl SR {
     pub(crate) fn sr(&mut self) -> &flash::SR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).sr }
+        unsafe { &(*FLASH::ptr()).sr() }
     }
 }
 
@@ -608,7 +608,7 @@ pub struct WRP1AR {
 impl WRP1AR {
     pub(crate) fn wrp1ar(&mut self) -> &flash::WRP1AR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).wrp1ar }
+        unsafe { &(*FLASH::ptr()).wrp1ar() }
     }
 }
 
@@ -621,6 +621,6 @@ pub struct WRP1BR {
 impl WRP1BR {
     pub(crate) fn wrp1br(&mut self) -> &flash::WRP1BR {
         // NOTE(unsafe) this proxy grants exclusive access to this register
-        unsafe { &(*FLASH::ptr()).wrp1br }
+        unsafe { &(*FLASH::ptr()).wrp1br() }
     }
 }
