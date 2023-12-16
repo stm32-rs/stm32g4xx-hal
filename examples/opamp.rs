@@ -12,6 +12,7 @@ use stm32g4xx_hal::opamp::opamp2::IntoPga as _;
 use stm32g4xx_hal::opamp::NonInvertingGain;
 use stm32g4xx_hal::opamp::PgaModeInternal;
 use stm32g4xx_hal::prelude::*;
+use stm32g4xx_hal::pwr::PwrExt;
 
 use utils::logger::info;
 
@@ -26,9 +27,10 @@ fn main() -> ! {
     let dp = stm32g4xx_hal::stm32::Peripherals::take().unwrap();
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
-    // setup clock
+    // setup clock and power
+    let pwr = dp.PWR.constrain().freeze();
     let config = stm32g4xx_hal::rcc::Config::hsi();
-    let mut rcc = dp.RCC.freeze(config);
+    let mut rcc = dp.RCC.freeze(config, pwr);
 
     // split gpio
     let gpioa = dp.GPIOA.split(&mut rcc);

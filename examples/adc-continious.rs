@@ -8,6 +8,7 @@ use crate::hal::{
     },
     delay::SYSTDelayExt,
     gpio::GpioExt,
+    pwr::PwrExt,
     rcc::{Config, RccExt},
     stm32::Peripherals,
 };
@@ -15,7 +16,7 @@ use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
 
-use log::info;
+use utils::logger::info;
 
 #[macro_use]
 mod utils;
@@ -32,7 +33,8 @@ fn main() -> ! {
     info!("rcc");
 
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = rcc.freeze(Config::hsi(), pwr);
 
     info!("Setup Gpio");
     let gpioa = dp.GPIOA.split(&mut rcc);

@@ -5,6 +5,7 @@
 
 use hal::delay::DelayFromCountDownTimer;
 use hal::prelude::*;
+use hal::pwr::PwrExt;
 use hal::rcc::Config;
 use hal::stm32;
 use hal::time::ExtU32;
@@ -24,7 +25,8 @@ fn main() -> ! {
     info!("start");
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
-    let mut rcc = dp.RCC.freeze(Config::hsi());
+    let pwr = dp.PWR.constrain().freeze();
+    let mut rcc = dp.RCC.freeze(Config::hsi(), pwr);
 
     info!("Init Led");
     let gpioa = dp.GPIOA.split(&mut rcc);
