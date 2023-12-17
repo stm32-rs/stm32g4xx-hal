@@ -47,18 +47,18 @@ pub enum FlashSize {
     Sz1M = 1024,
 }
 impl FlashSize {
-    const fn kbytes(self) -> u32 {
+    const fn bytes(self) -> u32 {
         SZ_1K * self as u32
     }
 }
 
-pub struct FlashWriter<'a, const SECTOR_SZ_KB: u32> {
+pub struct FlashWriter<'a, const SECTOR_SIZE: u32> {
     flash: &'a mut Parts,
     flash_sz: FlashSize,
     verify: bool,
     is_dual_bank: bool,
 }
-impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
+impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
     #[allow(unused)]
     fn unlock_options(&mut self) -> Result<()> {
         // Check if flash is busy
@@ -134,9 +134,9 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
 
         let bank_size = if self.is_dual_bank {
             // Each bank is only half the size in dual bank mode
-            self.flash_sz.kbytes() / 2
+            self.flash_sz.bytes() / 2
         } else {
-            self.flash_sz.kbytes()
+            self.flash_sz.bytes()
         };
 
         if offset > bank_size {
@@ -165,7 +165,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
     pub fn page_erase(&mut self, start_offset: u32) -> Result<()> {
         self.valid_address(start_offset)?;
 
-        if start_offset % SECTOR_SZ_KB != 0 {
+        if start_offset % SECTOR_SIZE != 0 {
             return Err(Error::AddressMisaligned);
         }
 
@@ -177,7 +177,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
 
         self.check_and_clear_errors()?;
 
-        let page = start_offset / SECTOR_SZ_KB;
+        let page = start_offset / SECTOR_SIZE;
         //defmt::dbg!(page);
 
         // Write address bits and Set Page Erase
@@ -212,6 +212,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
                     .per()
                     .set_bit()
             });
+            defmt::info!("{:b}", self.flash.cr.cr().read().bits());
         }
 
         // Not category 3 device
@@ -242,19 +243,9 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         self.check_and_clear_errors()?;
 
         if self.verify {
-            // By subtracting 1 from the sector size and masking with
-            // start_offset, we make 'start' point to the beginning of the
-            // page. We do this because the entire page should have been
-            // erased, regardless of where in the page the given
-            // 'start_offset' was.
-            let size = SECTOR_SZ_KB;
-            let start = start_offset & !(size - 1);
-            for idx in (start..start + size).step_by(2) {
-                let write_address = (FLASH_START + idx) as *const u16;
-                let verify: u16 = unsafe { core::ptr::read_volatile(write_address) };
-                if verify != 0xFFFF {
-                    return Err(Error::VerifyError);
-                }
+            let read = self.read(start_offset, SECTOR_SIZE as usize / 4)?;
+            for read in read.into_iter() {
+                assert_eq!(*read, u32::MAX);
             }
         }
 
@@ -267,7 +258,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
 
         // Make sure `start_offset` points to the begining of the page
         // so as to avoid erasing any data before it in the same page
-        if start_offset % SECTOR_SZ_KB != 0 {
+        if start_offset % SECTOR_SIZE != 0 {
             return Err(Error::AddressMisaligned);
         }
 
@@ -275,7 +266,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
 
         // Erase every sector touched by start_offset + length
         for offset in
-            (start_offset..start_offset + length as u32).step_by(SECTOR_SZ_KB.try_into().unwrap())
+            (start_offset..start_offset + length as u32).step_by(SECTOR_SIZE.try_into().unwrap())
         {
             defmt::dbg!(offset);
             self.page_erase(offset)?;
@@ -296,7 +287,9 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         let todo_dont = ();
         self.check_and_clear_errors().unwrap();
 
-        let address = (FLASH_START + offset) as *const _;
+        let address = (FLASH_START + offset) as *const u32;
+
+        // WARNING: I am getting the feeling that wee need to read this using volatile u32 reads
 
         Ok(
             // NOTE(unsafe) read with no side effects. The data returned will
@@ -310,7 +303,7 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
 
     pub fn read_exact(&mut self, start_offset: u32, dst: &mut [u8]) {
         self.check_and_clear_errors().unwrap();
-        let todo_dont = ();
+        let todo_maybe_dont = ();
 
         let address = (FLASH_START + start_offset) as *const u32;
         for (i, dst) in dst.chunks_mut(4).enumerate() {
@@ -372,7 +365,11 @@ impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
         self.check_and_clear_errors()?;
 
         if self.verify {
-            let todo = ();
+            let read = self.read(offset, data.len() / 4)?;
+            for (data, read) in data.chunks(4).zip(read) {
+                assert_eq!(data, read.to_ne_bytes());
+                let todo_remaining_bytes = ();
+            }
         }
 
         // Lock Flash and report success

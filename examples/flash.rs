@@ -29,21 +29,26 @@ fn main() -> ! {
     let mut flash_writer = flash.writer::<2048>(FlashSize::Sz256K);
 
     let bytes = flash_writer.read(0x0000_0000, 4).unwrap();
-    println!("Bank 1 first 4 bytes: {:?}", bytes);
+    println!("Bank 1 - first 4 bytes: {:#X}", bytes);
 
     if is_dual_bank {
-        let address = 0x0001_F000;
-        let bytes = flash_writer.read(address, 4).unwrap();
-        println!("Bank 2 first 4 bytes before write: {:?}", bytes);
+        let address = 0x0004_0000;
+        let mut before = [0];
+        before.copy_from_slice(flash_writer.read(address, 4).unwrap());
+        println!("Bank 2 - First 4 bytes before write: {:#X}", before);
         
         flash_writer.page_erase(address).unwrap();
         //let bytes = flash_writer.read(address, 4).unwrap();
-        //println!("Bank 2 first 4 bytes after erase: {:?}", bytes);
+        //println!("Bank 2 - First 4 bytes after erase: {:#X}", bytes);
 
-        let bytes = flash_writer.write(address, &[1, 2, 3, 4], true).unwrap();
+        let new_value = before[0].wrapping_add(2);
+        println!("Bank 2 - Writing: {:#X} to first 4 bytes", new_value);
+        let bytes = flash_writer.write(address, &new_value.to_ne_bytes(), true).unwrap();
         let bytes = flash_writer.read(address, 4).unwrap();
-        println!("Bank 2 first 4 bytes after write: {:?}", bytes);
+        println!("Bank 2 - First 4 bytes after write: {:#X}", bytes);
     }
+
+    println!("Done!");
 
     loop {
         cortex_m::asm::nop()
