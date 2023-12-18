@@ -379,8 +379,11 @@ impl Rcc {
         // The sequence to switch from Range11 normal mode to Range1 boost mode is:
         // 1. The system clock must be divided by 2 using the AHB prescaler before switching to a
         // higher system frequency.
-        self.rb.cfgr.modify(|_, w| unsafe { w.hpre().bits(0b1000) });
-        while self.rb.cfgr.read().hpre().bits() != 0b1000 {}
+        let half_apb = (self.rb.cfgr.read().hpre().bits() + 1).clamp(0b1000, 0b1111);
+        self.rb
+            .cfgr
+            .modify(|_r, w| unsafe { w.hpre().bits(half_apb) });
+        while self.rb.cfgr.read().hpre().bits() != half_apb {}
 
         // 2. Clear the R1MODE bit is in the PWR_CR5 register.
         unsafe { pwr::set_boost(true) };
@@ -402,8 +405,12 @@ impl Rcc {
 
         // 5. Wait for at least 1us and then reconfigure the AHB prescaler to get the needed HCLK
         // clock frequency.
+        let us_per_s = 1_000_000;
+        // Number of cycles @ sys_freq for 1us, rounded up, this will
+        // likely end up being 2us since the AHB prescaler is changed
+        let delay_cycles = (sys_freq + us_per_s - 1) / us_per_s;
+        cortex_m::asm::delay(delay_cycles);
 
-        // TODO: Do we really need to wait another 1us or is that included in the wait loop in step 1?
         self.rb
             .cfgr
             .modify(|_, w| unsafe { w.hpre().bits(ahb_psc_bits) });
