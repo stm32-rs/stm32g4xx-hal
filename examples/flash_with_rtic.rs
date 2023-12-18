@@ -73,7 +73,7 @@ mod app {
 
         unsafe {
             let mut flash = &(*stm32g4xx_hal::stm32::FLASH::ptr());
-            flash.acr.modify(|_, w| {
+            flash.acr().modify(|_, w| {
                 w.latency().bits(0b1000) // 8 wait states
             });
         }

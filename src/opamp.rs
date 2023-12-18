@@ -238,7 +238,7 @@ macro_rules! opamps {
 
                         /// Disables the opamp and returns the resources it held.
                         pub fn disable(self) -> (Disabled, Input, Option<$output>) {
-                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
+                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().reset() }
                             (Disabled, self.input, self.output)
                         }
 
@@ -246,7 +246,7 @@ macro_rules! opamps {
                         pub fn enable_output(&mut self, output:$output) {
                             self.output = Some(output);
                             unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().write(|w|
                                     w.opaintoen().output_pin());
                             }
                         }
@@ -256,7 +256,7 @@ macro_rules! opamps {
                         /// If the output was enabled, the output pin is returned.
                         pub fn disable_output(&mut self) -> Option<$output> {
                             unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().write(|w|
                                     w.opaintoen().adcchannel());
                             }
                             self.output.take()
@@ -267,7 +267,7 @@ macro_rules! opamps {
 
                         /// Disables the opamp and returns the resources it held.
                         pub fn disable(self) -> (Disabled, NonInverting, Inverting, Option<$output>) {
-                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
+                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().reset() }
                             (Disabled, self.non_inverting, self.inverting, self.output)
                         }
 
@@ -275,7 +275,7 @@ macro_rules! opamps {
                         pub fn enable_output(&mut self, output:$output) {
                             self.output = Some(output);
                             unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().write(|w|
                                     w.opaintoen().output_pin());
                             }
                         }
@@ -285,7 +285,7 @@ macro_rules! opamps {
                         /// If the output was enabled, the output pin is returned.
                         pub fn disable_output(&mut self) -> Option<$output> {
                             unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().write(|w|
                                     w.opaintoen().adcchannel());
                             }
                             self.output.take()
@@ -296,7 +296,7 @@ macro_rules! opamps {
 
                         /// Disables the opamp and returns the resources it held.
                         pub fn disable(self) -> (Disabled, NonInverting, MODE, Option<$output>) {
-                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
+                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().reset() }
                             (Disabled, self.non_inverting, self.config, self.output)
                         }
 
@@ -304,7 +304,7 @@ macro_rules! opamps {
                         pub fn enable_output(&mut self, output: $output) {
                             self.output = Some(output);
                             unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().write(|w|
                                     w.opaintoen().output_pin());
                             }
                         }
@@ -314,7 +314,7 @@ macro_rules! opamps {
                         /// If the output was enabled, the output pin is returned.
                         pub fn disable_output(&mut self) -> Option<$output> {
                             unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>]().write(|w|
                                     w.opaintoen().adcchannel());
                             }
                             self.output.take()
@@ -345,7 +345,7 @@ macro_rules! opamps {
                 ) -> (
                     $($opamp::Disabled,)*
                 ) {
-                    rcc.rb.apb2enr.modify(|_, w| w.syscfgen().set_bit());
+                    rcc.rb.apb2enr().modify(|_, w| w.syscfgen().set_bit());
 
                     (
                         $($opamp::Disabled,)*
@@ -383,7 +383,7 @@ macro_rules! opamps {
                     unsafe {
                         use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opamp _csr>]()
                             .write(|csr_w|
                                 csr_w
                                     .vp_sel()
@@ -452,7 +452,7 @@ macro_rules! opamps {
                     unsafe {
                         use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opamp _csr>]()
                             .write(|csr_w|
                                 csr_w.vp_sel()
                                     .$non_inverting_mask()
@@ -522,7 +522,7 @@ macro_rules! opamps {
                         use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
 
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opamp _csr>]()
                             .write(|csr_w|
                                 csr_w.vp_sel()
                                     .$non_inverting_mask()
