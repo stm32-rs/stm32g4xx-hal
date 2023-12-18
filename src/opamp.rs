@@ -174,6 +174,8 @@ macro_rules! opamps {
 
                 /// States for opampX.
                 pub mod $opamp {
+                    use core::{borrow::Borrow, marker::PhantomData};
+
                     #[allow(unused_imports)]
                     use crate::gpio::gpioa::*;
 
@@ -219,18 +221,18 @@ macro_rules! opamps {
 
                     /// State type for opamp running in programmable-gain mode.
                     pub struct Pga<NonInverting, MODE> {
-                        non_inverting: NonInverting,
+                        non_inverting: PhantomData<NonInverting>,
                         config: MODE,
                         output: Option<$output>,
                     }
 
                     /// Trait for opamps that can be run in programmable gain mode.
-                    pub trait IntoPga <IntoNonInverting, MODE, IntoOutput, NonInverting>
+                    pub trait IntoPga <MODE, IntoOutput, NonInverting>
                         where
                             IntoOutput: Into<$output>,
                     {
                         /// Configures the opamp for programmable gain operation.
-                        fn pga(self, non_inverting: IntoNonInverting, config: MODE, output: Option<IntoOutput>)
+                        fn pga<B: Borrow<NonInverting>>(self, non_inverting: B, config: MODE, output: Option<IntoOutput>)
                             -> Pga<NonInverting, MODE>;
                     }
 
@@ -295,9 +297,9 @@ macro_rules! opamps {
                     impl<NonInverting, MODE> Pga<NonInverting, MODE> {
 
                         /// Disables the opamp and returns the resources it held.
-                        pub fn disable(self) -> (Disabled, NonInverting, MODE, Option<$output>) {
+                        pub fn disable(self) -> (Disabled, MODE, Option<$output>) {
                             unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
-                            (Disabled, self.non_inverting, self.config, self.output)
+                            (Disabled, self.config, self.output)
                         }
 
                         /// Enables the external output pin.
@@ -504,19 +506,16 @@ macro_rules! opamps {
         $mode:ty
     } => {
         paste::paste!{
-            impl <IntoNonInverting, IntoOutput> IntoPga
-                <IntoNonInverting, $mode, IntoOutput, $non_inverting> for Disabled
+            impl<IntoOutput> IntoPga<$mode, IntoOutput, $non_inverting> for Disabled
                 where
-                    IntoNonInverting: Into<$non_inverting>,
                     IntoOutput: Into<$output>,
             {
-                fn pga(
+                fn pga<B: Borrow<$non_inverting>>(
                     self,
-                    non_inverting: IntoNonInverting,
+                    _non_inverting: B,
                     config: $mode,
                     output: Option<IntoOutput>,
                 ) -> Pga<$non_inverting, $mode> {
-                    let non_inverting = non_inverting.into();
                     let output = output.map(|output| output.into());
                     unsafe {
                         use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
@@ -539,7 +538,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Pga {non_inverting, config, output}
+                    Pga {non_inverting: PhantomData, config, output}
                 }
             }
         }

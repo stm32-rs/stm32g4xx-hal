@@ -86,8 +86,8 @@ fn main() -> ! {
 
     #[allow(unreachable_code)]
     {
-        let (_opamp1, _pa1, _mode, _some_pa2) = _opamp1.disable();
-        let (_opamp2, _pa7, _mode, _none) = opamp2.disable();
+        let (_opamp1, _pa1, _mode) = _opamp1.disable();
+        let (_opamp2, _pa7, _mode) = opamp2.disable();
 
         loop {
             delay.delay_ms(100);
