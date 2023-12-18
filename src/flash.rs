@@ -178,7 +178,6 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         self.check_and_clear_errors()?;
 
         let page = start_offset / SECTOR_SIZE;
-        //defmt::dbg!(page);
 
         // Write address bits and Set Page Erase
         // NOTE(unsafe) This sets the page address in the Address Register.
@@ -195,15 +194,11 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         unsafe {
             const PAGES_PER_BANK: u32 = 128;
             let (is_bank2, page) = if self.is_dual_bank() && page >= PAGES_PER_BANK {
-                //defmt::info!("Bank 2");
                 // page 0 in bank 2 is at the same address as page 128 would have had been, assuming the same page size
                 (true, page - PAGES_PER_BANK)
             } else {
                 (false, page)
             };
-
-            defmt::dbg!(is_bank2);
-            defmt::dbg!(page);
 
             self.flash.cr.cr().modify(|_, w| {
                 w.bits((is_bank2 as u32) << 11) // BKER // TODO remove this once it's added to the PAC
@@ -212,7 +207,6 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
                     .per()
                     .set_bit()
             });
-            defmt::info!("{:b}", self.flash.cr.cr().read().bits());
         }
 
         // Not category 3 device
@@ -243,9 +237,12 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         self.check_and_clear_errors()?;
 
         if self.verify {
-            let read = self.read(start_offset, SECTOR_SIZE as usize / 4)?;
-            for read in read.into_iter() {
-                assert_eq!(*read, u32::MAX);
+            for offset in start_offset..(SECTOR_SIZE / 4) {
+                let mut data = [u8::MAX; 16];
+                self.read_exact(offset, &mut data[..]);
+                if data != [u8::MAX; 16] {
+                    return Err(Error::VerifyError);
+                }
             }
         }
 
@@ -268,7 +265,6 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         for offset in
             (start_offset..start_offset + length as u32).step_by(SECTOR_SIZE.try_into().unwrap())
         {
-            defmt::dbg!(offset);
             self.page_erase(offset)?;
         }
 
@@ -279,13 +275,7 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
     /// Retrieve a slice of data from `FLASH_START + offset`
     pub fn read(&mut self, offset: u32, length: usize) -> Result<&[u32]> {
         self.valid_address(offset)?;
-
-        //if offset + length as u32 > self.flash_sz.kbytes() {
-        //    return Err(Error::LengthTooLong);
-        //}
-
-        let todo_dont = ();
-        self.check_and_clear_errors().unwrap();
+        self.valid_length(offset, length, true)?;
 
         let address = (FLASH_START + offset) as *const u32;
 
@@ -302,9 +292,6 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
     }
 
     pub fn read_exact(&mut self, start_offset: u32, dst: &mut [u8]) {
-        self.check_and_clear_errors().unwrap();
-        let todo_maybe_dont = ();
-
         let address = (FLASH_START + start_offset) as *const u32;
         for (i, dst) in dst.chunks_mut(4).enumerate() {
             let word = unsafe { core::ptr::read_volatile(address.add(i)) };
@@ -336,8 +323,6 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         for (idx, data) in data.chunks(8).enumerate() {
             let write_address1 = (FLASH_START + offset + 8 * idx as u32) as *mut u32;
             let write_address2 = unsafe { write_address1.add(1) };
-            //defmt::dbg!(write_address1);
-            //defmt::dbg!(write_address2);
 
             // Check if there is enough data to make 2 words, if there isn't, pad the data with 0xFF
             let mut tmp_buffer = [0xFF; 8];
@@ -365,10 +350,12 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         self.check_and_clear_errors()?;
 
         if self.verify {
-            let read = self.read(offset, data.len() / 4)?;
-            for (data, read) in data.chunks(4).zip(read) {
-                assert_eq!(data, read.to_ne_bytes());
-                let todo_remaining_bytes = ();
+            for (i, data) in data.into_iter().enumerate() {
+                let mut read = [u8::MAX; 1];
+                self.read_exact(offset + i as u32, &mut read[..]);
+                if data != &read[0] {
+                    return Err(Error::VerifyError);
+                }
             }
         }
 
@@ -380,18 +367,17 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
     /// NOTE: This will (try to) lock the flash if there is an error
     fn check_and_clear_errors(&mut self) -> Result<()> {
         let status = self.flash.sr.sr().read();
-        assert!(status.fasterr().bit_is_clear());
-        assert!(status.miserr().bit_is_clear());
-        assert!(status.operr().bit_is_clear());
-        assert!(status.optverr().bit_is_clear());
-        assert!(status.progerr().bit_is_clear());
-        assert!(status.rderr().bit_is_clear());
-        assert!(status.sizerr().bit_is_clear());
-        assert!(status.pgserr().bit_is_clear());
+        debug_assert!(status.fasterr().bit_is_clear());
+        debug_assert!(status.miserr().bit_is_clear());
+        debug_assert!(status.operr().bit_is_clear());
+        debug_assert!(status.optverr().bit_is_clear());
+        debug_assert!(status.progerr().bit_is_clear());
+        debug_assert!(status.rderr().bit_is_clear());
+        debug_assert!(status.sizerr().bit_is_clear());
+        debug_assert!(status.pgserr().bit_is_clear());
 
         Ok(if status.pgaerr().bit_is_set() {
             self.flash.sr.sr().modify(|_, w| w.pgaerr().clear_bit());
-            panic!();
             self.lock()?;
             return Err(Error::ProgrammingError);
         } else if status.wrperr().bit_is_set() {
