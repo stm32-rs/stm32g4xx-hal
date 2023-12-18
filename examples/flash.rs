@@ -2,11 +2,10 @@
 #![no_std]
 
 use cortex_m_rt::entry;
-use hal::prelude::*;
+use hal::flash::FlashExt;
+use hal::flash::FlashSize;
 use hal::stm32;
 use stm32g4xx_hal as hal;
-use hal::flash::FlashSize;
-use hal::flash::FlashExt;
 extern crate cortex_m_rt as rt;
 
 #[macro_use]
@@ -19,7 +18,6 @@ fn main() -> ! {
     utils::logger::init();
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let mut rcc = dp.RCC.constrain();
 
     let mut flash = dp.FLASH.constrain();
     let is_dual_bank = flash.is_dual_bank();
@@ -36,14 +34,16 @@ fn main() -> ! {
         let mut before = [0];
         before.copy_from_slice(flash_writer.read(address, 4).unwrap());
         println!("Bank 2 - First 4 bytes before write: {:#X}", before);
-        
+
         flash_writer.page_erase(address).unwrap();
-        //let bytes = flash_writer.read(address, 4).unwrap();
-        //println!("Bank 2 - First 4 bytes after erase: {:#X}", bytes);
+        let bytes = flash_writer.read(address, 4).unwrap();
+        println!("Bank 2 - First 4 bytes after erase: {:#X}", bytes);
 
         let new_value = before[0].wrapping_add(2);
         println!("Bank 2 - Writing: {:#X} to first 4 bytes", new_value);
-        let bytes = flash_writer.write(address, &new_value.to_ne_bytes(), true).unwrap();
+        let bytes = flash_writer
+            .write(address, &new_value.to_ne_bytes(), true)
+            .unwrap();
         let bytes = flash_writer.read(address, 4).unwrap();
         println!("Bank 2 - First 4 bytes after write: {:#X}", bytes);
     }
