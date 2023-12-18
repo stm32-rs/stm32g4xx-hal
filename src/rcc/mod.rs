@@ -531,16 +531,16 @@ pub struct AHB1 {
 impl AHB1 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::AHB1ENR {
-        &rcc.ahb1enr()
+        rcc.ahb1enr()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::AHB1RSTR {
-        &rcc.ahb1rstr()
+        rcc.ahb1rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB1SMENR {
-        &rcc.ahb1smenr()
+        rcc.ahb1smenr()
     }
 }
 
@@ -550,16 +550,16 @@ pub struct AHB2 {
 impl AHB2 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::AHB2ENR {
-        &rcc.ahb2enr()
+        rcc.ahb2enr()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::AHB2RSTR {
-        &rcc.ahb2rstr()
+        rcc.ahb2rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB2SMENR {
-        &rcc.ahb2smenr()
+        rcc.ahb2smenr()
     }
 }
 
@@ -570,17 +570,17 @@ impl AHB3 {
     #[allow(unused)]
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::AHB3ENR {
-        &rcc.ahb3enr()
+        rcc.ahb3enr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::AHB3RSTR {
-        &rcc.ahb3rstr()
+        rcc.ahb3rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB3SMENR {
-        &rcc.ahb3smenr()
+        rcc.ahb3smenr()
     }
 }
 
@@ -590,16 +590,16 @@ pub struct APB1_1 {
 impl APB1_1 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::APB1ENR1 {
-        &rcc.apb1enr1()
+        rcc.apb1enr1()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR1 {
-        &rcc.apb1rstr1()
+        rcc.apb1rstr1()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR1 {
-        &rcc.apb1smenr1()
+        rcc.apb1smenr1()
     }
 }
 
@@ -609,16 +609,16 @@ pub struct APB1_2 {
 impl APB1_2 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::APB1ENR2 {
-        &rcc.apb1enr2()
+        rcc.apb1enr2()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR2 {
-        &rcc.apb1rstr2()
+        rcc.apb1rstr2()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR2 {
-        &rcc.apb1smenr2()
+        rcc.apb1smenr2()
     }
 }
 
@@ -628,16 +628,16 @@ pub struct APB2 {
 impl APB2 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::APB2ENR {
-        &rcc.apb2enr()
+        rcc.apb2enr()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::APB2RSTR {
-        &rcc.apb2rstr()
+        rcc.apb2rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB2SMENR {
-        &rcc.apb2smenr()
+        rcc.apb2smenr()
     }
 }
 
