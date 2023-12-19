@@ -26,26 +26,26 @@ fn main() -> ! {
 
     let mut flash_writer = flash.writer::<2048>(FlashSize::Sz256K);
 
-    let bytes = flash_writer.read(0x0000_0000, 4).unwrap();
-    println!("Bank 1 - first 4 bytes: {:#X}", bytes);
+    let mut words = [0; 1];
+    flash_writer.read_exact(0x0000_0000, &mut words[..]);
+    println!("Bank 1 - first 4 bytes: {:#X}", words[0]);
 
     if is_dual_bank {
         let address = 0x0004_0000;
-        let mut before = [0];
-        before.copy_from_slice(flash_writer.read(address, 4).unwrap());
-        println!("Bank 2 - First 4 bytes before write: {:#X}", before);
+        flash_writer.read_exact(address, &mut words[..]);
+        println!("Bank 2 - First 4 bytes before write: {:#X}", words[0]);
 
         flash_writer.page_erase(address).unwrap();
-        let bytes = flash_writer.read(address, 4).unwrap();
-        println!("Bank 2 - First 4 bytes after erase: {:#X}", bytes);
+        flash_writer.read_exact(address, &mut words[..]);
+        println!("Bank 2 - First 4 bytes after erase: {:#X}", words[0]);
 
-        let new_value = before[0].wrapping_add(2);
+        let new_value = words[0].wrapping_add(2);
         println!("Bank 2 - Writing: {:#X} to first 4 bytes", new_value);
         flash_writer
             .write(address, &new_value.to_ne_bytes(), true)
             .unwrap();
-        let bytes = flash_writer.read(address, 4).unwrap();
-        println!("Bank 2 - First 4 bytes after write: {:#X}", bytes);
+        flash_writer.read_exact(address, &mut words[..]);
+        println!("Bank 2 - First 4 bytes after write: {:#X}", words[0]);
     }
 
     println!("Done!");
