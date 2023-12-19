@@ -41,7 +41,7 @@ fn main() -> ! {
 
         let new_value = before[0].wrapping_add(2);
         println!("Bank 2 - Writing: {:#X} to first 4 bytes", new_value);
-        let bytes = flash_writer
+        flash_writer
             .write(address, &new_value.to_ne_bytes(), true)
             .unwrap();
         let bytes = flash_writer.read(address, 4).unwrap();

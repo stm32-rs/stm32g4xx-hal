@@ -350,7 +350,7 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         self.check_and_clear_errors()?;
 
         if self.verify {
-            for (i, data) in data.into_iter().enumerate() {
+            for (i, data) in data.iter().enumerate() {
                 let mut read = [u8::MAX; 1];
                 self.read_exact(offset + i as u32, &mut read[..]);
                 if data != &read[0] {
@@ -376,7 +376,7 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
         debug_assert!(status.sizerr().bit_is_clear());
         debug_assert!(status.pgserr().bit_is_clear());
 
-        Ok(if status.pgaerr().bit_is_set() {
+        if status.pgaerr().bit_is_set() {
             self.flash.sr.sr().modify(|_, w| w.pgaerr().clear_bit());
             self.lock()?;
             return Err(Error::ProgrammingError);
@@ -385,7 +385,9 @@ impl<'a, const SECTOR_SIZE: u32> FlashWriter<'a, SECTOR_SIZE> {
 
             self.lock()?;
             return Err(Error::WriteError);
-        })
+        }
+
+        Ok(())
     }
 
     fn wait_for_ready(&mut self) {
@@ -484,23 +486,6 @@ pub struct Parts {
     pub(crate) _wrp1br: WRP1BR,
 }
 impl Parts {
-    #[cfg(any(feature = "stm32g431", feature = "stm32g441",))]
-    pub fn writer(&mut self, flash_sz: FlashSize) -> FlashWriter<{ 2 * SZ_1K }> {
-        FlashWriter {
-            flash: self,
-            flash_sz,
-            verify: true,
-        }
-    }
-    #[cfg(any(
-        feature = "stm32g471",
-        feature = "stm32g473",
-        feature = "stm32g474",
-        feature = "stm32g483",
-        feature = "stm32g484",
-        feature = "stm32g491",
-        feature = "stm32g4a1",
-    ))]
     pub fn writer<const PAGE_SIZE_KB: u32>(
         &mut self,
         flash_sz: FlashSize,
