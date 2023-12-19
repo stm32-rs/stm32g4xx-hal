@@ -20,6 +20,10 @@ use crate::stm32::{RCC, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
 use core::cell::UnsafeCell;
 use core::ptr;
+use crate::dma::MemoryToPeripheral;
+use crate::dma::traits::TargetAddress;
+use crate::dma::mux::DmaMuxResources;
+
 pub use hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
 
 /// SPI error
@@ -74,6 +78,7 @@ macro_rules! spi {
         sck: [ $($( #[ $pmetasck:meta ] )* $SCK:ty,)+ ],
         miso: [ $($( #[ $pmetamiso:meta ] )* $MISO:ty,)+ ],
         mosi: [ $($( #[ $pmetamosi:meta ] )* $MOSI:ty,)+ ],
+        $mux:expr,
     ) => {
         impl PinSck<$SPIX> for NoSck {}
 
@@ -166,6 +171,14 @@ macro_rules! spi {
             pub fn release(self) -> ($SPIX, PINS) {
                 (self.spi, self.pins)
             }
+
+            pub fn enable_tx_dma(self) -> Spi<$SPIX, PINS> {
+                self.spi.cr2.modify(|_, w| w.txdmaen().set_bit());
+                Spi {
+                    spi: self.spi,
+                    pins: self.pins,
+                }
+            }
         }
 
         impl SpiExt<$SPIX> for $SPIX {
@@ -220,6 +233,18 @@ macro_rules! spi {
                 })
             }
         }
+        unsafe impl<Pin> TargetAddress<MemoryToPeripheral> for Spi<$SPIX, Pin> {
+            #[inline(always)]
+            fn address(&self) -> u32 {
+                // unsafe: only the Tx part accesses the Tx register
+                &unsafe { &*<$SPIX>::ptr() }.dr as *const _ as u32
+            }
+
+            type MemSize = u8;
+
+            const REQUEST_LINE: Option<u8> = Some($mux as u8);
+        }
+
 
         impl<PINS> ::hal::blocking::spi::transfer::Default<u8> for Spi<$SPIX, PINS> {}
 
@@ -266,6 +291,7 @@ spi!(
         ))]
         PG4<Alternate<AF5>>,
     ],
+    DmaMuxResources::SPI1_TX,
 );
 
 spi!(
@@ -285,6 +311,7 @@ spi!(
         PA11<Alternate<AF5>>,
         PB15<Alternate<AF5>>,
     ],
+    DmaMuxResources::SPI2_TX,
 );
 
 spi!(
@@ -310,6 +337,7 @@ spi!(
         PB5<Alternate<AF6>>,
         PC12<Alternate<AF6>>,
     ],
+    DmaMuxResources::SPI3_TX,
 );
 
 #[cfg(any(
@@ -334,4 +362,5 @@ spi!(
         PE6<Alternate<AF5>>,
         PE14<Alternate<AF5>>,
     ],
+    DmaMuxResources::SPI4_TX,
 );
