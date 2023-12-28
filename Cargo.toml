@@ -40,6 +40,10 @@ version = "0.2.5"
 features = ["unproven"]
 version = "0.2.4"
 
+[dependencies.embedded-hal-one]
+version = "1.0.0-rc.3"
+package = "embedded-hal"
+
 [dependencies.embedded-dma]
 version = "0.1.2"
 
