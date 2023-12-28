@@ -37,6 +37,16 @@ pub enum Error {
     Crc,
 }
 
+impl embedded_hal_one::spi::Error for Error {
+    fn kind(&self) -> embedded_hal_one::spi::ErrorKind {
+        match self {
+            Self::Overrun => embedded_hal_one::spi::ErrorKind::Overrun,
+            Self::ModeFault => embedded_hal_one::spi::ErrorKind::ModeFault,
+            Self::Crc => embedded_hal_one::spi::ErrorKind::Other,
+        }
+    }
+}
+
 /// A filler type for when the SCK pin is unnecessary
 pub struct NoSck;
 /// A filler type for when the Miso pin is unnecessary
@@ -71,6 +81,17 @@ pub trait SpiExt<SPI>: Sized {
     where
         PINS: Pins<SPI>,
         T: Into<Hertz>;
+}
+
+pub trait FrameSize: Copy + Default {
+    const DFF: bool;
+}
+
+impl FrameSize for u8 {
+    const DFF: bool = false;
+}
+impl FrameSize for u16 {
+    const DFF: bool = true;
 }
 
 macro_rules! spi {
@@ -181,22 +202,9 @@ macro_rules! spi {
             }
         }
 
-        impl SpiExt<$SPIX> for $SPIX {
-            fn spi<PINS, T>(self, pins: PINS, mode: Mode, freq: T, rcc: &mut Rcc) -> Spi<$SPIX, PINS>
-            where
-                PINS: Pins<$SPIX>,
-                T: Into<Hertz>
-                {
-                    Spi::$spiX(self, pins, mode, freq, rcc)
-                }
-        }
-
-        impl<PINS> hal::spi::FullDuplex<u8> for Spi<$SPIX, PINS> {
-            type Error = Error;
-
-            fn read(&mut self) -> nb::Result<u8, Error> {
+        impl<PINS> Spi<$SPIX, PINS> {
+            fn nb_read<W: FrameSize>(&mut self) -> nb::Result<W, Error> {
                 let sr = self.spi.sr.read();
-
                 Err(if sr.ovr().bit_is_set() {
                     nb::Error::Other(Error::Overrun)
                 } else if sr.modf().bit_is_set() {
@@ -207,16 +215,14 @@ macro_rules! spi {
                     // NOTE(read_volatile) read only 1 byte (the svd2rust API only allows
                     // reading a half-word)
                     return Ok(unsafe {
-                        ptr::read_volatile(&self.spi.dr as *const _ as *const u8)
+                        ptr::read_volatile(&self.spi.dr as *const _ as *const W)
                     });
                 } else {
                     nb::Error::WouldBlock
                 })
             }
-
-            fn send(&mut self, byte: u8) -> nb::Result<(), Error> {
+            fn nb_write<W: FrameSize>(&mut self, word: W) -> nb::Result<(), Error> {
                 let sr = self.spi.sr.read();
-
                 Err(if sr.ovr().bit_is_set() {
                     nb::Error::Other(Error::Overrun)
                 } else if sr.modf().bit_is_set() {
@@ -224,13 +230,130 @@ macro_rules! spi {
                 } else if sr.crcerr().bit_is_set() {
                     nb::Error::Other(Error::Crc)
                 } else if sr.txe().bit_is_set() {
-                    let dr = &self.spi.dr as *const _ as *const UnsafeCell<u8>;
+                    let dr = &self.spi.dr as *const _ as *const UnsafeCell<W>;
                     // NOTE(write_volatile) see note above
-                    unsafe { ptr::write_volatile(UnsafeCell::raw_get(dr), byte) };
+                    unsafe { ptr::write_volatile(UnsafeCell::raw_get(dr), word) };
                     return Ok(());
                 } else {
                     nb::Error::WouldBlock
                 })
+            }
+            fn set_tx_only(&mut self) {
+                self.spi
+                    .cr1
+                    .modify(|_, w| w.bidimode().set_bit().bidioe().set_bit());
+            }
+            fn set_bidi(&mut self) {
+                self.spi
+                    .cr1
+                    .modify(|_, w| w.bidimode().clear_bit().bidioe().clear_bit());
+            }
+        }
+
+        impl SpiExt<$SPIX> for $SPIX {
+            fn spi<PINS, T>(self, pins: PINS, mode: Mode, freq: T, rcc: &mut Rcc) -> Spi<$SPIX, PINS>
+            where
+                PINS: Pins<$SPIX>,
+                T: Into<Hertz>
+                {
+                    Spi::$spiX(self, pins, mode, freq, rcc)
+                }
+        }
+
+        impl<PINS> embedded_hal_one::spi::ErrorType for Spi<$SPIX, PINS> {
+            type Error = Error;
+        }
+
+        impl<PINS> embedded_hal_one::spi::SpiBus for Spi<$SPIX, PINS> {
+            fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                if words.len() == 0 { return Ok(()) }
+                // clear tx-only status in the case the previous operation was a write
+                self.set_bidi();
+                // prefill write fifo so that the clock doen't stop while fetch the read byte
+                // one frame should be enough?
+                nb::block!(self.nb_write(0u8))?;
+                let len = words.len();
+                for w in words[..len-1].iter_mut() {
+                    // TODO: 16 bit frames, bidirectional pins
+                    nb::block!(self.nb_write(0u8))?;
+                    *w = nb::block!(self.nb_read())?;
+                }
+                // safety: length > 0 checked at start of function
+                *words.last_mut().unwrap() = nb::block!(self.nb_read())?;
+                Ok(())
+            }
+
+            fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
+                self.set_tx_only();
+                Ok(for w in words {
+                    nb::block!(self.nb_write(*w))?
+                })
+            }
+
+            fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
+                if read.len() == 0 {
+                    return self.write(write)
+                } else if write.len() == 0 {
+                    return self.read(read)
+                }
+
+                self.set_bidi();
+                // same prefill as in read, this time with actual data
+                nb::block!(self.nb_write(write[0]))?;
+                let common_len = core::cmp::min(read.len(), write.len());
+                // take 1 less because write skips the first element
+                let zipped = read.iter_mut().zip(write.into_iter().skip(1)).take(common_len - 1);
+                for (r, w) in zipped {
+                    nb::block!(self.nb_write(*w))?;
+                    *r = nb::block!(self.nb_read())?;
+                }
+                read[common_len-1] = nb::block!(self.nb_read())?;
+                
+                if read.len() > common_len {
+                    self.read(&mut read[common_len..])
+                } else {
+                    self.write(&write[common_len..])
+                }
+            }
+            fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
+                if words.len() == 0 { return Ok(()) }
+                self.set_bidi();
+                nb::block!(self.nb_write(words[0]))?;
+                let cells = core::cell::Cell::from_mut(words).as_slice_of_cells();
+
+                for rw in cells.windows(2) {
+                    let r = &rw[0];
+                    let w = &rw[1];
+                    
+                    nb::block!(self.nb_write(w.get()))?;
+                    r.set(nb::block!(self.nb_read())?);
+                }
+                *words.last_mut().unwrap() = nb::block!(self.nb_read())?;
+                Ok(())
+            }
+            fn flush(&mut self) -> Result<(), Self::Error> {
+                // stop receiving data
+                self.set_tx_only();
+                // wait for tx fifo to be drained by the peripheral
+                while self.spi.sr.read().ftlvl() != 0 { core::hint::spin_loop() };
+                // drain rx fifo
+                Ok(while match self.nb_read::<u8>() {
+                    Ok(_) => true,
+                    Err(nb::Error::WouldBlock) => false,
+                    Err(nb::Error::Other(e)) => return Err(e)
+                } { core::hint::spin_loop() })
+            }
+        }
+
+        impl<PINS> hal::spi::FullDuplex<u8> for Spi<$SPIX, PINS> {
+            type Error = Error;
+
+            fn read(&mut self) -> nb::Result<u8, Error> {
+                self.nb_read()
+            }
+
+            fn send(&mut self, byte: u8) -> nb::Result<(), Error> {
+                self.nb_write(byte)
             }
         }
         unsafe impl<Pin> TargetAddress<MemoryToPeripheral> for Spi<$SPIX, Pin> {
