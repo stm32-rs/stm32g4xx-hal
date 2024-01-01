@@ -1,9 +1,11 @@
 #![allow(unsafe_code)]
 cfg_if::cfg_if! {
     if #[cfg(all(feature = "log-rtt", feature = "defmt"))] {
+        #[allow(unused_imports)]
         pub use defmt::{info, trace, warn, debug, error};
 
     } else {
+        #[allow(unused_imports)]
         pub use log::{info, trace, warn, debug, error};
     }
 }
