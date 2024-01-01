@@ -58,7 +58,9 @@ cfg_if::cfg_if! {
     else if #[cfg(all(feature = "log-rtt"/*, feature = "defmt"*/))] {
         use defmt_rtt as _; // global logger
         use panic_probe as _;
+        #[allow(unused_imports)]
         pub use defmt::Logger;
+        #[allow(unused_imports)]
         pub use defmt::println;
 
         #[allow(dead_code)]
