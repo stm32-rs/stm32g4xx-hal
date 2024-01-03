@@ -92,8 +92,11 @@ fn main() -> ! {
         let vref =
             Vref::sample_to_millivolts_ext((b[2] + b[5]) / 2, vdda, config::Resolution::Twelve);
         info!("vref: {}mV", vref);
-        let raw_temp = (((b[1] + b[4]) / 2) as f32 * (vdda as f32 / 3000.0)) as u16;
-        let temp = Temperature::temperature_to_degrees_centigrade(raw_temp);
+        let temp = Temperature::temperature_to_degrees_centigrade(
+            (b[1] + b[4]) / 2,
+            vdda as f32 / 1000.,
+            config::Resolution::Twelve,
+        );
         info!("temp: {}°C", temp);
     }
 }
