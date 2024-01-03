@@ -85,7 +85,7 @@ fn main() -> ! {
     // Assume vdda is 3.3V, see adc-continious.rs for an example of measuring VDDA using VREF
     let temp =
         Temperature::temperature_to_degrees_centigrade(first_buffer[1], 3.3, Resolution::Twelve);
-    info!("temp: {}℃C", temp);
+    info!("temp: {}°C", temp);
 
     #[allow(clippy::empty_loop)]
     loop {}

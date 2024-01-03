@@ -5,6 +5,7 @@ mod utils;
 
 use crate::hal::{
     adc::{
+        config,
         config::{Continuous, Dma as AdcDma, SampleTime, Sequence},
         AdcClaim, ClockSource, Temperature, Vref,
     },
@@ -13,12 +14,10 @@ use crate::hal::{
     gpio::GpioExt,
     pwr::PwrExt,
     rcc::{Config, RccExt},
+    signature::{VrefCal, VDDA_CALIB},
     stm32::Peripherals,
 };
 use stm32g4xx_hal as hal;
-
-use stm32g4xx_hal::adc::config;
-use stm32g4xx_hal::signature::{VrefCal, VDDA_CALIB};
 
 use cortex_m_rt::entry;
 use utils::logger::info;

@@ -10,9 +10,9 @@ use crate::hal::{
     gpio::GpioExt,
     pwr::PwrExt,
     rcc::{Config, RccExt},
+    signature::{VrefCal, VDDA_CALIB},
     stm32::Peripherals,
 };
-use hal::signature::{VrefCal, VDDA_CALIB};
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
@@ -77,6 +77,6 @@ fn main() -> ! {
             vdda as f32 / 1000.,
             Resolution::Twelve,
         );
-        info!("temp: {}℃C", temp);
+        info!("temp: {}°C", temp);
     }
 }
