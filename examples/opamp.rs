@@ -5,7 +5,7 @@
 
 use stm32g4xx_hal::adc::AdcClaim;
 use stm32g4xx_hal::adc::ClockSource;
-use stm32g4xx_hal::opamp::{InternalOutput, NonInvertingGain, PgaModeInternal};
+use stm32g4xx_hal::opamp::{Gain, InternalOutput};
 use stm32g4xx_hal::prelude::*;
 use stm32g4xx_hal::pwr::PwrExt;
 
@@ -50,15 +50,15 @@ fn main() -> ! {
     // Configure opamp1 with pa1 as non-inverting input and set gain to x2
     let _opamp1 = opamp1.pga(
         pa1,
-        PgaModeInternal::gain(NonInvertingGain::Gain2),
         pa2, // Route output to pin pa2
+        Gain::Gain2,
     );
 
     // Configure op with pa7 as non-inverting input and set gain to x4
     let opamp2 = opamp2.pga(
         pa7,
-        PgaModeInternal::gain(NonInvertingGain::Gain4),
         InternalOutput, // Do not route output to any external pin, use internal AD instead
+        Gain::Gain4,
     );
 
     // Lock opamp2. After the opamp is locked its registers cannot be written
@@ -85,7 +85,7 @@ fn main() -> ! {
 
     #[allow(unreachable_code)]
     {
-        let (_opamp1, _mode, _pin) = _opamp1.disable();
+        let (_opamp1, _pin) = _opamp1.disable();
 
         loop {
             delay.delay_ms(100);

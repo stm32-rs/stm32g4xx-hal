@@ -93,7 +93,7 @@ macro_rules! adc_opamp {
                 fn channel() -> u8 { $chan }
             }
 
-            impl<A, B> Channel<stm32::$adc> for opamp::Pga<$opamp, A, B, InternalOutput> {
+            impl<A> Channel<stm32::$adc> for opamp::Pga<$opamp, A, InternalOutput> {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
