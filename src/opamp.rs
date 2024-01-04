@@ -118,12 +118,13 @@ pub struct Pga<Opamp, NonInverting, MODE, Output> {
     output: Option<Output>,
 }
 /// State type for an opamp that has been locked.
-pub struct Locked<Opamp> {
+pub struct Locked<Opamp, Output> {
     opamp: PhantomData<Opamp>,
+    output: PhantomData<Output>,
 }
 
-/// Represents the case where the output of the opamp is connected
-/// to the ADC internally, and not connected to an output pin.
+/// Represents the output when the opamp is connected to the
+/// ADC internally, and not connected to a pin.
 pub struct InternalOutput;
 
 /// Trait for opamps that can be run in follower mode.
@@ -264,12 +265,12 @@ macro_rules! opamps {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp> {
+                    pub fn lock(self) -> Locked<$opamp, $output> {
                         unsafe {
                             (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
                                 w.lock().set_bit());
                         }
-                        Locked { opamp: PhantomData }
+                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 
@@ -297,12 +298,12 @@ macro_rules! opamps {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp> {
+                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
                         unsafe {
                             (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
                                 w.lock().set_bit());
                         }
-                        Locked { opamp: PhantomData }
+                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 
@@ -337,12 +338,12 @@ macro_rules! opamps {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp> {
+                    pub fn lock(self) -> Locked<$opamp, $output> {
                         unsafe {
                             (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
                                 w.lock().set_bit());
                         }
-                        Locked { opamp: PhantomData }
+                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 
@@ -371,12 +372,12 @@ macro_rules! opamps {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp> {
+                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
                         unsafe {
                             (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
                                 w.lock().set_bit());
                         }
-                        Locked { opamp: PhantomData }
+                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 
@@ -410,12 +411,12 @@ macro_rules! opamps {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp> {
+                    pub fn lock(self) -> Locked<$opamp, $output> {
                         unsafe {
                             (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
                                 w.lock().set_bit());
                         }
-                        Locked { opamp: PhantomData }
+                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 
@@ -444,12 +445,12 @@ macro_rules! opamps {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp> {
+                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
                         unsafe {
                             (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
                                 w.lock().set_bit());
                         }
-                        Locked { opamp: PhantomData }
+                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 

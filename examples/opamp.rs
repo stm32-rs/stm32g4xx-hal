@@ -51,15 +51,11 @@ fn main() -> ! {
     let (_opamp3, _pb0, _pb2, _pb1) = opamp3.disable();
 
     // Configure opamp1 with pa1 as non-inverting input and set gain to x2
-    let opamp1 = opamp1.pga(
+    let _opamp1 = opamp1.pga(
         pa1,
         PgaModeInternal::gain(NonInvertingGain::Gain2),
         pa2, // Route output to pin pa2
     );
-
-    // Lock opamp1. After the opamp is locked the register cannot be written
-    // until the device is reset (even if using unsafe register accesses).
-    let _opamp1 = opamp1.lock();
 
     // Configure op with pa7 as non-inverting input and set gain to x4
     let opamp2 = opamp2.pga(
@@ -67,6 +63,10 @@ fn main() -> ! {
         PgaModeInternal::gain(NonInvertingGain::Gain4),
         InternalOutput, // Do not route output to any external pin, use internal AD instead
     );
+
+    // Lock opamp2. After the opamp is locked its registers cannot be written
+    // until the device is reset (even if using unsafe register accesses).
+    let opamp2 = opamp2.lock();
 
     let mut delay = cp.SYST.delay(&rcc.clocks);
     let mut adc = dp
@@ -88,7 +88,7 @@ fn main() -> ! {
 
     #[allow(unreachable_code)]
     {
-        let (_opamp2, _mode) = opamp2.disable();
+        let (_opamp1, _mode, _pin) = _opamp1.disable();
 
         loop {
             delay.delay_ms(100);
