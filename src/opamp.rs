@@ -7,10 +7,11 @@
 //!
 //! extern crate panic_halt;
 //!
+//! use stm32g4xx_hal::opamp::{
+//!     InternalOutput, IntoFollower, IntoOpenLoop, IntoPga, NonInvertingGain, PgaModeInternal,
+//! };
 //! use stm32g4xx_hal::prelude::*;
-//! use stm32g4xx_hal::gpio::gpioa::*;
-//! use stm32g4xx_hal::gpio::gpiob::*;
-//! use stm32g4xx_hal::gpio::Analog;
+//! use stm32g4xx_hal::pwr::PwrExt;
 //!
 //! #[cortex_m_rt::entry]
 //! fn main() -> ! {
@@ -19,7 +20,8 @@
 //!
 //!     // setup clock
 //!     let config = stm32g4xx_hal::rcc::Config::hsi();
-//!     let mut rcc = dp.RCC.freeze(config);
+//!     let pwr_cfg = dp.PWR.constrain().freeze();
+//!     let mut rcc = dp.RCC.freeze(config, pwr_cfg);
 //!
 //!     // split gpio
 //!     let gpioa = dp.GPIOA.split(&mut rcc);
@@ -28,33 +30,34 @@
 //!     // setup opamps
 //!     let (opamp1, opamp2, opamp3, opamp4, _opamp5, _opamp6) = dp.OPAMP.split(&mut rcc);
 //!
-//!     let opamp1 = opamp1.follower(gpioa.pa1, Some(gpioa.pa2));
-//!     let opamp2 = opamp2.follower(gpioa.pa7, Option::<PA6<Analog>>::None);
+//!     let opamp1 = opamp1.follower(gpioa.pa1, gpioa.pa2);
+//!     let opamp2 = opamp2.follower(gpioa.pa7, InternalOutput);
 //!
-//!     let opamp3 = opamp3.open_loop(gpiob.pb0, gpiob.pb2, Some(gpiob.pb1));
-//!     let opamp4 = opamp4.open_loop(gpiob.pb11, gpiob.pb10, Option::<PB12<Analog>>::None);
+//!     let opamp3 = opamp3.open_loop(gpiob.pb0, gpiob.pb2, gpiob.pb1);
+//!     let opamp4 = opamp4.open_loop(gpiob.pb11, gpiob.pb10, InternalOutput);
 //!
 //!     // disable opamps
-//!     let (opamp1, pa1, some_pa2) = opamp1.disable();
-//!     let (opamp2, pa7, _none) = opamp2.disable();
+//!     let (opamp1, pa1, pa2) = opamp1.disable();
+//!     let (opamp2, pa7) = opamp2.disable();
 //!
-//!     let (_opamp3, _pb0, _pb2, _some_pb1) = opamp3.disable();
-//!     let (_opamp4, _pb11, _pb10, _none) = opamp4.disable();
+//!     let (_opamp3, _pb0, _pb2, _pb1) = opamp3.disable();
+//!     let (_opamp4, _pb11, _pb10) = opamp4.disable();
 //!
-//!     let opamp1 = opamp1.pga(pa1, some_pa2);
-//!     let opamp2 = opamp2.pga(pa7, Option::<PA6<Analog>>::None);
+//!     let opamp1 = opamp1.pga(pa1, PgaModeInternal::gain(NonInvertingGain::Gain2), pa2);
+//!     let opamp2 = opamp2.pga(
+//!         pa7,
+//!         PgaModeInternal::gain(NonInvertingGain::Gain2),
+//!         InternalOutput,
+//!     );
 //!
-//!     let (_opamp1, _pa1, _some_pa2) = opamp1.disable();
-//!     let (_opamp2, _pa7, _none) = opamp2.disable();
+//!     let (_opamp1, _pa1, _pa2) = opamp1.disable();
+//!     let (_opamp2, _pa7) = opamp2.disable();
 //!
 //!     loop {}
 //! }
 //! ```
 
-// TODO: Add support for locking using the `LOCK` bit in `OPAMPx_CSR`
 // TODO: Add support for calibration
-// TODO: The output can not be a Option<Output> if we want to handle "route to pin vs adc"
-//       in a compile time way. See OPAINTOEN in OPAMPx_CSR
 
 use core::{borrow::Borrow, marker::PhantomData};
 
