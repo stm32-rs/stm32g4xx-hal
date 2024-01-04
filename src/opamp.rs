@@ -56,6 +56,8 @@
 // TODO: The output can not be a Option<PIN> if we want to handle "route to pin vs adc"
 //       in a compile time way. See OPAINTOEN in OPAMPx_CSR
 
+use core::{borrow::Borrow, marker::PhantomData};
+
 /// Pga mode internal
 ///
 /// This mode does not expose the inverting signal on any pin,
@@ -79,21 +81,87 @@ pub struct PgaModeInvertedInputFiltered<PIN> {
 pub enum NonInvertingGain {
     /// 2x Gain
     Gain2 = 0,
-
     /// 4x Gain
     Gain4 = 1,
-
     /// 8x Gain
     Gain8 = 2,
-
     /// 16x Gain
     Gain16 = 3,
-
     /// 32x Gain
     Gain32 = 4,
-
     /// 64x Gain
     Gain64 = 5,
+}
+
+/// State type for disabled opamp.
+pub struct Disabled<Opamp> {
+    opamp: PhantomData<Opamp>,
+}
+/// State type for opamp running in voltage follower mode.
+pub struct Follower<Opamp, Input, PIN> {
+    opamp: PhantomData<Opamp>,
+    input: Input,
+    output: Option<PIN>,
+}
+/// State type for opamp running in open-loop mode.
+pub struct OpenLoop<Opamp, NonInverting, Inverting, PIN> {
+    opamp: PhantomData<Opamp>,
+    non_inverting: NonInverting,
+    inverting: Inverting,
+    output: Option<PIN>,
+}
+/// State type for opamp running in programmable-gain mode.
+pub struct Pga<Opamp, NonInverting, MODE, PIN> {
+    opamp: PhantomData<Opamp>,
+    non_inverting: PhantomData<NonInverting>,
+    config: MODE,
+    output: Option<PIN>,
+}
+/// State type for an opamp that has been locked.
+pub struct Locked<Opamp> {
+    opamp: PhantomData<Opamp>,
+}
+
+/// Trait for opamps that can be run in follower mode.
+pub trait IntoFollower<Opamp, IntoInput, IntoOutput, Input, PIN>
+where
+    IntoOutput: Into<PIN>,
+{
+    /// Coonfigures the opamp as voltage follower.
+    fn follower(self, input: IntoInput, output: Option<IntoOutput>) -> Follower<Opamp, Input, PIN>;
+}
+/// Trait for opamps that can be run in open-loop mode.
+pub trait IntoOpenLoop<
+    Opamp,
+    IntoNonInverting,
+    IntoInverting,
+    IntoOutput,
+    NonInverting,
+    Inverting,
+    PIN,
+> where
+    IntoOutput: Into<PIN>,
+{
+    /// Configures the opamp for open-loop operation.
+    fn open_loop(
+        self,
+        non_inverting: IntoNonInverting,
+        inverting: IntoInverting,
+        output: Option<IntoOutput>,
+    ) -> OpenLoop<Opamp, NonInverting, Inverting, PIN>;
+}
+/// Trait for opamps that can be run in programmable gain mode.
+pub trait IntoPga<Opamp, MODE, IntoOutput, NonInverting, PIN>
+where
+    IntoOutput: Into<PIN>,
+{
+    /// Configures the opamp for programmable gain operation.
+    fn pga<B: Borrow<NonInverting>>(
+        self,
+        non_inverting: B,
+        config: MODE,
+        output: Option<IntoOutput>,
+    ) -> Pga<Opamp, NonInverting, MODE, PIN>;
 }
 
 macro_rules! opamps {
@@ -135,198 +203,101 @@ macro_rules! opamps {
         $(,)?
     } => {
         paste::paste!{
-            /// Re-exports usefull traits.
-            pub mod prelude {
-                $(pub use super::$opamp::IntoFollower as _;)*
-                $(pub use super::$opamp::IntoOpenLoop as _;)*
-            }
-
             $(
-                impl From<&PgaModeInternal> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                    fn from(x: &PgaModeInternal) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                        use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
+                /// Opamp
+                struct $opamp;
 
-                        match x.0 {
-                            NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2,
-                            NonInvertingGain::Gain4 => PGA_GAIN_A::Gain4,
-                            NonInvertingGain::Gain8 => PGA_GAIN_A::Gain8,
-                            NonInvertingGain::Gain16 => PGA_GAIN_A::Gain16,
-                            NonInvertingGain::Gain32 => PGA_GAIN_A::Gain32,
-                            NonInvertingGain::Gain64 => PGA_GAIN_A::Gain64,
+                impl<Opamp, Input, PIN> Follower<Opamp, Input, PIN> {
+
+                    /// Disables the opamp and returns the resources it held.
+                    pub fn disable(self) -> (Disabled<Opamp>, Input, Option<PIN>) {
+                        unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
+                        (Disabled { opamp: PhantomData }, self.input, self.output)
+                    }
+
+                    /// Enables the external output pin.
+                    pub fn enable_output(&mut self, output:$output) {
+                        self.output = Some(output);
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                w.opaintoen().output_pin());
                         }
+                    }
+
+                    /// Disables the external output.
+                    /// This will connect the opamp output to the internal ADC.
+                    /// If the output was enabled, the output pin is returned.
+                    pub fn disable_output(&mut self) -> Option<$output> {
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                w.opaintoen().adcchannel());
+                        }
+                        self.output.take()
                     }
                 }
 
-                impl<PIN> From<&PgaModeInvertedInputFiltered<PIN>> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                    fn from(x: &PgaModeInvertedInputFiltered<PIN>) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                        use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
+                impl<Opamp, NonInverting, Inverting, PIN> OpenLoop<Opamp, NonInverting, Inverting, PIN> {
 
-                        match x.gain {
-                            NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2FilteringVinm0,
-                            NonInvertingGain::Gain4 => PGA_GAIN_A::Gain4FilteringVinm0,
-                            NonInvertingGain::Gain8 => PGA_GAIN_A::Gain8FilteringVinm0,
-                            NonInvertingGain::Gain16 => PGA_GAIN_A::Gain16FilteringVinm0,
-                            NonInvertingGain::Gain32 => PGA_GAIN_A::Gain32FilteringVinm0,
-                            NonInvertingGain::Gain64 => PGA_GAIN_A::Gain64FilteringVinm0,
+                    /// Disables the opamp and returns the resources it held.
+                    pub fn disable(self) -> (Disabled<Opamp>, NonInverting, Inverting, Option<$output>) {
+                        unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
+                        (Disabled { opamp: PhantomData }, self.non_inverting, self.inverting, self.output)
+                    }
+
+                    /// Enables the external output pin.
+                    pub fn enable_output(&mut self, output:$output) {
+                        self.output = Some(output);
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                w.opaintoen().output_pin());
                         }
+                    }
+
+                    /// Disables the external output.
+                    /// This will connect the opamp output to the internal ADC.
+                    /// If the output was enabled, the output pin is returned.
+                    pub fn disable_output(&mut self) -> Option<$output> {
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                w.opaintoen().adcchannel());
+                        }
+                        self.output.take()
                     }
                 }
 
-                /// States for opampX.
-                pub mod $opamp {
-                    use core::{borrow::Borrow, marker::PhantomData};
+                impl<Opamp, NonInverting, MODE, PIN> Pga<Opamp, NonInverting, MODE, PIN> {
 
-                    #[allow(unused_imports)]
-                    use crate::gpio::gpioa::*;
-
-                    #[allow(unused_imports)]
-                    use crate::gpio::gpiob::*;
-
-                    /// State type for disabled opamp.
-                    pub struct Disabled;
-
-                    /// State type for opamp running in voltage follower mode.
-                    pub struct Follower<Input> {
-                        input: Input,
-                        output: Option<$output>,
+                    /// Disables the opamp and returns the resources it held.
+                    pub fn disable(self) -> (Disabled<Opamp>, MODE, Option<$output>) {
+                        unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
+                        (Disabled { opamp: PhantomData }, self.config, self.output)
                     }
 
-                    /// State type for opamp running in open-loop mode.
-                    pub struct OpenLoop<NonInverting, Inverting> {
-                        non_inverting: NonInverting,
-                        inverting: Inverting,
-                        output: Option<$output>,
-                    }
-
-                    // TODO: Inverting gain
-
-                    /// Trait for opamps that can be run in follower mode.
-                    pub trait IntoFollower <IntoInput, IntoOutput, Input>
-                        where
-                            IntoOutput: Into<$output>,
-                    {
-                        /// Coonfigures the opamp as voltage follower.
-                        fn follower(self, input: IntoInput, output: Option<IntoOutput>) -> Follower<Input>;
-                    }
-
-                    /// Trait for opamps that can be run in open-loop mode.
-                    pub trait IntoOpenLoop <IntoNonInverting, IntoInverting, IntoOutput, NonInverting, Inverting>
-                        where
-                            IntoOutput: Into<$output>,
-                    {
-                        /// Configures the opamp for open-loop operation.
-                        fn open_loop(self, non_inverting: IntoNonInverting, inverting: IntoInverting, output: Option<IntoOutput>)
-                            -> OpenLoop<NonInverting, Inverting>;
-                    }
-
-                    /// State type for opamp running in programmable-gain mode.
-                    pub struct Pga<NonInverting, MODE> {
-                        non_inverting: PhantomData<NonInverting>,
-                        config: MODE,
-                        output: Option<$output>,
-                    }
-
-                    /// Trait for opamps that can be run in programmable gain mode.
-                    pub trait IntoPga <MODE, IntoOutput, NonInverting>
-                        where
-                            IntoOutput: Into<$output>,
-                    {
-                        /// Configures the opamp for programmable gain operation.
-                        fn pga<B: Borrow<NonInverting>>(self, non_inverting: B, config: MODE, output: Option<IntoOutput>)
-                            -> Pga<NonInverting, MODE>;
-                    }
-
-                    impl<Input> Follower<Input> {
-
-                        /// Disables the opamp and returns the resources it held.
-                        pub fn disable(self) -> (Disabled, Input, Option<$output>) {
-                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
-                            (Disabled, self.input, self.output)
-                        }
-
-                        /// Enables the external output pin.
-                        pub fn enable_output(&mut self, output:$output) {
-                            self.output = Some(output);
-                            unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().output_pin());
-                            }
-                        }
-
-                        /// Disables the external output.
-                        /// This will connect the opamp output to the internal ADC.
-                        /// If the output was enabled, the output pin is returned.
-                        pub fn disable_output(&mut self) -> Option<$output> {
-                            unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().adcchannel());
-                            }
-                            self.output.take()
+                    /// Enables the external output pin.
+                    pub fn enable_output(&mut self, output: $output) {
+                        self.output = Some(output);
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                w.opaintoen().output_pin());
                         }
                     }
 
-                    impl<NonInverting, Inverting> OpenLoop<NonInverting, Inverting> {
-
-                        /// Disables the opamp and returns the resources it held.
-                        pub fn disable(self) -> (Disabled, NonInverting, Inverting, Option<$output>) {
-                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
-                            (Disabled, self.non_inverting, self.inverting, self.output)
+                    /// Disables the external output.
+                    /// This will connect the opamp output to the internal ADC.
+                    /// If the output was enabled, the output pin is returned.
+                    pub fn disable_output(&mut self) -> Option<$output> {
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                                w.opaintoen().adcchannel());
                         }
-
-                        /// Enables the external output pin.
-                        pub fn enable_output(&mut self, output:$output) {
-                            self.output = Some(output);
-                            unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().output_pin());
-                            }
-                        }
-
-                        /// Disables the external output.
-                        /// This will connect the opamp output to the internal ADC.
-                        /// If the output was enabled, the output pin is returned.
-                        pub fn disable_output(&mut self) -> Option<$output> {
-                            unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().adcchannel());
-                            }
-                            self.output.take()
-                        }
+                        self.output.take()
                     }
-
-                    impl<NonInverting, MODE> Pga<NonInverting, MODE> {
-
-                        /// Disables the opamp and returns the resources it held.
-                        pub fn disable(self) -> (Disabled, MODE, Option<$output>) {
-                            unsafe { (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset() }
-                            (Disabled, self.config, self.output)
-                        }
-
-                        /// Enables the external output pin.
-                        pub fn enable_output(&mut self, output: $output) {
-                            self.output = Some(output);
-                            unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().output_pin());
-                            }
-                        }
-
-                        /// Disables the external output.
-                        /// This will connect the opamp output to the internal ADC.
-                        /// If the output was enabled, the output pin is returned.
-                        pub fn disable_output(&mut self) -> Option<$output> {
-                            unsafe {
-                                (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
-                                    w.opaintoen().adcchannel());
-                            }
-                            self.output.take()
-                        }
-                    }
-
-                    opamps!{ @follower $opamp, $output, $($non_inverting_mask, $non_inverting),* }
-                    opamps!{ @open_loop_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
-                    opamps!{ @pga_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : $vinm0 }
                 }
+
+                opamps!{ @follower $opamp, $output, $($non_inverting_mask, $non_inverting),* }
+                opamps!{ @open_loop_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
+                opamps!{ @pga_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : $vinm0 }
+
             )*
 
             /// Extension trait for the OPAMP block.
@@ -336,7 +307,7 @@ macro_rules! opamps {
                     self,
                     rcc: &mut crate::rcc::Rcc,
                 ) -> (
-                    $($opamp::Disabled,)*
+                    $(Disabled::<$opamp>,)*
                 );
             }
 
@@ -345,7 +316,7 @@ macro_rules! opamps {
                     self,
                     rcc: &mut crate::rcc::Rcc,
                 ) -> (
-                    $($opamp::Disabled,)*
+                    $(Disabled::<$opamp>,)*
                 ) {
                     rcc.rb.apb2enr.modify(|_, w| w.syscfgen().set_bit());
 
@@ -370,7 +341,7 @@ macro_rules! opamps {
         ),*
     } => {
         paste::paste!{
-            $(impl <IntoInput, IntoOutput> IntoFollower <IntoInput, IntoOutput, $input> for Disabled
+            $(impl <Opamp, IntoInput, IntoOutput, PIN> IntoFollower <Opamp, IntoInput, IntoOutput, $input, PIN> for Disabled<Opamp>
                 where
                     IntoInput: Into<$input>,
                     IntoOutput: Into<$output>,
@@ -379,7 +350,7 @@ macro_rules! opamps {
                     self,
                     input: IntoInput,
                     output: Option<IntoOutput>,
-                ) -> Follower<$input> {
+                ) -> Follower<Opamp, $input, PIN> {
                     let input = input.into();
                     let output = output.map(|output| output.into());
                     unsafe {
@@ -401,7 +372,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Follower {input, output}
+                    Follower {opamp: PhantomData, input, output}
                 }
             })*
         }
@@ -435,8 +406,8 @@ macro_rules! opamps {
         ($($inverting_mask:tt, $inverting:ty),*)
     } => {
         paste::paste!{
-            $(impl <IntoNonInverting, IntoInverting, IntoOutput> IntoOpenLoop
-                <IntoNonInverting, IntoInverting, IntoOutput, $non_inverting, $inverting> for Disabled
+            $(impl <Opamp, IntoNonInverting, IntoInverting, IntoOutput, PIN> IntoOpenLoop
+                <Opamp, IntoNonInverting, IntoInverting, IntoOutput, $non_inverting, $inverting, PIN> for Disabled<Opamp>
                 where
                     IntoNonInverting: Into<$non_inverting>,
                     IntoInverting: Into<$inverting>,
@@ -447,7 +418,7 @@ macro_rules! opamps {
                     non_inverting: IntoNonInverting,
                     inverting: IntoInverting,
                     output: Option<IntoOutput>,
-                ) -> OpenLoop<$non_inverting, $inverting> {
+                ) -> OpenLoop<Opamp, $non_inverting, $inverting, PIN> {
                     let non_inverting = non_inverting.into();
                     let inverting = inverting.into();
                     let output = output.map(|output| output.into());
@@ -469,7 +440,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    OpenLoop {non_inverting, inverting, output}
+                    OpenLoop {opamp: PhantomData, non_inverting, inverting, output}
                 }
             })*
         }
@@ -483,7 +454,7 @@ macro_rules! opamps {
         ,
         $($non_inverting_mask:tt, $non_inverting:ty),*
         :
-        $vinm0:ident
+        $vinm0:ty
     } => {
         $(
             opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, crate::opamp::PgaModeInternal }
@@ -506,7 +477,7 @@ macro_rules! opamps {
         $mode:ty
     } => {
         paste::paste!{
-            impl<IntoOutput> IntoPga<$mode, IntoOutput, $non_inverting> for Disabled
+            impl<Opamp, IntoOutput, PIN> IntoPga<Opamp, $mode, IntoOutput, $non_inverting, PIN> for Disabled<Opamp>
                 where
                     IntoOutput: Into<$output>,
             {
@@ -515,7 +486,7 @@ macro_rules! opamps {
                     _non_inverting: B,
                     config: $mode,
                     output: Option<IntoOutput>,
-                ) -> Pga<$non_inverting, $mode> {
+                ) -> Pga<Opamp, $non_inverting, $mode, PIN> {
                     let output = output.map(|output| output.into());
                     unsafe {
                         use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
@@ -538,7 +509,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Pga {non_inverting: PhantomData, config, output}
+                    Pga {opamp: PhantomData, non_inverting: PhantomData, config, output}
                 }
             }
         }
@@ -597,7 +568,7 @@ opamps! {
 ))]
 opamps! {
     opamp1: {
-        vinm0: PA3,
+        vinm0: crate::gpio::gpioa::PA3,
         inverting: {
             crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
             crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
@@ -610,7 +581,7 @@ opamps! {
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
     opamp2: {
-        vinm0: PA5,
+        vinm0: crate::gpio::gpioa::PA5,
         inverting: {
             crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
             crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
@@ -624,7 +595,7 @@ opamps! {
         output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
     },
     opamp3: {
-        vinm0: PB2,
+        vinm0: crate::gpio::gpioa::PB2,
         inverting: {
             crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
             crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
@@ -637,7 +608,7 @@ opamps! {
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
     },
     opamp4: {
-        vinm0: PB10,
+        vinm0: crate::gpio::gpioa::PB10,
         inverting: {
             crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm0,
             crate::gpio::gpiod::PD8<crate::gpio::Analog>: vinm1,
@@ -650,7 +621,7 @@ opamps! {
         output: crate::gpio::gpiob::PB12<crate::gpio::Analog>,
     },
     opamp5: {
-        vinm0: PB15,
+        vinm0: crate::gpio::gpioa::PB15,
         inverting: {
             crate::gpio::gpiob::PB15<crate::gpio::Analog>: vinm0,
             crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm1,
@@ -663,7 +634,7 @@ opamps! {
         output: crate::gpio::gpioa::PA8<crate::gpio::Analog>,
     },
     opamp6: {
-        vinm0: PA1,
+        vinm0: crate::gpio::gpioa::PA1,
         inverting: {
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
             crate::gpio::gpiob::PB1<crate::gpio::Analog>: vinm1,
