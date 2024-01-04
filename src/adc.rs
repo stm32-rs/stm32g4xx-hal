@@ -13,7 +13,7 @@ pub use crate::time::U32Ext as _;
 use crate::{
     dma::{mux::DmaMuxResources, traits::TargetAddress, PeripheralToMemory},
     gpio::*,
-    opamp,
+    opamp::{self, InternalOutput},
     rcc::{Enable, Rcc, Reset},
     signature::{VtempCal130, VtempCal30, VDDA_CALIB},
     stm32,
@@ -83,7 +83,7 @@ macro_rules! adc_pins {
 macro_rules! adc_op_pga {
     ($($opamp:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
         $(
-            impl<A, B, C> Channel<stm32::$adc> for $opamp {
+            impl<A, B> Channel<stm32::$adc> for $opamp {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
@@ -94,7 +94,7 @@ macro_rules! adc_op_pga {
 macro_rules! adc_op_follower {
     ($($opamp:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
         $(
-            impl<A, B> Channel<stm32::$adc> for $opamp {
+            impl<A> Channel<stm32::$adc> for $opamp {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
@@ -2662,17 +2662,17 @@ adc_op_pga!(
     // TODO: Add all opamp types: OpenLoop, Follower(for all opamps)
     // TODO: Should we restrict type parameters A and B?
     // TODO: Also allow AD-channels shared by pins
-    opamp::Pga<opamp::opamp1, A, B, C> => (ADC1, 13),
-    opamp::Pga<opamp::opamp2, A, B, C> => (ADC2, 16),
+    opamp::Pga<opamp::opamp1, A, B, InternalOutput> => (ADC1, 13),
+    opamp::Pga<opamp::opamp2, A, B, InternalOutput> => (ADC2, 16),
 
-    opamp::Pga<opamp::opamp3, A, B, C> => (ADC2, 18),
+    opamp::Pga<opamp::opamp3, A, B, InternalOutput> => (ADC2, 18),
 );
 
 adc_op_follower!(
-    opamp::Follower<opamp::opamp1, A, B> => (ADC1, 13),
-    opamp::Follower<opamp::opamp2, A, B> => (ADC2, 16),
+    opamp::Follower<opamp::opamp1, A, InternalOutput> => (ADC1, 13),
+    opamp::Follower<opamp::opamp2, A, InternalOutput> => (ADC2, 16),
 
-    opamp::Follower<opamp::opamp3, A, B> => (ADC2, 18),
+    opamp::Follower<opamp::opamp3, A, InternalOutput> => (ADC2, 18),
 );
 
 #[cfg(any(
@@ -2684,15 +2684,15 @@ adc_op_follower!(
     feature = "stm32g4a1",
 ))]
 adc_op_pga!(
-    opamp::Pga<opamp::opamp3, A, B, C> => (ADC3, 13),
-    opamp::Pga<opamp::opamp4, A, B, C> => (ADC5, 5),
-    opamp::Pga<opamp::opamp5, A, B, C> => (ADC5, 3),
-    opamp::Pga<opamp::opamp6, A, B, C> => (ADC4, 17),
+    opamp::Pga<opamp::opamp3, A, B, InternalOutput> => (ADC3, 13),
+    opamp::Pga<opamp::opamp4, A, B, InternalOutput> => (ADC5, 5),
+    opamp::Pga<opamp::opamp5, A, B, InternalOutput> => (ADC5, 3),
+    opamp::Pga<opamp::opamp6, A, B, InternalOutput> => (ADC4, 17),
 );
 
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
 adc_op_pga!(
-    opamp::Pga<opamp::opamp6, A, B, C> => (ADC3, 17),
+    opamp::Pga<opamp::opamp6, A, B, InternalOutput> => (ADC3, 17),
 );
 
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
