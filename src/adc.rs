@@ -2666,9 +2666,9 @@ adc_opamp!(
     // TODO: Add all opamp types: OpenLoop, Follower(for all opamps)
     // TODO: Should we restrict type parameters A and B?
     // TODO: Also allow AD-channels shared by pins
-    opamp::opamp1 => (ADC1, 13),
-    opamp::opamp2 => (ADC2, 16),
-    opamp::opamp3 => (ADC2, 18),
+    opamp::Opamp1 => (ADC1, 13),
+    opamp::Opamp2 => (ADC2, 16),
+    opamp::Opamp3 => (ADC2, 18),
 );
 
 #[cfg(any(
@@ -2680,15 +2680,15 @@ adc_opamp!(
     feature = "stm32g4a1",
 ))]
 adc_opamp!(
-    opamp::opamp3 => (ADC3, 13),
-    opamp::opamp4 => (ADC5, 5),
-    opamp::opamp5 => (ADC5, 3),
-    opamp::opamp6 => (ADC4, 17),
+    opamp::Opamp3 => (ADC3, 13),
+    opamp::Opamp4 => (ADC5, 5),
+    opamp::Opamp5 => (ADC5, 3),
+    opamp::Opamp6 => (ADC4, 17),
 );
 
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
 adc_opamp!(
-    opamp::opamp6 => (ADC3, 17),
+    opamp::Opamp6 => (ADC3, 17),
 );
 
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]

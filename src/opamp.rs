@@ -168,7 +168,7 @@ pub trait IntoPga<Opamp, MODE, IntoOutput, NonInverting, Output> {
 macro_rules! opamps {
     {
         $(
-            $opamp:ident
+            $opamp:ident => $opampreg:ident
             :
             {
                 vinm0: $vinm0:ty,
@@ -208,9 +208,9 @@ macro_rules! opamps {
                 /// Opamp
                 pub struct $opamp;
 
-                impl From<&PgaModeInternal> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                    fn from(x: &PgaModeInternal) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                        use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
+                impl From<&PgaModeInternal> for crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A {
+                    fn from(x: &PgaModeInternal) -> crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A {
+                        use crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A;
 
                         match x.0 {
                             NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2,
@@ -223,9 +223,9 @@ macro_rules! opamps {
                     }
                 }
 
-                impl<Output> From<&PgaModeInvertedInputFiltered<Output>> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                    fn from(x: &PgaModeInvertedInputFiltered<Output>) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                        use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
+                impl<Output> From<&PgaModeInvertedInputFiltered<Output>> for crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A {
+                    fn from(x: &PgaModeInvertedInputFiltered<Output>) -> crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A {
+                        use crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A;
 
                         match x.gain {
                             NonInvertingGain::Gain2 => PGA_GAIN_A::Gain2FilteringVinm0,
@@ -241,20 +241,20 @@ macro_rules! opamps {
                 impl $opamp {
                     /// Reset the opamp. Used by internal implementations.
                     unsafe fn _reset() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].reset()
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].reset()
                     }
 
                     /// Disable the output (connect the opamp to the internal ADC
                     /// channel). Used by internal implementations.
                     unsafe fn _disable_output() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].write(|w|
                             w.opaintoen().adcchannel())
                     }
 
                     /// Enable the output (connect the opamp to a pin).
                     /// Used by internal implementations.
                     unsafe fn _enable_output() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].write(|w|
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].write(|w|
                             w.opaintoen().output_pin())
                     }
 
@@ -262,13 +262,13 @@ macro_rules! opamps {
                     /// Used by internal implementations.
                     unsafe fn _lock() {
                         // Write the lock bit
-                        (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].modify(|_, w|
                             w.lock().set_bit());
                         // Write the lock bit for the corresponding TCMR register.
                         // We don't currently expose TCMR functionality, but presumably
                         // the user doesn't want anything changing if they care to set
                         // the lock bit.
-                        (*crate::stm32::OPAMP::ptr()).[<$opamp _tcmr>].modify(|_, w|
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _tcmr>].modify(|_, w|
                             w.lock().set_bit())
                     }
                 }
@@ -456,9 +456,9 @@ macro_rules! opamps {
                     }
                 }
 
-                opamps!{ @follower $opamp, $output, $($non_inverting_mask, $non_inverting),* }
-                opamps!{ @open_loop_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
-                opamps!{ @pga_tt $opamp, $output, $($non_inverting_mask, $non_inverting),* : $vinm0 }
+                opamps!{ @follower $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* }
+                opamps!{ @open_loop_tt $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
+                opamps!{ @pga_tt $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* : $vinm0 }
 
             )*
 
@@ -492,7 +492,7 @@ macro_rules! opamps {
 
     {
         @follower
-        $opamp:ident
+        $opamp:ident => $opampreg:ident
         ,
         $output:ty
         ,
@@ -517,9 +517,9 @@ macro_rules! opamps {
                     let input = input.into();
                     let output = output.into();
                     unsafe {
-                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opampreg _csr>]
                             .write(|csr_w|
                                 csr_w
                                     .vp_sel()
@@ -547,9 +547,9 @@ macro_rules! opamps {
                 ) -> Follower<$opamp, $input, InternalOutput> {
                     let input = input.into();
                     unsafe {
-                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opampreg _csr>]
                             .write(|csr_w|
                                 csr_w
                                     .vp_sel()
@@ -572,7 +572,7 @@ macro_rules! opamps {
 
     {
         @open_loop_tt
-        $opamp:ident
+        $opamp:ident => $opampreg:ident
         ,
         $output:ty
         ,
@@ -581,13 +581,13 @@ macro_rules! opamps {
         $invertings:tt
     } => {
         $(
-            opamps!{ @open_loop $opamp, $output, $non_inverting_mask, $non_inverting, $invertings }
+            opamps!{ @open_loop $opamp => $opampreg, $output, $non_inverting_mask, $non_inverting, $invertings }
         )*
     };
 
     {
         @open_loop
-        $opamp:ident
+        $opamp:ident => $opampreg:ident
         ,
         $output:ty
         ,
@@ -616,9 +616,9 @@ macro_rules! opamps {
                     let inverting = inverting.into();
                     let output = output.into();
                     unsafe {
-                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opampreg _csr>]
                             .write(|csr_w|
                                 csr_w.vp_sel()
                                     .$non_inverting_mask()
@@ -648,9 +648,9 @@ macro_rules! opamps {
                     let non_inverting = non_inverting.into();
                     let inverting = inverting.into();
                     unsafe {
-                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opampreg _csr>]
                             .write(|csr_w|
                                 csr_w.vp_sel()
                                     .$non_inverting_mask()
@@ -671,7 +671,7 @@ macro_rules! opamps {
 
     {
         @pga_tt
-        $opamp:ident
+        $opamp:ident => $opampreg:ident
         ,
         $output:ty
         ,
@@ -680,8 +680,8 @@ macro_rules! opamps {
         $vinm0:ty
     } => {
         $(
-            opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, crate::opamp::PgaModeInternal }
-            opamps!{ @pga $opamp, $output, $non_inverting_mask, $non_inverting, crate::opamp::PgaModeInvertedInputFiltered<$vinm0> }
+            opamps!{ @pga $opamp => $opampreg, $output, $non_inverting_mask, $non_inverting, crate::opamp::PgaModeInternal }
+            opamps!{ @pga $opamp => $opampreg, $output, $non_inverting_mask, $non_inverting, crate::opamp::PgaModeInvertedInputFiltered<$vinm0> }
             // TODO: Add `PGA mode, non-inverting gain setting (x2/x4/x8/x16/x32/x64) or inverting gain setting (x-1/x-3/x-7/x-15/x-31/x-63)`
             // TODO: Add `PGA mode, non-inverting gain setting (x2/x4/x8/x16/x32/x64) or inverting gain setting (x-1/x-3/x-7/x-15/x-31/x-63) with filtering`
         )*
@@ -689,7 +689,7 @@ macro_rules! opamps {
 
     {
         @pga
-        $opamp:ident
+        $opamp:ident => $opampreg:ident
         ,
         $output:ty
         ,
@@ -712,10 +712,10 @@ macro_rules! opamps {
                 ) -> Pga<$opamp, $non_inverting, $mode, $output> {
                     let output = output.into();
                     unsafe {
-                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
 
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opampreg _csr>]
                             .write(|csr_w|
                                 csr_w.vp_sel()
                                     .$non_inverting_mask()
@@ -741,10 +741,10 @@ macro_rules! opamps {
                     _output: InternalOutput,
                 ) -> Pga<$opamp, $non_inverting, $mode, InternalOutput> {
                     unsafe {
-                        use crate::stm32::opamp::[<$opamp _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
 
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opamp _csr>]
+                            .[<$opampreg _csr>]
                             .write(|csr_w|
                                 csr_w.vp_sel()
                                     .$non_inverting_mask()
@@ -767,7 +767,7 @@ macro_rules! opamps {
 
 #[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
 opamps! {
-    opamp1: {
+    Opamp1 => opamp1: {
         vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
@@ -780,7 +780,7 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
-    opamp2: {
+    Opamp2 => opamp2: {
         vinm0: crate::gpio::gpioa::PA5<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
@@ -794,7 +794,7 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
     },
-    opamp3: {
+    Opamp3 => opamp3: {
         vinm0: crate::gpio::gpiob::PB2<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
@@ -816,7 +816,7 @@ opamps! {
     feature = "stm32g484",
 ))]
 opamps! {
-    opamp1: {
+    Opamp1 => opamp1: {
         vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
@@ -829,7 +829,7 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
-    opamp2: {
+    Opamp2 => opamp2: {
         vinm0: crate::gpio::gpioa::PA5<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
@@ -843,7 +843,7 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
     },
-    opamp3: {
+    Opamp3 => opamp3: {
         vinm0: crate::gpio::gpiob::PB2<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
@@ -856,7 +856,7 @@ opamps! {
         },
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
     },
-    opamp4: {
+    Opamp4 => opamp4: {
         vinm0: crate::gpio::gpiob::PB10<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm0,
@@ -869,7 +869,7 @@ opamps! {
         },
         output: crate::gpio::gpiob::PB12<crate::gpio::Analog>,
     },
-    opamp5: {
+    Opamp5 => opamp5: {
         vinm0: crate::gpio::gpiob::PB15<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpiob::PB15<crate::gpio::Analog>: vinm0,
@@ -882,7 +882,7 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA8<crate::gpio::Analog>,
     },
-    opamp6: {
+    Opamp6 => opamp6: {
         vinm0: crate::gpio::gpioa::PA1<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
