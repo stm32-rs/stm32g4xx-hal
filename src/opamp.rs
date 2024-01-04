@@ -104,21 +104,21 @@ pub struct Disabled<Opamp> {
 pub struct Follower<Opamp, Input, Output> {
     opamp: PhantomData<Opamp>,
     input: Input,
-    output: Option<Output>,
+    output: Output,
 }
 /// State type for opamp running in open-loop mode.
 pub struct OpenLoop<Opamp, NonInverting, Inverting, Output> {
     opamp: PhantomData<Opamp>,
     non_inverting: NonInverting,
     inverting: Inverting,
-    output: Option<Output>,
+    output: Output,
 }
 /// State type for opamp running in programmable-gain mode.
 pub struct Pga<Opamp, NonInverting, MODE, Output> {
     opamp: PhantomData<Opamp>,
     non_inverting: PhantomData<NonInverting>,
     config: MODE,
-    output: Option<Output>,
+    output: Output,
 }
 /// State type for an opamp that has been locked.
 pub struct Locked<Opamp, Output> {
@@ -277,24 +277,19 @@ macro_rules! opamps {
                     /// Disables the opamp and returns the resources it held.
                     pub fn disable(self) -> (Disabled<$opamp>, Input, $output) {
                         unsafe { $opamp::_reset() };
-                        // Safe to unwrap `self.output` because `self.output` is only None
-                        // when the Output type is InternalOutput
-                        (Disabled { opamp: PhantomData }, self.input, self.output.unwrap())
+                        (Disabled { opamp: PhantomData }, self.input, self.output)
                     }
 
                     /// Disables the external output.
                     /// This will connect the opamp output to the internal ADC.
                     /// If the output was enabled, the output pin is returned.
-                    pub fn disable_output(mut self) -> (Follower<$opamp, Input, InternalOutput>, $output) {
+                    pub fn disable_output(self) -> (Follower<$opamp, Input, InternalOutput>, $output) {
                         unsafe { $opamp::_disable_output(); }
-
-                        // Safe to unwrap `self.output` because `self.output` is only None
-                        // when the Output type is InternalOutput
                         (Follower::<$opamp, Input, InternalOutput> {
                             opamp: PhantomData,
                             input: self.input,
-                            output: None,
-                        }, self.output.take().unwrap())
+                            output: InternalOutput,
+                        }, self.output)
                     }
 
                     /// Set the lock bit in the registers. After the lock bit is
@@ -320,7 +315,7 @@ macro_rules! opamps {
                         Follower::<$opamp, Input, $output> {
                             opamp: PhantomData,
                             input: self.input,
-                            output: Some(output),
+                            output,
                         }
                     }
 
@@ -337,25 +332,20 @@ macro_rules! opamps {
                     /// Disables the opamp and returns the resources it held.
                     pub fn disable(self) -> (Disabled<$opamp>, NonInverting, Inverting, $output) {
                         unsafe { $opamp::_reset() };
-                        // Safe to unwrap `self.output` because `self.output` is only None
-                        // when the Output type is InternalOutput
-                        (Disabled { opamp: PhantomData }, self.non_inverting, self.inverting, self.output.unwrap())
+                        (Disabled { opamp: PhantomData }, self.non_inverting, self.inverting, self.output)
                     }
 
                     /// Disables the external output.
                     /// This will connect the opamp output to the internal ADC.
                     /// If the output was enabled, the output pin is returned.
-                    pub fn disable_output(mut self) -> (OpenLoop<$opamp, NonInverting, Inverting, InternalOutput>, $output) {
+                    pub fn disable_output(self) -> (OpenLoop<$opamp, NonInverting, Inverting, InternalOutput>, $output) {
                         unsafe { $opamp::_disable_output(); }
-
-                        // Safe to unwrap `self.output` because `self.output` is only None
-                        // when the Output type is InternalOutput
                         (OpenLoop::<$opamp, NonInverting, Inverting, InternalOutput> {
                             opamp: PhantomData,
                             inverting: self.inverting,
                             non_inverting: self.non_inverting,
-                            output: None,
-                        }, self.output.take().unwrap())
+                            output: InternalOutput,
+                        }, self.output)
                     }
 
                     /// Set the lock bit in the registers. After the lock bit is
@@ -382,7 +372,7 @@ macro_rules! opamps {
                             opamp: PhantomData,
                             inverting: self.inverting,
                             non_inverting: self.non_inverting,
-                            output: Some(output),
+                            output,
                         }
                     }
 
@@ -399,24 +389,19 @@ macro_rules! opamps {
                     /// Disables the opamp and returns the resources it held.
                     pub fn disable(self) -> (Disabled<$opamp>, MODE, $output) {
                         unsafe { $opamp::_reset() };
-                        // Safe to unwrap `self.output` because `self.output` is only None
-                        // when the Output type is InternalOutput
-                        (Disabled { opamp: PhantomData }, self.config, self.output.unwrap())
+                        (Disabled { opamp: PhantomData }, self.config, self.output)
                     }
 
                     /// Disables the external output.
                     /// This will connect the opamp output to the internal ADC.
-                    pub fn disable_output(mut self) -> (Pga<$opamp, NonInverting, MODE, InternalOutput>, $output) {
+                    pub fn disable_output(self) -> (Pga<$opamp, NonInverting, MODE, InternalOutput>, $output) {
                         unsafe { $opamp::_disable_output(); }
-
-                        // Safe to unwrap `self.output` because `self.output` is only None
-                        // when the Output type is InternalOutput
                         (Pga::<$opamp, NonInverting, MODE, InternalOutput> {
                             opamp: PhantomData,
                             non_inverting: self.non_inverting,
                             config: self.config,
-                            output: None,
-                        }, self.output.take().unwrap())
+                            output: InternalOutput,
+                        }, self.output)
                     }
 
                     /// Set the lock bit in the registers. After the lock bit is
@@ -443,7 +428,7 @@ macro_rules! opamps {
                             opamp: PhantomData,
                             non_inverting: self.non_inverting,
                             config: self.config,
-                            output: Some(output),
+                            output,
                         }
                     }
 
@@ -532,7 +517,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Follower {opamp: PhantomData, input, output: Some(output)}
+                    Follower {opamp: PhantomData, input, output}
                 }
             }
 
@@ -562,7 +547,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Follower {opamp: PhantomData, input, output: None}
+                    Follower {opamp: PhantomData, input, output: InternalOutput}
                 }
             }
 
@@ -630,7 +615,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    OpenLoop {opamp: PhantomData, non_inverting, inverting, output: Some(output)}
+                    OpenLoop {opamp: PhantomData, non_inverting, inverting, output}
                 }
             }
             impl <IntoNonInverting, IntoInverting> IntoOpenLoop
@@ -662,7 +647,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    OpenLoop {opamp: PhantomData, non_inverting, inverting, output: None}
+                    OpenLoop {opamp: PhantomData, non_inverting, inverting, output: InternalOutput}
                 }
             }
         )*
@@ -729,7 +714,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Pga {opamp: PhantomData, non_inverting: PhantomData, config, output: Some(output)}
+                    Pga {opamp: PhantomData, non_inverting: PhantomData, config, output}
                 }
             }
             impl IntoPga<$opamp, $mode, InternalOutput, $non_inverting, InternalOutput> for Disabled<$opamp>
@@ -758,7 +743,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Pga {opamp: PhantomData, non_inverting: PhantomData, config, output: None}
+                    Pga {opamp: PhantomData, non_inverting: PhantomData, config, output: InternalOutput}
                 }
             }
         }
