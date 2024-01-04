@@ -53,7 +53,7 @@
 
 // TODO: Add support for locking using the `LOCK` bit in `OPAMPx_CSR`
 // TODO: Add support for calibration
-// TODO: The output can not be a Option<PIN> if we want to handle "route to pin vs adc"
+// TODO: The output can not be a Option<Output> if we want to handle "route to pin vs adc"
 //       in a compile time way. See OPAINTOEN in OPAMPx_CSR
 
 use core::{borrow::Borrow, marker::PhantomData};
@@ -72,9 +72,9 @@ impl PgaModeInternal {
 
 /// Same as PgaModeInternal but the inverted signal is routed to pin
 /// to allow external filter
-pub struct PgaModeInvertedInputFiltered<PIN> {
+pub struct PgaModeInvertedInputFiltered<Output> {
     gain: NonInvertingGain,
-    pin: core::marker::PhantomData<PIN>,
+    pin: core::marker::PhantomData<Output>,
 }
 
 /// PGA Gain for non inverted modes
@@ -98,24 +98,24 @@ pub struct Disabled<Opamp> {
     opamp: PhantomData<Opamp>,
 }
 /// State type for opamp running in voltage follower mode.
-pub struct Follower<Opamp, Input, PIN> {
+pub struct Follower<Opamp, Input, Output> {
     opamp: PhantomData<Opamp>,
     input: Input,
-    output: Option<PIN>,
+    output: Option<Output>,
 }
 /// State type for opamp running in open-loop mode.
-pub struct OpenLoop<Opamp, NonInverting, Inverting, PIN> {
+pub struct OpenLoop<Opamp, NonInverting, Inverting, Output> {
     opamp: PhantomData<Opamp>,
     non_inverting: NonInverting,
     inverting: Inverting,
-    output: Option<PIN>,
+    output: Option<Output>,
 }
 /// State type for opamp running in programmable-gain mode.
-pub struct Pga<Opamp, NonInverting, MODE, PIN> {
+pub struct Pga<Opamp, NonInverting, MODE, Output> {
     opamp: PhantomData<Opamp>,
     non_inverting: PhantomData<NonInverting>,
     config: MODE,
-    output: Option<PIN>,
+    output: Option<Output>,
 }
 /// State type for an opamp that has been locked.
 pub struct Locked<Opamp> {
@@ -123,12 +123,16 @@ pub struct Locked<Opamp> {
 }
 
 /// Trait for opamps that can be run in follower mode.
-pub trait IntoFollower<Opamp, IntoInput, IntoOutput, Input, PIN>
+pub trait IntoFollower<Opamp, IntoInput, IntoOutput, Input, Output>
 where
-    IntoOutput: Into<PIN>,
+    IntoOutput: Into<Output>,
 {
     /// Coonfigures the opamp as voltage follower.
-    fn follower(self, input: IntoInput, output: Option<IntoOutput>) -> Follower<Opamp, Input, PIN>;
+    fn follower(
+        self,
+        input: IntoInput,
+        output: Option<IntoOutput>,
+    ) -> Follower<Opamp, Input, Output>;
 }
 /// Trait for opamps that can be run in open-loop mode.
 pub trait IntoOpenLoop<
@@ -138,9 +142,9 @@ pub trait IntoOpenLoop<
     IntoOutput,
     NonInverting,
     Inverting,
-    PIN,
+    Output,
 > where
-    IntoOutput: Into<PIN>,
+    IntoOutput: Into<Output>,
 {
     /// Configures the opamp for open-loop operation.
     fn open_loop(
@@ -148,12 +152,12 @@ pub trait IntoOpenLoop<
         non_inverting: IntoNonInverting,
         inverting: IntoInverting,
         output: Option<IntoOutput>,
-    ) -> OpenLoop<Opamp, NonInverting, Inverting, PIN>;
+    ) -> OpenLoop<Opamp, NonInverting, Inverting, Output>;
 }
 /// Trait for opamps that can be run in programmable gain mode.
-pub trait IntoPga<Opamp, MODE, IntoOutput, NonInverting, PIN>
+pub trait IntoPga<Opamp, MODE, IntoOutput, NonInverting, Output>
 where
-    IntoOutput: Into<PIN>,
+    IntoOutput: Into<Output>,
 {
     /// Configures the opamp for programmable gain operation.
     fn pga<B: Borrow<NonInverting>>(
@@ -161,7 +165,7 @@ where
         non_inverting: B,
         config: MODE,
         output: Option<IntoOutput>,
-    ) -> Pga<Opamp, NonInverting, MODE, PIN>;
+    ) -> Pga<Opamp, NonInverting, MODE, Output>;
 }
 
 macro_rules! opamps {
@@ -222,8 +226,8 @@ macro_rules! opamps {
                     }
                 }
 
-                impl<PIN> From<&PgaModeInvertedInputFiltered<PIN>> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
-                    fn from(x: &PgaModeInvertedInputFiltered<PIN>) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
+                impl<Output> From<&PgaModeInvertedInputFiltered<Output>> for crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
+                    fn from(x: &PgaModeInvertedInputFiltered<Output>) -> crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A {
                         use crate::stm32::opamp::[<$opamp _csr>]::PGA_GAIN_A;
 
                         match x.gain {
@@ -264,6 +268,17 @@ macro_rules! opamps {
                         }
                         self.output.take()
                     }
+
+                    /// Set the lock bit in the registers. After the lock bit is
+                    /// set the opamp cannot be reconfigured until the chip is
+                    /// reset.
+                    pub fn lock(self) -> Locked<$opamp> {
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
+                                w.lock().set_bit());
+                        }
+                        Locked { opamp: PhantomData }
+                    }
                 }
 
                 impl<NonInverting, Inverting> OpenLoop<$opamp, NonInverting, Inverting, $output> {
@@ -293,6 +308,17 @@ macro_rules! opamps {
                         }
                         self.output.take()
                     }
+
+                    /// Set the lock bit in the registers. After the lock bit is
+                    /// set the opamp cannot be reconfigured until the chip is
+                    /// reset.
+                    pub fn lock(self) -> Locked<$opamp> {
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
+                                w.lock().set_bit());
+                        }
+                        Locked { opamp: PhantomData }
+                    }
                 }
 
                 impl<NonInverting, MODE> Pga<$opamp, NonInverting, MODE, $output> {
@@ -321,6 +347,17 @@ macro_rules! opamps {
                                 w.opaintoen().adcchannel());
                         }
                         self.output.take()
+                    }
+
+                    /// Set the lock bit in the registers. After the lock bit is
+                    /// set the opamp cannot be reconfigured until the chip is
+                    /// reset.
+                    pub fn lock(self) -> Locked<$opamp> {
+                        unsafe {
+                            (*crate::stm32::OPAMP::ptr()).[<$opamp _csr>].modify(|_, w|
+                                w.lock().set_bit());
+                        }
+                        Locked { opamp: PhantomData }
                     }
                 }
 
