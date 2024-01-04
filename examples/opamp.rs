@@ -7,10 +7,9 @@ use stm32g4xx_hal::adc::AdcClaim;
 use stm32g4xx_hal::adc::ClockSource;
 use stm32g4xx_hal::gpio::gpioa::*;
 use stm32g4xx_hal::gpio::Analog;
-use stm32g4xx_hal::opamp::opamp1::IntoPga as _;
-use stm32g4xx_hal::opamp::opamp2::IntoPga as _;
-use stm32g4xx_hal::opamp::NonInvertingGain;
-use stm32g4xx_hal::opamp::PgaModeInternal;
+use stm32g4xx_hal::opamp::{
+    IntoFollower, IntoOpenLoop, IntoPga, NonInvertingGain, PgaModeInternal,
+};
 use stm32g4xx_hal::prelude::*;
 use stm32g4xx_hal::pwr::PwrExt;
 
