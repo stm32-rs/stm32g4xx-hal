@@ -1519,6 +1519,8 @@ macro_rules! tim_pin_hal {
                     self.ccer_enable();
                 }
 
+                fn enable_mode2(&mut self) { todo!() }
+
                 fn get_duty(&self) -> Self::Duty {
                     let tim = unsafe { &*$TIMX::ptr() };
 
@@ -1842,6 +1844,8 @@ macro_rules! lptim_hal {
 
                     tim.cr.modify(|_, w| w.cntstrt().set_bit().enable().set_bit());
                 }
+
+                fn enable_mode2(&mut self) { todo!() }
 
                 fn get_duty(&self) -> u16 {
                     let tim = unsafe { &*$TIMX::ptr() };
