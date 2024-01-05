@@ -33,7 +33,7 @@ fn main() -> ! {
     let streams = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()
         .transfer_complete_interrupt(false)
-        .circular_buffer(false)
+        .circular_buffer(true)
         .memory_increment(true);
 
     info!("Init UART");
