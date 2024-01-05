@@ -384,14 +384,6 @@ where
     ) -> &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize] {
         let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
         let available = self.elements_available();
-        let ndtr = STREAM::get_number_of_transfers() as usize;
-        defmt::trace!(
-            "ndtr: {}, pos: {}, available: {}",
-            ndtr,
-            self.r_pos,
-            available
-        );
-        assert!(available < blen, "available: {}, blen: {}", available, blen);
         let len = data.len().min(available).min(blen - 1);
         let result = &mut data[0..len];
         self.read_exact(result);
