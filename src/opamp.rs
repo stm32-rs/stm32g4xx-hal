@@ -135,37 +135,42 @@ pub trait IntoOpenLoop<
     ) -> OpenLoop<Opamp, NonInverting, Inverting, Output>;
 }
 /// Trait for opamps that can be run in programmable gain mode.
-pub trait IntoPga<Opamp, NonInverting, IntoOutput, Output> {
-    /// Type of the associated vinm0 input.
-    type vinm0;
-    /// Type of the associated vinm1 input.
-    type vinm1;
-
+#[allow(private_bounds)]
+pub trait IntoPga<Opamp, NonInverting, Output>
+where
+    Opamp: ConfigurePgaReg<Opamp, NonInverting> + LookupPgaGain,
+{
     /// Configures the opamp for programmable gain operation.
     fn pga<B: Borrow<NonInverting>>(
         self,
         non_inverting: B,
-        output: IntoOutput,
+        output: Output,
         gain: Gain,
     ) -> Pga<Opamp, NonInverting, Output>;
 
     /// Trait for opamps that can be run in programmable gain mode,
     /// with external filtering.
-    fn pga_external_filter<B1: Borrow<NonInverting>, B2: Borrow<Self::vinm0>>(
+    fn pga_external_filter<
+        B1: Borrow<NonInverting>,
+        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm0>,
+    >(
         self,
         non_inverting: B1,
         filter: B2,
-        output: IntoOutput,
+        output: Output,
         gain: Gain,
     ) -> Pga<Opamp, NonInverting, Output>;
 
     /// Configures the opamp for programmable gain operation, with
     /// external filtering.
-    fn pga_external_bias<B1: Borrow<NonInverting>, B2: Borrow<Self::vinm0>>(
+    fn pga_external_bias<
+        B1: Borrow<NonInverting>,
+        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm0>,
+    >(
         self,
         non_inverting: B1,
         inverting: B2,
-        output: IntoOutput,
+        output: Output,
         gain: Gain,
     ) -> Pga<Opamp, NonInverting, Output>;
 
@@ -173,16 +178,49 @@ pub trait IntoPga<Opamp, NonInverting, IntoOutput, Output> {
     /// external filtering.
     fn pga_external_bias_and_filter<
         B1: Borrow<NonInverting>,
-        B2: Borrow<Self::vinm0>,
-        B3: Borrow<Self::vinm1>,
+        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm0>,
+        B3: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm1>,
     >(
         self,
         non_inverting: B1,
         inverting: B2,
         filter: B3,
-        output: IntoOutput,
+        output: Output,
         gain: Gain,
     ) -> Pga<Opamp, NonInverting, Output>;
+}
+
+/// Internal trait implementing the low level register write used to
+/// configure the PGA.
+trait ConfigurePgaReg<Opamp, NonInverting>
+where
+    Opamp: LookupPgaGain,
+{
+    /// Type of the associated vinm0 input.
+    type vinm0;
+    /// Type of the associated vinm1 input.
+    type vinm1;
+
+    /// Write the opamp CSR register configuring the opamp PGA.
+    ///
+    /// Safety: This is a raw register access.
+    unsafe fn write_pga_reg(gain: Gain, mode: PgaMode, output_enable: bool);
+
+    /// Configure the
+    ///
+    fn configure_pga<Output>(
+        output: Output,
+        gain: Gain,
+        mode: PgaMode,
+        output_enable: bool,
+    ) -> Pga<Opamp, NonInverting, Output> {
+        unsafe { Self::write_pga_reg(gain, mode, output_enable) };
+        Pga {
+            opamp: PhantomData,
+            non_inverting: PhantomData,
+            output: output,
+        }
+    }
 }
 
 /// Internal enum, used when converting [`Gain`] to
@@ -197,8 +235,10 @@ enum PgaMode {
 /// Internal trait, implemented on each opamp struct
 /// and used to lookup internal register values based
 /// on [`Gain`].
-trait LookupPgaGain<PgaGainReg> {
-    fn pga_gain(mode: PgaMode, gain: Gain) -> PgaGainReg;
+trait LookupPgaGain {
+    type PgaGainReg;
+
+    fn pga_gain(mode: PgaMode, gain: Gain) -> Self::PgaGainReg;
 }
 
 macro_rules! opamps {
@@ -245,8 +285,10 @@ macro_rules! opamps {
                 /// Opamp
                 pub struct $opamp;
 
-                impl LookupPgaGain<crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A> for $opamp {
-                    fn pga_gain(mode: PgaMode, gain: Gain) -> crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A {
+                impl LookupPgaGain for $opamp {
+                    type PgaGainReg = crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A;
+
+                    fn pga_gain(mode: PgaMode, gain: Gain) -> Self::PgaGainReg {
                         use crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A;
 
                         match (mode, gain) {
@@ -695,175 +737,146 @@ macro_rules! opamps {
         $vinm1:ty
     } => {
         paste::paste!{
-            impl<IntoOutput> IntoPga<$opamp, $non_inverting, IntoOutput, $output> for Disabled<$opamp>
-            where
-                IntoOutput: Into<$output>,
+            impl ConfigurePgaReg<$opamp, $non_inverting> for $opamp
             {
                 type vinm0 = $vinm0;
                 type vinm1 = $vinm1;
 
-                fn pga<B: Borrow<$non_inverting>>(
-                    self,
-                    non_inverting: B,
-                    output: IntoOutput,
-                    gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, $output> {
-                    self.pga(non_inverting, InternalOutput, gain).enable_output(output.into())
-                }
+                /// Configures the opamp for programmable gain operation.
+                unsafe fn write_pga_reg(gain: Gain, mode: PgaMode, output_enable: bool) {
+                    use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
 
-                fn pga_external_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
-                    self,
-                    non_inverting: B1,
-                    filter: B2,
-                    output: IntoOutput,
-                    gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, $output> {
-                    self.pga_external_filter(non_inverting, filter, InternalOutput, gain).enable_output(output.into())
-                }
-
-                fn pga_external_bias<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
-                    self,
-                    non_inverting: B1,
-                    bias: B2,
-                    output: IntoOutput,
-                    gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, $output> {
-                    self.pga_external_bias(non_inverting, bias, InternalOutput, gain).enable_output(output.into())
-                }
-
-                fn pga_external_bias_and_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>, B3: Borrow<$vinm1>>(
-                    self,
-                    non_inverting: B1,
-                    bias: B2,
-                    filter: B3,
-                    output: IntoOutput,
-                    gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, $output> {
-                    self.pga_external_bias_and_filter(non_inverting, bias, filter, InternalOutput, gain).enable_output(output.into())
+                    (*crate::stm32::OPAMP::ptr())
+                        .[<$opampreg _csr>]
+                        .write(|csr_w|
+                            csr_w.vp_sel()
+                                .$non_inverting_mask()
+                                .vm_sel()
+                                .pga()
+                                .pga_gain()
+                                .variant($opamp::pga_gain(mode, gain))
+                                .opaintoen()
+                                .variant(match output_enable {
+                                    true => OPAINTOEN_A::OutputPin,
+                                    false => OPAINTOEN_A::Adcchannel,
+                                })
+                                .opaen()
+                                .enabled()
+                        );
                 }
             }
-            impl IntoPga<$opamp, $non_inverting, InternalOutput, InternalOutput> for Disabled<$opamp>
-            {
-                type vinm0 = $vinm0;
-                type vinm1 = $vinm1;
 
+            impl IntoPga<$opamp, $non_inverting, $output> for Disabled<$opamp>
+            {
+                fn pga<B: Borrow<$non_inverting>>(
+                    self,
+                    _non_inverting: B,
+                    output: $output,
+                    gain: Gain,
+                ) -> Pga<$opamp, $non_inverting, $output>
+                {
+                    $opamp::configure_pga(output.into(), gain, PgaMode::Pga, true)
+                }
+
+                #[allow(private_bounds)]
+                fn pga_external_filter<
+                    B1: Borrow<$non_inverting>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                >(
+                    self,
+                    _non_inverting: B1,
+                    _filter: B2,
+                    output: $output,
+                    gain: Gain,
+                ) -> Pga<$opamp, $non_inverting, $output> {
+                    $opamp::configure_pga(output.into(), gain, PgaMode::PgaExternalFilter, true)
+                }
+
+                #[allow(private_bounds)]
+                fn pga_external_bias<
+                    B1: Borrow<$non_inverting>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                >(
+                    self,
+                    _non_inverting: B1,
+                    _inverting: B2,
+                    output: $output,
+                    gain: Gain,
+                ) -> Pga<$opamp, $non_inverting, $output> {
+                    $opamp::configure_pga(output.into(), gain, PgaMode::PgaExternalBias, true)
+                }
+
+                #[allow(private_bounds)]
+                fn pga_external_bias_and_filter<
+                    B1: Borrow<$non_inverting>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm1>,
+                >(
+                    self,
+                    _non_inverting: B1,
+                    _inverting: B2,
+                    _filter: B3,
+                    output: $output,
+                    gain: Gain,
+                ) -> Pga<$opamp, $non_inverting, $output> {
+                    $opamp::configure_pga(output.into(), gain, PgaMode::PgaExternalBiasAndFilter, true)
+                }
+            }
+
+            impl IntoPga<$opamp, $non_inverting, InternalOutput> for Disabled<$opamp>
+            {
                 fn pga<B: Borrow<$non_inverting>>(
                     self,
                     _non_inverting: B,
                     _output: InternalOutput,
                     gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, InternalOutput> {
-                    unsafe {
-                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
-
-                        (*crate::stm32::OPAMP::ptr())
-                            .[<$opampreg _csr>]
-                            .write(|csr_w|
-                                csr_w.vp_sel()
-                                    .$non_inverting_mask()
-                                    .vm_sel()
-                                    .pga()
-                                    .pga_gain()
-                                    .variant($opamp::pga_gain(PgaMode::Pga, gain))
-                                    .opaintoen()
-                                    .variant(OPAINTOEN_A::Adcchannel)
-                                    .opaen()
-                                    .enabled()
-                            );
-                    }
-                    Pga {opamp: PhantomData, non_inverting: PhantomData, output: InternalOutput}
+                ) -> Pga<$opamp, $non_inverting, InternalOutput>
+                {
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::Pga, true)
                 }
 
-                fn pga_external_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
+                #[allow(private_bounds)]
+                fn pga_external_filter<
+                    B1: Borrow<$non_inverting>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                >(
                     self,
                     _non_inverting: B1,
                     _filter: B2,
                     _output: InternalOutput,
                     gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, InternalOutput>
-                {
-                    unsafe {
-                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
-
-                        (*crate::stm32::OPAMP::ptr())
-                            .[<$opampreg _csr>]
-                            .write(|csr_w|
-                                csr_w.vp_sel()
-                                    .$non_inverting_mask()
-                                    .vm_sel()
-                                    .pga()
-                                    .pga_gain()
-                                    .variant($opamp::pga_gain(PgaMode::PgaExternalFilter, gain))
-                                    .opaintoen()
-                                    .variant(OPAINTOEN_A::Adcchannel)
-                                    .opaen()
-                                    .enabled()
-                            );
-                    }
-                    Pga {opamp: PhantomData, non_inverting: PhantomData, output: InternalOutput}
+                ) -> Pga<$opamp, $non_inverting, InternalOutput> {
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalFilter, true)
                 }
 
-                fn pga_external_bias<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
+                #[allow(private_bounds)]
+                fn pga_external_bias<
+                    B1: Borrow<$non_inverting>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                >(
                     self,
                     _non_inverting: B1,
                     _inverting: B2,
                     _output: InternalOutput,
                     gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, InternalOutput>
-                {
-                    unsafe {
-                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
-
-                        (*crate::stm32::OPAMP::ptr())
-                            .[<$opampreg _csr>]
-                            .write(|csr_w|
-                                csr_w.vp_sel()
-                                    .$non_inverting_mask()
-                                    .vm_sel()
-                                    .pga()
-                                    .pga_gain()
-                                    .variant($opamp::pga_gain(PgaMode::PgaExternalBias, gain))
-                                    .opaintoen()
-                                    .variant(OPAINTOEN_A::Adcchannel)
-                                    .opaen()
-                                    .enabled()
-                            );
-                    }
-                    Pga {opamp: PhantomData, non_inverting: PhantomData, output: InternalOutput}
+                ) -> Pga<$opamp, $non_inverting, InternalOutput> {
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBias, true)
                 }
 
-                fn pga_external_bias_and_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>, B3: Borrow<$vinm1>>(
+                #[allow(private_bounds)]
+                fn pga_external_bias_and_filter<
+                    B1: Borrow<$non_inverting>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm1>,
+                >(
                     self,
                     _non_inverting: B1,
                     _inverting: B2,
                     _filter: B3,
                     _output: InternalOutput,
                     gain: Gain,
-                ) -> Pga<$opamp, $non_inverting, InternalOutput>
-                {
-                    unsafe {
-                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
-
-                        (*crate::stm32::OPAMP::ptr())
-                            .[<$opampreg _csr>]
-                            .write(|csr_w|
-                                csr_w.vp_sel()
-                                    .$non_inverting_mask()
-                                    .vm_sel()
-                                    .pga()
-                                    .pga_gain()
-                                    .variant($opamp::pga_gain(PgaMode::PgaExternalBiasAndFilter, gain))
-                                    .opaintoen()
-                                    .variant(OPAINTOEN_A::Adcchannel)
-                                    .opaen()
-                                    .enabled()
-                            );
-                    }
-                    Pga {
-                        opamp: PhantomData,
-                        non_inverting: PhantomData,
-                        output: InternalOutput
-                    }
+                ) -> Pga<$opamp, $non_inverting, InternalOutput> {
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBiasAndFilter, true)
                 }
             }
         }
