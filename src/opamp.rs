@@ -100,31 +100,6 @@ pub struct Pga<Opamp, NonInverting, Output> {
     non_inverting: PhantomData<NonInverting>,
     output: Output,
 }
-/// State type for opamp running in programmable-gain mode,
-/// with external filtering.
-pub struct PgaExternalFilter<Opamp, NonInverting, Filter, Output> {
-    opamp: PhantomData<Opamp>,
-    non_inverting: PhantomData<NonInverting>,
-    filter: PhantomData<Filter>,
-    output: Output,
-}
-/// State type for opamp running in programmable-gain mode,
-/// with external bias.
-pub struct PgaExternalBias<Opamp, NonInverting, Inverting, Output> {
-    opamp: PhantomData<Opamp>,
-    non_inverting: PhantomData<NonInverting>,
-    inverting: PhantomData<Inverting>,
-    output: Output,
-}
-/// State type for opamp running in programmable-gain mode,
-/// with external filtering and bias.
-pub struct PgaExternalBiasAndFilter<Opamp, NonInverting, Inverting, Filter, Output> {
-    opamp: PhantomData<Opamp>,
-    non_inverting: PhantomData<NonInverting>,
-    inverting: PhantomData<Inverting>,
-    filter: PhantomData<Filter>,
-    output: Output,
-}
 /// State type for an opamp that has been locked.
 pub struct Locked<Opamp, Output> {
     opamp: PhantomData<Opamp>,
@@ -161,6 +136,11 @@ pub trait IntoOpenLoop<
 }
 /// Trait for opamps that can be run in programmable gain mode.
 pub trait IntoPga<Opamp, NonInverting, IntoOutput, Output> {
+    /// Type of the associated vinm0 input.
+    type vinm0;
+    /// Type of the associated vinm1 input.
+    type vinm1;
+
     /// Configures the opamp for programmable gain operation.
     fn pga<B: Borrow<NonInverting>>(
         self,
@@ -168,42 +148,33 @@ pub trait IntoPga<Opamp, NonInverting, IntoOutput, Output> {
         output: IntoOutput,
         gain: Gain,
     ) -> Pga<Opamp, NonInverting, Output>;
-}
-/// Trait for opamps that can be run in programmable gain mode,
-/// with external filtering.
-pub trait IntoPgaExternalFilter<Opamp, NonInverting, Filter, IntoOutput, Output> {
-    /// Configures the opamp for programmable gain operation, with
-    /// external filtering.
-    fn pga_external_filter<B1: Borrow<NonInverting>, B2: Borrow<Filter>>(
+
+    /// Trait for opamps that can be run in programmable gain mode,
+    /// with external filtering.
+    fn pga_external_filter<B1: Borrow<NonInverting>, B2: Borrow<Self::vinm0>>(
         self,
         non_inverting: B1,
         filter: B2,
         output: IntoOutput,
         gain: Gain,
-    ) -> PgaExternalFilter<Opamp, NonInverting, Filter, Output>;
-}
-/// Trait for opamps that can be run in programmable gain mode,
-/// with external bias.
-pub trait IntoPgaExternalBias<Opamp, NonInverting, Inverting, IntoOutput, Output> {
+    ) -> Pga<Opamp, NonInverting, Output>;
+
     /// Configures the opamp for programmable gain operation, with
     /// external filtering.
-    fn pga_external_bias<B1: Borrow<NonInverting>, B2: Borrow<Inverting>>(
+    fn pga_external_bias<B1: Borrow<NonInverting>, B2: Borrow<Self::vinm0>>(
         self,
         non_inverting: B1,
         inverting: B2,
         output: IntoOutput,
         gain: Gain,
-    ) -> PgaExternalBias<Opamp, NonInverting, Inverting, Output>;
-}
-/// Trait for opamps that can be run in programmable gain mode,
-/// with external bias and filtering.
-pub trait IntoPgaExternalBiasAndFilter<Opamp, NonInverting, Inverting, Filter, IntoOutput, Output> {
+    ) -> Pga<Opamp, NonInverting, Output>;
+
     /// Configures the opamp for programmable gain operation, with
     /// external filtering.
     fn pga_external_bias_and_filter<
         B1: Borrow<NonInverting>,
-        B2: Borrow<Inverting>,
-        B3: Borrow<Filter>,
+        B2: Borrow<Self::vinm0>,
+        B3: Borrow<Self::vinm1>,
     >(
         self,
         non_inverting: B1,
@@ -211,7 +182,7 @@ pub trait IntoPgaExternalBiasAndFilter<Opamp, NonInverting, Inverting, Filter, I
         filter: B3,
         output: IntoOutput,
         gain: Gain,
-    ) -> PgaExternalBiasAndFilter<Opamp, NonInverting, Inverting, Filter, Output>;
+    ) -> Pga<Opamp, NonInverting, Output>;
 }
 
 /// Internal enum, used when converting [`Gain`] to
@@ -515,186 +486,6 @@ macro_rules! opamps {
                     }
                 }
 
-                impl<NonInverting, Filter> PgaExternalFilter<$opamp, NonInverting, Filter, $output> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, $output) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.output)
-                    }
-
-                    /// Disables the external output.
-                    /// This will connect the opamp output to the internal ADC.
-                    pub fn disable_output(self) -> (PgaExternalFilter<$opamp, NonInverting, Filter, InternalOutput>, $output) {
-                        unsafe { $opamp::_disable_output(); }
-                        (PgaExternalFilter::<$opamp, NonInverting, Filter, InternalOutput> {
-                            opamp: PhantomData,
-                            non_inverting: self.non_inverting,
-                            filter: self.filter,
-                            output: InternalOutput,
-                        }, self.output)
-                    }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, $output> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
-                }
-
-                impl<NonInverting, Filter> PgaExternalFilter<$opamp, NonInverting, Filter, InternalOutput> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> Disabled<$opamp> {
-                        unsafe { $opamp::_reset() };
-                        Disabled { opamp: PhantomData }
-                    }
-
-                    /// Enables the external output pin.
-                    pub fn enable_output<IntoOutput>(self, output: IntoOutput) -> PgaExternalFilter<$opamp, NonInverting, Filter, $output>
-                    where
-                        IntoOutput: Into<$output>,
-                    {
-                        unsafe { $opamp::_enable_output(); }
-
-                        PgaExternalFilter::<$opamp, NonInverting, Filter, $output> {
-                            opamp: PhantomData,
-                            non_inverting: self.non_inverting,
-                            filter: self.filter,
-                            output: output.into(),
-                        }
-                    }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
-                }
-
-                impl<NonInverting, Inverting> PgaExternalBias<$opamp, NonInverting, Inverting, $output> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, $output) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.output)
-                    }
-
-                    /// Disables the external output.
-                    /// This will connect the opamp output to the internal ADC.
-                    pub fn disable_output(self) -> (PgaExternalBias<$opamp, NonInverting, Inverting, InternalOutput>, $output) {
-                        unsafe { $opamp::_disable_output(); }
-                        (PgaExternalBias::<$opamp, NonInverting, Inverting, InternalOutput> {
-                            opamp: PhantomData,
-                            non_inverting: self.non_inverting,
-                            inverting: self.inverting,
-                            output: InternalOutput,
-                        }, self.output)
-                    }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, $output> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
-                }
-
-                impl<NonInverting, Inverting> PgaExternalBias<$opamp, NonInverting, Inverting, InternalOutput> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> Disabled<$opamp> {
-                        unsafe { $opamp::_reset() };
-                        Disabled { opamp: PhantomData }
-                    }
-
-                    /// Enables the external output pin.
-                    pub fn enable_output<IntoOutput>(self, output: IntoOutput) -> PgaExternalBias<$opamp, NonInverting, Inverting, $output>
-                    where
-                        IntoOutput: Into<$output>,
-                    {
-                        unsafe { $opamp::_enable_output(); }
-
-                        PgaExternalBias::<$opamp, NonInverting, Inverting, $output> {
-                            opamp: PhantomData,
-                            non_inverting: self.non_inverting,
-                            inverting: self.inverting,
-                            output: output.into(),
-                        }
-                    }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
-                }
-
-                impl<NonInverting, Inverting, Filter> PgaExternalBiasAndFilter<$opamp, NonInverting, Inverting, Filter, $output> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, $output) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.output)
-                    }
-
-                    /// Disables the external output.
-                    /// This will connect the opamp output to the internal ADC.
-                    pub fn disable_output(self) -> (PgaExternalBiasAndFilter<$opamp, NonInverting, Inverting, Filter, InternalOutput>, $output) {
-                        unsafe { $opamp::_disable_output(); }
-                        (PgaExternalBiasAndFilter::<$opamp, NonInverting, Inverting, Filter, InternalOutput> {
-                            opamp: PhantomData,
-                            non_inverting: self.non_inverting,
-                            inverting: self.inverting,
-                            filter: self.filter,
-                            output: InternalOutput,
-                        }, self.output)
-                    }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, $output> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
-                }
-
-                impl<NonInverting, Inverting, Filter> PgaExternalBiasAndFilter<$opamp, NonInverting, Inverting, Filter, InternalOutput> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> Disabled<$opamp> {
-                        unsafe { $opamp::_reset() };
-                        Disabled { opamp: PhantomData }
-                    }
-
-                    /// Enables the external output pin.
-                    pub fn enable_output<IntoOutput>(self, output: IntoOutput) ->
-                        PgaExternalBiasAndFilter<$opamp, NonInverting, Inverting, Filter, $output>
-                    where
-                        IntoOutput: Into<$output>,
-                    {
-                        unsafe { $opamp::_enable_output(); }
-
-                        PgaExternalBiasAndFilter::<$opamp, NonInverting, Inverting, Filter, $output> {
-                            opamp: PhantomData,
-                            non_inverting: self.non_inverting,
-                            inverting: self.inverting,
-                            filter: self.filter,
-                            output: output.into(),
-                        }
-                    }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
-                }
-
                 opamps!{ @follower $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* }
                 opamps!{ @open_loop_tt $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
                 opamps!{ @pga_tt $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* : $vinm0, $vinm1 }
@@ -908,6 +699,9 @@ macro_rules! opamps {
             where
                 IntoOutput: Into<$output>,
             {
+                type vinm0 = $vinm0;
+                type vinm1 = $vinm1;
+
                 fn pga<B: Borrow<$non_inverting>>(
                     self,
                     non_inverting: B,
@@ -916,39 +710,27 @@ macro_rules! opamps {
                 ) -> Pga<$opamp, $non_inverting, $output> {
                     self.pga(non_inverting, InternalOutput, gain).enable_output(output.into())
                 }
-            }
-            impl<IntoOutput> IntoPgaExternalFilter<$opamp, $non_inverting, $vinm0, IntoOutput, $output> for Disabled<$opamp>
-            where
-                IntoOutput: Into<$output>,
-            {
+
                 fn pga_external_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
                     self,
                     non_inverting: B1,
                     filter: B2,
                     output: IntoOutput,
                     gain: Gain,
-                ) -> PgaExternalFilter<$opamp, $non_inverting, $vinm0, $output> {
+                ) -> Pga<$opamp, $non_inverting, $output> {
                     self.pga_external_filter(non_inverting, filter, InternalOutput, gain).enable_output(output.into())
                 }
-            }
-            impl<IntoOutput> IntoPgaExternalBias<$opamp, $non_inverting, $vinm0, IntoOutput, $output> for Disabled<$opamp>
-            where
-                IntoOutput: Into<$output>,
-            {
+
                 fn pga_external_bias<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
                     self,
                     non_inverting: B1,
                     bias: B2,
                     output: IntoOutput,
                     gain: Gain,
-                ) -> PgaExternalBias<$opamp, $non_inverting, $vinm0, $output> {
+                ) -> Pga<$opamp, $non_inverting, $output> {
                     self.pga_external_bias(non_inverting, bias, InternalOutput, gain).enable_output(output.into())
                 }
-            }
-            impl<IntoOutput> IntoPgaExternalBiasAndFilter<$opamp, $non_inverting, $vinm0, $vinm1, IntoOutput, $output> for Disabled<$opamp>
-            where
-                IntoOutput: Into<$output>,
-            {
+
                 fn pga_external_bias_and_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>, B3: Borrow<$vinm1>>(
                     self,
                     non_inverting: B1,
@@ -956,12 +738,15 @@ macro_rules! opamps {
                     filter: B3,
                     output: IntoOutput,
                     gain: Gain,
-                ) -> PgaExternalBiasAndFilter<$opamp, $non_inverting, $vinm0, $vinm1, $output> {
+                ) -> Pga<$opamp, $non_inverting, $output> {
                     self.pga_external_bias_and_filter(non_inverting, bias, filter, InternalOutput, gain).enable_output(output.into())
                 }
             }
             impl IntoPga<$opamp, $non_inverting, InternalOutput, InternalOutput> for Disabled<$opamp>
             {
+                type vinm0 = $vinm0;
+                type vinm1 = $vinm1;
+
                 fn pga<B: Borrow<$non_inverting>>(
                     self,
                     _non_inverting: B,
@@ -988,16 +773,14 @@ macro_rules! opamps {
                     }
                     Pga {opamp: PhantomData, non_inverting: PhantomData, output: InternalOutput}
                 }
-            }
-            impl IntoPgaExternalFilter<$opamp, $non_inverting, $vinm0, InternalOutput, InternalOutput> for Disabled<$opamp>
-            {
+
                 fn pga_external_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
                     self,
                     _non_inverting: B1,
                     _filter: B2,
                     _output: InternalOutput,
                     gain: Gain,
-                ) -> PgaExternalFilter<$opamp, $non_inverting, $vinm0, InternalOutput>
+                ) -> Pga<$opamp, $non_inverting, InternalOutput>
                 {
                     unsafe {
                         use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
@@ -1017,18 +800,16 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    PgaExternalFilter {opamp: PhantomData, non_inverting: PhantomData, filter: PhantomData, output: InternalOutput}
+                    Pga {opamp: PhantomData, non_inverting: PhantomData, output: InternalOutput}
                 }
-            }
-            impl IntoPgaExternalBias<$opamp, $non_inverting, $vinm0, InternalOutput, InternalOutput> for Disabled<$opamp>
-            {
+
                 fn pga_external_bias<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>>(
                     self,
                     _non_inverting: B1,
                     _inverting: B2,
                     _output: InternalOutput,
                     gain: Gain,
-                ) -> PgaExternalBias<$opamp, $non_inverting, $vinm0, InternalOutput>
+                ) -> Pga<$opamp, $non_inverting, InternalOutput>
                 {
                     unsafe {
                         use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
@@ -1048,11 +829,9 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    PgaExternalBias {opamp: PhantomData, non_inverting: PhantomData, inverting: PhantomData, output: InternalOutput}
+                    Pga {opamp: PhantomData, non_inverting: PhantomData, output: InternalOutput}
                 }
-            }
-            impl IntoPgaExternalBiasAndFilter<$opamp, $non_inverting, $vinm0, $vinm1, InternalOutput, InternalOutput> for Disabled<$opamp>
-            {
+
                 fn pga_external_bias_and_filter<B1: Borrow<$non_inverting>, B2: Borrow<$vinm0>, B3: Borrow<$vinm1>>(
                     self,
                     _non_inverting: B1,
@@ -1060,7 +839,7 @@ macro_rules! opamps {
                     _filter: B3,
                     _output: InternalOutput,
                     gain: Gain,
-                ) -> PgaExternalBiasAndFilter<$opamp, $non_inverting, $vinm0, $vinm1, InternalOutput>
+                ) -> Pga<$opamp, $non_inverting, InternalOutput>
                 {
                     unsafe {
                         use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
@@ -1080,11 +859,9 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    PgaExternalBiasAndFilter {
+                    Pga {
                         opamp: PhantomData,
                         non_inverting: PhantomData,
-                        inverting: PhantomData,
-                        filter: PhantomData,
                         output: InternalOutput
                     }
                 }
