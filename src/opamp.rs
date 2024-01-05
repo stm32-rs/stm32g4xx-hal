@@ -236,8 +236,12 @@ enum PgaMode {
 /// and used to lookup internal register values based
 /// on [`Gain`].
 trait LookupPgaGain {
+    /// Type of the register that is returned (this is specific
+    /// to each opamp instance)
     type PgaGainReg;
 
+    /// Lookup table to convert a [`PgaMode`] and [`Gain`] to
+    /// the internal register enumeration.
     fn pga_gain(mode: PgaMode, gain: Gain) -> Self::PgaGainReg;
 }
 
@@ -321,30 +325,23 @@ macro_rules! opamps {
                 }
 
                 impl $opamp {
-                    /// Reset the opamp. Used by internal implementations.
                     #[inline(always)]
                     unsafe fn _reset() {
                         (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].reset()
                     }
 
-                    /// Disable the output (connect the opamp to the internal ADC
-                    /// channel). Used by internal implementations.
                     #[inline(always)]
                     unsafe fn _disable_output() {
                         (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].write(|w|
                             w.opaintoen().adcchannel())
                     }
 
-                    /// Enable the output (connect the opamp to a pin).
-                    /// Used by internal implementations.
                     #[inline(always)]
                     unsafe fn _enable_output() {
                         (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].write(|w|
                             w.opaintoen().output_pin())
                     }
 
-                    /// Lock the opamp registers
-                    /// Used by internal implementations.
                     #[inline(always)]
                     unsafe fn _lock() {
                         // Write the lock bit
@@ -356,6 +353,16 @@ macro_rules! opamps {
                         // the lock bit.
                         (*crate::stm32::OPAMP::ptr()).[<$opampreg _tcmr>].modify(|_, w|
                             w.lock().set_bit())
+                    }
+                }
+
+                impl<Input, Output> Follower<$opamp, Input, Output> {
+                    /// Set the lock bit in the registers. After the lock bit is
+                    /// set the opamp cannot be reconfigured until the chip is
+                    /// reset.
+                    pub fn lock(self) -> Locked<$opamp, Output> {
+                        unsafe { $opamp::_lock() };
+                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 
@@ -377,14 +384,6 @@ macro_rules! opamps {
                             output: InternalOutput,
                         }, self.output)
                     }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, $output> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
                 }
 
                 impl<Input> Follower<$opamp, Input, InternalOutput> {
@@ -404,11 +403,13 @@ macro_rules! opamps {
                             output,
                         }
                     }
+                }
 
+                impl<NonInverting, Inverting, Output> OpenLoop<$opamp, NonInverting, Inverting, Output> {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
+                    pub fn lock(self) -> Locked<$opamp, Output> {
                         unsafe { $opamp::_lock() };
                         Locked { opamp: PhantomData, output: PhantomData }
                     }
@@ -433,14 +434,6 @@ macro_rules! opamps {
                             output: InternalOutput,
                         }, self.output)
                     }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, $output> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
                 }
 
                 impl<NonInverting, Inverting> OpenLoop<$opamp, NonInverting, Inverting, InternalOutput> {
@@ -461,11 +454,13 @@ macro_rules! opamps {
                             output,
                         }
                     }
+                }
 
+                impl<NonInverting, Output> Pga<$opamp, NonInverting, Output> {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
                     /// reset.
-                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
+                    pub fn lock(self) -> Locked<$opamp, Output> {
                         unsafe { $opamp::_lock() };
                         Locked { opamp: PhantomData, output: PhantomData }
                     }
@@ -488,14 +483,6 @@ macro_rules! opamps {
                             output: InternalOutput,
                         }, self.output)
                     }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, $output> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
-                    }
                 }
 
                 impl<NonInverting> Pga<$opamp, NonInverting, InternalOutput> {
@@ -517,14 +504,6 @@ macro_rules! opamps {
                             non_inverting: self.non_inverting,
                             output: output.into(),
                         }
-                    }
-
-                    /// Set the lock bit in the registers. After the lock bit is
-                    /// set the opamp cannot be reconfigured until the chip is
-                    /// reset.
-                    pub fn lock(self) -> Locked<$opamp, InternalOutput> {
-                        unsafe { $opamp::_lock() };
-                        Locked { opamp: PhantomData, output: PhantomData }
                     }
                 }
 
