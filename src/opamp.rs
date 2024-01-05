@@ -332,13 +332,13 @@ macro_rules! opamps {
 
                     #[inline(always)]
                     unsafe fn _disable_output() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].write(|w|
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].modify(|_, w|
                             w.opaintoen().adcchannel())
                     }
 
                     #[inline(always)]
                     unsafe fn _enable_output() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].write(|w|
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].modify(|_, w|
                             w.opaintoen().output_pin())
                     }
 
@@ -560,6 +560,7 @@ macro_rules! opamps {
                     IntoInput: Into<$input>,
                     IntoOutput: Into<$output>,
             {
+                #[inline]
                 fn follower(
                     self,
                     input: IntoInput,
@@ -639,6 +640,7 @@ macro_rules! opamps {
                     IntoInverting: Into<$inverting>,
                     IntoOutput: Into<$output>,
             {
+                #[inline]
                 fn open_loop(
                     self,
                     non_inverting: IntoNonInverting,
