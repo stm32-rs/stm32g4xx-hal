@@ -1,3 +1,4 @@
+pub mod adc_trigger;
 pub mod compare_register;
 pub mod control;
 pub mod deadtime;
