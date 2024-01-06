@@ -16,7 +16,7 @@ pub struct HrTim<TIM, PSCL> {
     _prescaler: PhantomData<PSCL>,
 }
 
-pub trait HrTimer<TIM, PSCL> {
+pub trait HrTimer<TIM, PSCL>: Sized {
     /// Get period of timer in number of ticks
     ///
     /// This is also the maximum duty usable for `HrCompareRegister::set_duty`
@@ -35,10 +35,34 @@ pub trait HrTimer<TIM, PSCL> {
 
     /// Stop timer and reset counter
     fn stop_and_reset(&mut self, _hr_control: &mut HrPwmControl);
+
+    /// Make a handle to this timers reset event to use as adc trigger
+    fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self>;
+
+    /// Make a handle to this timers period event to use as adc trigger
+    fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self>;
 }
 
 macro_rules! hrtim_timer {
-    ($($TIMX:ident: $cntXr:ident, $cntx:ident, $perXr:ident, $tXcen:ident, $perx:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident, $icr:ident, $repc:ident, $([$rstXr:ident, $TimerXResetEventSource:ident],)*)+) => {$(
+    ($(
+        $TIMX:ident:
+        $cntXr:ident,
+        $cntx:ident,
+        $perXr:ident,
+        $tXcen:ident,
+        $perx:ident,
+        $rep:ident,
+        $repx:ident, 
+        $dier:ident,
+        $repie:ident,
+        $icr:ident,
+        $repc:ident,
+        $(($rstXr:ident, $TimerXResetEventSource:ident))*
+        ,[$(($AdcTrigger:ident: [
+            $((PER: $adc_trigger_bits_period:expr),)*
+            $((RST: $adc_trigger_bits_reset:expr)),*
+        ])),*]),+
+    ) => {$(
         impl<PSCL> HrTimer<$TIMX, PSCL> for HrTim<$TIMX, PSCL> {
             fn get_period(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
@@ -75,6 +99,16 @@ macro_rules! hrtim_timer {
                 // Reset counter
                 let tim = unsafe { &*$TIMX::ptr() };
                 unsafe { tim.$cntXr.write(|w| w.$cntx().bits(0)); }
+            }
+
+            /// Make a handle to this timers reset event to use as adc trigger
+            fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self> {
+                super::adc_trigger::TimerReset(PhantomData)
+            }
+
+            /// Make a handle to this timers period event to use as adc trigger
+            fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self> {
+                super::adc_trigger::TimerPeriod(PhantomData)
             }
         }
 
@@ -126,16 +160,31 @@ macro_rules! hrtim_timer {
                 tim.$icr.write(|w| w.$repc().set_bit());
             }
         }
+    
+        $(
+            $(impl<PSCL> $AdcTrigger for super::adc_trigger::TimerReset<HrTim<$TIMX, PSCL>> {
+                const BITS: u32 = $adc_trigger_bits_reset;
+            })*
+
+            $(impl<PSCL> $AdcTrigger for super::adc_trigger::TimerPeriod<HrTim<$TIMX, PSCL>> {
+                const BITS: u32 = $adc_trigger_bits_period;
+            })*
+        )*
     )+};
 }
 
-hrtim_timer! {
-    HRTIM_MASTER: mcntr, mcnt, mper, mcen, mper, mrep, mrep, mdier, mrepie, micr, mrepc,
+use super::adc_trigger::Adc13Trigger as Adc13;
+use super::adc_trigger::Adc24Trigger as Adc24;
+use super::adc_trigger::Adc579Trigger as Adc579;
+use super::adc_trigger::Adc6810Trigger as Adc6810;
 
-    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, [rstar, TimerAResetEventSource],
-    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, [rstbr, TimerBResetEventSource],
-    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, [rstcr, TimerCResetEventSource],
-    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, [rstdr, TimerDResetEventSource],
-    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, [rster, TimerEResetEventSource],
-    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, [rstfr, TimerFResetEventSource],
+hrtim_timer! {
+    HRTIM_MASTER: mcntr, mcnt, mper, mcen, mper, mrep, mrep, mdier, mrepie, micr, mrepc,, [(Adc13: [(PER: 1 << 4),]), (Adc24: [(PER: 1 << 4),]), (Adc579: [(PER: 4),]), (Adc6810: [(PER: 4),])],
+
+    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, (rstar, TimerAResetEventSource), [(Adc13: [(PER: 1 << 13), (RST: 1 << 14)]), (Adc24: [(PER: 1 << 13),               ]), (Adc579: [(PER: 12), (RST: 13)]), (Adc6810: [(PER: 12),          ])],
+    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, (rstbr, TimerBResetEventSource),  [(Adc13: [(PER: 1 << 18), (RST: 1 << 19)]), (Adc24: [(PER: 1 << 17),               ]), (Adc579: [(PER: 16), (RST: 17)]), (Adc6810: [(PER: 15),          ])],
+    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, (rstcr, TimerCResetEventSource), [(Adc13: [(PER: 1 << 23),               ]), (Adc24: [(PER: 1 << 21), (RST: 1 << 22)]), (Adc579: [(PER: 20),          ]), (Adc6810: [(PER: 18), (RST: 19)])],
+    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, (rstdr, TimerDResetEventSource), [(Adc13: [(PER: 1 << 27),               ]), (Adc24: [(PER: 1 << 26), (RST: 1 << 27)]), (Adc579: [(PER: 23),          ]), (Adc6810: [(PER: 22), (RST: 23)])],
+    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, (rster, TimerEResetEventSource), [(Adc13: [(PER: 1 << 31),               ]), (Adc24: [                (RST: 1 << 31)]), (Adc579: [(PER: 26),          ]), (Adc6810: [                    ])],
+    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, (rstfr, TimerFResetEventSource), [(Adc13: [(PER: 1 << 24), (RST: 1 << 28)]), (Adc24: [(PER: 1 << 24),               ]), (Adc579: [(PER: 30), (RST: 31)]), (Adc6810: [(PER: 31),          ])]
 }
