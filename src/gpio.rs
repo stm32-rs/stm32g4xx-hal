@@ -241,6 +241,7 @@ macro_rules! gpio {
         pub mod $gpiox {
             use core::marker::PhantomData;
             use hal::digital::v2::{toggleable, InputPin, OutputPin, StatefulOutputPin};
+            use embedded_hal_one as hal1;
             use crate::stm32::{EXTI, $GPIOX};
             use crate::exti::{ExtiExt, Event};
             use crate::rcc::Rcc;
@@ -288,6 +289,24 @@ macro_rules! gpio {
                 }
             }
 
+            impl<MODE> hal1::digital::ErrorType for $PXx<Output<MODE>> {
+                type Error = core::convert::Infallible;
+            }
+
+            impl<MODE> hal1::digital::OutputPin for $PXx<Output<MODE>> {
+                fn set_high(&mut self) -> Result<(), Self::Error> {
+                    // NOTE(unsafe) atomic write to a stateless register
+                    unsafe { (*$GPIOX::ptr()).bsrr.write(|w| w.bits(1 << self.i)) };
+                    Ok(())
+                }
+
+                fn set_low(&mut self) -> Result<(), Self::Error> {
+                    // NOTE(unsafe) atomic write to a stateless register
+                    unsafe { (*$GPIOX::ptr()).bsrr.write(|w| w.bits(1 << (self.i + 16))) };
+                    Ok(())
+                }
+            }
+
             impl<MODE> StatefulOutputPin for $PXx<Output<MODE>> {
                 fn is_set_high(&self) -> Result<bool, ()> {
                     let is_set_high = !self.is_set_low()?;
@@ -301,8 +320,30 @@ macro_rules! gpio {
                 }
             }
 
-            impl<MODE> toggleable::Default for $PXx<Output<MODE>> {
+            impl<MODE> hal1::digital::StatefulOutputPin for $PXx<Output<MODE>> {
+                fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+                    let is_set_high = !self.is_set_low()?;
+                    Ok(is_set_high)
+                }
+
+                fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+                    // NOTE(unsafe) atomic read with no side effects
+                    let is_set_low = unsafe { (*$GPIOX::ptr()).odr.read().bits() & (1 << self.i) == 0 };
+                    Ok(is_set_low)
+                }
             }
+
+            impl<MODE> hal1::digital::ToggleableOutputPin for $PXx<Output<MODE>> {
+                fn toggle(&mut self) -> Result<(), Self::Error> {
+                    if <Self as hal1::digital::StatefulOutputPin>::is_set_high(self)? {
+                        <Self as hal1::digital::OutputPin>::set_low(self)
+                    } else {
+                        <Self as hal1::digital::OutputPin>::set_high(self)
+                    }
+                }
+            }
+
+            impl<MODE> toggleable::Default for $PXx<Output<MODE>> {}
 
             impl<MODE> InputPin for $PXx<Output<MODE>> {
                 type Error = ();
@@ -319,6 +360,20 @@ macro_rules! gpio {
                 }
             }
 
+            impl<MODE> hal1::digital::InputPin for $PXx<Output<MODE>> {
+                fn is_high(&mut self) -> Result<bool, Self::Error> {
+                    let is_high = !self.is_low()?;
+                    Ok(is_high)
+                }
+
+                fn is_low(&mut self) -> Result<bool, Self::Error>  {
+                    // NOTE(unsafe) atomic read with no side effects
+                    let is_low = unsafe { (*$GPIOX::ptr()).idr.read().bits() & (1 << self.i) == 0 };
+                    Ok(is_low)
+                }
+            }
+
+
             impl<MODE> InputPin for $PXx<Input<MODE>> {
                 type Error = ();
 
@@ -328,6 +383,23 @@ macro_rules! gpio {
                 }
 
                 fn is_low(&self) -> Result<bool, ()> {
+                    // NOTE(unsafe) atomic read with no side effects
+                    let is_low = unsafe { (*$GPIOX::ptr()).idr.read().bits() & (1 << self.i) == 0 };
+                    Ok(is_low)
+                }
+            }
+
+            impl<MODE> hal1::digital::ErrorType for $PXx<Input<MODE>> {
+                type Error = core::convert::Infallible;
+            }
+
+            impl<MODE> hal1::digital::InputPin for $PXx<Input<MODE>> {
+                fn is_high(&mut self) -> Result<bool, Self::Error> {
+                    let is_high = !self.is_low()?;
+                    Ok(is_high)
+                }
+
+                fn is_low(&mut self) -> Result<bool, Self::Error> {
                     // NOTE(unsafe) atomic read with no side effects
                     let is_low = unsafe { (*$GPIOX::ptr()).idr.read().bits() & (1 << self.i) == 0 };
                     Ok(is_low)
@@ -580,6 +652,24 @@ macro_rules! gpio {
                     }
                 }
 
+                impl<MODE> hal1::digital::ErrorType for $PXi<Output<MODE>> {
+                    type Error = core::convert::Infallible;
+                }
+
+                impl<MODE> hal1::digital::OutputPin for $PXi<Output<MODE>> {
+                    fn set_high(&mut self) -> Result<(), Self::Error> {
+                        // NOTE(unsafe) atomic write to a stateless register
+                        unsafe { (*$GPIOX::ptr()).bsrr.write(|w| w.bits(1 << $i)) };
+                        Ok(())
+                    }
+
+                    fn set_low(&mut self) -> Result<(), Self::Error>{
+                        // NOTE(unsafe) atomic write to a stateless register
+                        unsafe { (*$GPIOX::ptr()).bsrr.write(|w| w.bits(1 << ($i + 16))) };
+                        Ok(())
+                    }
+                }
+
                 impl<MODE> StatefulOutputPin for $PXi<Output<MODE>> {
                     fn is_set_high(&self) -> Result<bool, ()> {
                         let is_set_high = !self.is_set_low()?;
@@ -593,7 +683,29 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> toggleable::Default for $PXi<Output<MODE>> {
+                impl<MODE> hal1::digital::StatefulOutputPin for $PXi<Output<MODE>> {
+                    fn is_set_high(&mut self) -> Result<bool, Self::Error> {
+                        let is_set_high = !self.is_set_low()?;
+                        Ok(is_set_high)
+                    }
+
+                    fn is_set_low(&mut self) -> Result<bool, Self::Error> {
+                        // NOTE(unsafe) atomic read with no side effects
+                        let is_set_low = unsafe { (*$GPIOX::ptr()).odr.read().bits() & (1 << $i) == 0 };
+                        Ok(is_set_low)
+                    }
+                }
+
+                impl<MODE> toggleable::Default for $PXi<Output<MODE>> {}
+
+                impl<MODE> hal1::digital::ToggleableOutputPin for $PXi<Output<MODE>> {
+                    fn toggle(&mut self) -> Result<(), Self::Error> {
+                        if <Self as hal1::digital::StatefulOutputPin>::is_set_high(self)? {
+                            <Self as hal1::digital::OutputPin>::set_low(self)
+                        } else {
+                            <Self as hal1::digital::OutputPin>::set_high(self)
+                        }
+                    }
                 }
 
                 impl<MODE> InputPin for $PXi<Output<MODE>> {
@@ -611,6 +723,19 @@ macro_rules! gpio {
                     }
                 }
 
+                impl<MODE> hal1::digital::InputPin for $PXi<Output<MODE>> {
+                    fn is_high(&mut self) -> Result<bool, Self::Error> {
+                        let is_high = !self.is_low()?;
+                        Ok(is_high)
+                    }
+
+                    fn is_low(&mut self) -> Result<bool, Self::Error>  {
+                        // NOTE(unsafe) atomic read with no side effects
+                        let is_low = unsafe { (*$GPIOX::ptr()).idr.read().bits() & (1 << $i) == 0 };
+                        Ok(is_low)
+                    }
+                }
+
                 impl<MODE> $PXi<Input<MODE>> {
                     /// Erases the pin number from the type
                     ///
@@ -618,6 +743,23 @@ macro_rules! gpio {
                     /// need all the elements to have the same type
                     pub fn downgrade(self) -> $PXx<Input<MODE>> {
                         $PXx { i: $i, _mode: self._mode }
+                    }
+                }
+
+                impl<MODE> hal1::digital::ErrorType for $PXi<Input<MODE>> {
+                    type Error = core::convert::Infallible;
+                }
+                
+                impl<MODE> hal1::digital::InputPin for $PXi<Input<MODE>> {
+                    fn is_high(&mut self) -> Result<bool, Self::Error> {
+                        let is_high = !self.is_low()?;
+                        Ok(is_high)
+                    }
+
+                    fn is_low(&mut self) -> Result<bool, Self::Error> {
+                        // NOTE(unsafe) atomic read with no side effects
+                        let is_low = unsafe { (*$GPIOX::ptr()).idr.read().bits() & (1 << $i) == 0 };
+                        Ok(is_low)
                     }
                 }
 
