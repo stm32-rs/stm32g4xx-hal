@@ -333,16 +333,6 @@ macro_rules! gpio {
                 }
             }
 
-            impl<MODE> hal1::digital::ToggleableOutputPin for $PXx<Output<MODE>> {
-                fn toggle(&mut self) -> Result<(), Self::Error> {
-                    if <Self as hal1::digital::StatefulOutputPin>::is_set_high(self)? {
-                        <Self as hal1::digital::OutputPin>::set_low(self)
-                    } else {
-                        <Self as hal1::digital::OutputPin>::set_high(self)
-                    }
-                }
-            }
-
             impl<MODE> toggleable::Default for $PXx<Output<MODE>> {}
 
             impl<MODE> InputPin for $PXx<Output<MODE>> {
@@ -697,16 +687,6 @@ macro_rules! gpio {
                 }
 
                 impl<MODE> toggleable::Default for $PXi<Output<MODE>> {}
-
-                impl<MODE> hal1::digital::ToggleableOutputPin for $PXi<Output<MODE>> {
-                    fn toggle(&mut self) -> Result<(), Self::Error> {
-                        if <Self as hal1::digital::StatefulOutputPin>::is_set_high(self)? {
-                            <Self as hal1::digital::OutputPin>::set_low(self)
-                        } else {
-                            <Self as hal1::digital::OutputPin>::set_high(self)
-                        }
-                    }
-                }
 
                 impl<MODE> InputPin for $PXi<Output<MODE>> {
                     type Error = ();
