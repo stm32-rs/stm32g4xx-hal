@@ -44,7 +44,7 @@ features = ["unproven"]
 version = "0.2.4"
 
 [dependencies.embedded-hal-one]
-version = "1.0.0-rc.3"
+version = "1.0.0"
 package = "embedded-hal"
 
 [dependencies.embedded-dma]
