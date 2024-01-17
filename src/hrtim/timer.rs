@@ -8,12 +8,14 @@ use super::{
     event::{
         TimerAResetEventSource, TimerBResetEventSource, TimerCResetEventSource,
         TimerDResetEventSource, TimerEResetEventSource, TimerFResetEventSource,
-    },
+    }, capture::{HrCapt, self},
 };
 
 pub struct HrTim<TIM, PSCL> {
     _timer: PhantomData<TIM>,
     _prescaler: PhantomData<PSCL>,
+    capture_ch1: HrCapt<TIM, PSCL, capture::Ch1>,
+    capture_ch2: HrCapt<TIM, PSCL, capture::Ch2>,
 }
 
 pub trait HrTimer<TIM, PSCL>: Sized {
@@ -158,6 +160,14 @@ macro_rules! hrtim_timer {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 tim.$icr.write(|w| w.$repc().set_bit());
+            }
+            
+            pub fn capture_ch1(&mut self) -> &mut HrCapt<$TIMX, PSCL, capture::Ch1> {
+                &mut self.capture_ch1
+            }
+
+            pub fn capture_ch2(&mut self) -> &mut HrCapt<$TIMX, PSCL, capture::Ch2> {
+                &mut self.capture_ch2
             }
         }
     
