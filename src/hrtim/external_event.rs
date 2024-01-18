@@ -7,58 +7,11 @@ use crate::gpio::{self, AF13, AF3};
 use crate::pwm::Polarity;
 use crate::stm32::HRTIM_COMMON;
 
-use super::event::EevFastOrNormal;
-use super::{control::HrTimCalibrated, event::EventSource};
+use super::control::HrTimCalibrated;
 
 #[derive(Copy, Clone, PartialEq)]
-pub struct ExternalEventSourceInner<const N: u8, const IS_FAST: bool> {
+pub struct ExternalEventSource<const N: u8, const IS_FAST: bool> {
     _x: PhantomData<()>,
-}
-
-#[derive(Copy, Clone, PartialEq)]
-pub enum ExternalEventSource<const IS_FAST: bool> {
-    Eevnt1 {
-        x: ExternalEventSourceInner<1, IS_FAST>,
-    },
-    Eevnt2 {
-        x: ExternalEventSourceInner<2, IS_FAST>,
-    },
-    Eevnt3 {
-        x: ExternalEventSourceInner<3, IS_FAST>,
-    },
-    Eevnt4 {
-        x: ExternalEventSourceInner<4, IS_FAST>,
-    },
-    Eevnt5 {
-        x: ExternalEventSourceInner<5, IS_FAST>,
-    },
-    Eevnt6 {
-        x: ExternalEventSourceInner<6, IS_FAST>,
-    },
-    Eevnt7 {
-        x: ExternalEventSourceInner<7, IS_FAST>,
-    },
-    Eevnt8 {
-        x: ExternalEventSourceInner<8, IS_FAST>,
-    },
-    Eevnt9 {
-        x: ExternalEventSourceInner<9, IS_FAST>,
-    },
-    Eevnt10 {
-        x: ExternalEventSourceInner<10, IS_FAST>,
-    },
-}
-
-impl<PSCL, DST> From<ExternalEventSource<true>> for EventSource<PSCL, DST> {
-    fn from(e: ExternalEventSource<true>) -> Self {
-        EventSource::ExternalEvent(EevFastOrNormal::Fast(e))
-    }
-}
-
-impl<PSCL, DST> From<ExternalEventSource<false>> for EventSource<PSCL, DST> {
-    fn from(e: ExternalEventSource<false>) -> Self {
-        EventSource::ExternalEvent(EevFastOrNormal::Normal(e))
-    }
 }
 
 pub struct EevInputs {
@@ -281,7 +234,7 @@ where
 }
 
 pub trait ToExternalEventSource<const N: u8, const IS_FAST: bool> {
-    fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSourceInner<N, IS_FAST>;
+    fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<N, IS_FAST>;
 }
 
 #[derive(Copy, Clone)]
@@ -317,7 +270,7 @@ macro_rules! impl_eev1_5_to_es {
             fn finalize(
                 self,
                 _calibrated: &mut HrTimCalibrated,
-            ) -> ExternalEventSourceInner<$N, IS_FAST> {
+            ) -> ExternalEventSource<$N, IS_FAST> {
                 let SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,
@@ -342,7 +295,7 @@ macro_rules! impl_eev1_5_to_es {
                     });
                 }
 
-                ExternalEventSourceInner { _x: PhantomData }
+                ExternalEventSource { _x: PhantomData }
             }
         }
     };
@@ -353,10 +306,7 @@ macro_rules! impl_eev6_10_to_es {
         impl ExternalEventBuilder6To10 for SourceBuilder<$N, false> {}
 
         impl ToExternalEventSource<$N, false> for SourceBuilder<$N, false> {
-            fn finalize(
-                self,
-                _calibrated: &mut HrTimCalibrated,
-            ) -> ExternalEventSourceInner<$N, false> {
+            fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<$N, false> {
                 let SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,
@@ -380,7 +330,7 @@ macro_rules! impl_eev6_10_to_es {
                     common.eecr3.modify(|_r, w| w.$eeXf().bits(filter_bits));
                 }
 
-                ExternalEventSourceInner { _x: PhantomData }
+                ExternalEventSource { _x: PhantomData }
             }
         }
     };
@@ -398,40 +348,14 @@ impl_eev6_10_to_es!(Eevnt8, 8, ee8src, ee8pol, ee8sns, ee8f);
 impl_eev6_10_to_es!(Eevnt9, 9, ee9src, ee9pol, ee9sns, ee9f);
 impl_eev6_10_to_es!(Eevnt10, 10, ee10src, ee10pol, ee10sns, ee10f);
 
-impl<const N: u8, const IS_FAST: bool, TIM, PSCL>
-    super::capture::CaptureEvent<TIM, PSCL, super::capture::Ch1>
-    for ExternalEventSourceInner<N, IS_FAST>
+impl<const N: u8, const IS_FAST: bool, TIM, PSCL> super::capture::CaptureEvent<TIM, PSCL>
+    for ExternalEventSource<N, IS_FAST>
 {
     const BITS: u32 = 1 << (N + 1); // EEV1 is at bit #2 etc
 }
 
-impl<const N: u8, const IS_FAST: bool, TIM, PSCL>
-    super::capture::CaptureEvent<TIM, PSCL, super::capture::Ch2>
-    for ExternalEventSourceInner<N, IS_FAST>
+impl<const N: u8, const IS_FAST: bool, DST, PSCL> super::event::TimerResetEventSource<DST, PSCL>
+    for ExternalEventSource<N, IS_FAST>
 {
-    const BITS: u32 = 1 << (N + 1); // EEV1 is at bit #2 etc
-}
-
-// TODO: Get rid of ExternalEventSource completely in favour of using ExternalEventSourceInner directly
-macro_rules! impl_into_ees {
-    ($($N:literal => $variant:ident),+) => {$(
-        impl<const IS_FAST: bool> Into<ExternalEventSource<IS_FAST>> for ExternalEventSourceInner<$N, IS_FAST> {
-            fn into(self) -> ExternalEventSource<IS_FAST> {
-                ExternalEventSource::$variant { x: self }
-            }
-        }
-    )+}
-}
-
-impl_into_ees! {
-    1 => Eevnt1,
-    2 => Eevnt2,
-    3 => Eevnt3,
-    4 => Eevnt4,
-    5 => Eevnt5,
-    6 => Eevnt6,
-    7 => Eevnt7,
-    8 => Eevnt8,
-    9 => Eevnt9,
-    10 => Eevnt10
+    const BITS: u32 = 1 << (N + 8); // EEV1 is at bit 9
 }
