@@ -14,7 +14,6 @@ pub struct HrCr2<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 pub struct HrCr3<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 pub struct HrCr4<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 
-
 use super::adc_trigger::Adc13Trigger as Adc13;
 use super::adc_trigger::Adc24Trigger as Adc24;
 use super::adc_trigger::Adc579Trigger as Adc579;
@@ -41,7 +40,6 @@ macro_rules! hrtim_cr_helper {
     };
 }
 
-
 macro_rules! hrtim_cr {
     ($($TIMX:ident: [
         [$cmpX1r:ident, $cmp1x:ident, $(($cr1_trigger:ident: $cr1_trigger_bits:expr)),*],
@@ -58,19 +56,19 @@ macro_rules! hrtim_cr {
 
 hrtim_cr! {
     HRTIM_MASTER: [
-        [mcmp1r,mcmp1,  (Adc13: 1 << 0),  (Adc24: 1 << 0),  (Adc579: 0),  (Adc6810: 0) ], 
-        [mcmp2r,mcmp2,  (Adc13: 1 << 1),  (Adc24: 1 << 1),  (Adc579: 1),  (Adc6810: 1) ], 
-        [mcmp3r,mcmp3,  (Adc13: 1 << 2),  (Adc24: 1 << 2),  (Adc579: 2),  (Adc6810: 2) ], 
+        [mcmp1r,mcmp1,  (Adc13: 1 << 0),  (Adc24: 1 << 0),  (Adc579: 0),  (Adc6810: 0) ],
+        [mcmp2r,mcmp2,  (Adc13: 1 << 1),  (Adc24: 1 << 1),  (Adc579: 1),  (Adc6810: 1) ],
+        [mcmp3r,mcmp3,  (Adc13: 1 << 2),  (Adc24: 1 << 2),  (Adc579: 2),  (Adc6810: 2) ],
         [mcmp4r,mcmp4,  (Adc13: 1 << 3),  (Adc24: 1 << 3),  (Adc579: 3),  (Adc6810: 3) ]
     ],
-    
+
     HRTIM_TIMA: [
         [cmp1ar, cmp1x,                                                                ],
         [cmp2ar, cmp2x,                   (Adc24: 1 << 10),               (Adc6810: 10)],
         [cmp3ar, cmp3x, (Adc13: 1 << 11),                   (Adc579: 10)               ],
         [cmp4ar, cmp4x, (Adc13: 1 << 12), (Adc24: 1 << 12), (Adc579: 11), (Adc6810: 11)]
     ],
-    
+
     HRTIM_TIMB: [
         [cmp1br, cmp1x,                                                                ],
         [cmp2br, cmp2x,                   (Adc24: 1 << 14),               (Adc6810: 13)],

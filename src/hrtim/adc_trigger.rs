@@ -1,4 +1,3 @@
-
 use core::marker::PhantomData;
 
 pub trait Adc13Trigger {
@@ -17,5 +16,5 @@ pub trait Adc6810Trigger {
     const BITS: u32;
 }
 
-pub struct TimerReset<T>(pub(crate)PhantomData<T>);
-pub struct TimerPeriod<T>(pub(crate)PhantomData<T>);
+pub struct TimerReset<T>(pub(crate) PhantomData<T>);
+pub struct TimerPeriod<T>(pub(crate) PhantomData<T>);
