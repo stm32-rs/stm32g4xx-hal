@@ -18,8 +18,8 @@ pub enum CountingDirection {
 /// * TIM's update event
 /// * EEVT1-10
 /// TODO: This sould be implemeted
-/// * All neighbor timers CMP1, CPM2, OUTPUT($CH)_RST and OUTPUT($CH)_SET events
-pub trait CaptureEvent<TIM, PSCL, CH> {
+/// * All neighbor timers CMP1, CPM2, OUT1_RST and OUT1_SET events
+pub trait CaptureEvent<TIM, PSCL> {
     const BITS: u32;
 }
 
@@ -52,7 +52,7 @@ macro_rules! impl_capture {
             ///
             /// If multiple events are added, they will be ORed together meaning
             /// that a capture will be trigger if any one of the events triggers
-            pub fn add_event<E: CaptureEvent<$TIMX, PSCL, $CH>>(&mut self, _event: &E) {
+            pub fn add_event<E: CaptureEvent<$TIMX, PSCL>>(&mut self, _event: &E) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 // SAFETY: We are the only one with access to cptXYcr
@@ -62,7 +62,7 @@ macro_rules! impl_capture {
             }
 
             /// Remove event to capture
-            pub fn remove_event<E: CaptureEvent<$TIMX, PSCL, $CH>>(&mut self, _event: &E) {
+            pub fn remove_event<E: CaptureEvent<$TIMX, PSCL>>(&mut self, _event: &E) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 // SAFETY: We are the only one with access to cptXYcr
@@ -96,22 +96,22 @@ macro_rules! impl_capture {
     };
 }
 
-impl_capture!{
-    HRTIM_TIMA: Ch1, cpt1ar, cpt1acr, cpt1x, 
+impl_capture! {
+    HRTIM_TIMA: Ch1, cpt1ar, cpt1acr, cpt1x,
     HRTIM_TIMA: Ch2, cpt2ar, cpt2acr, cpt2x,
-    
+
     HRTIM_TIMB: Ch1, cpt1br, cpt1bcr, cpt1x,
     HRTIM_TIMB: Ch2, cpt2br, cpt2bcr, cpt2x,
-    
+
     HRTIM_TIMC: Ch1, cpt1cr, cpt1ccr, cpt1x,
     HRTIM_TIMC: Ch2, cpt2cr, cpt2ccr, cpt2x,
-    
+
     HRTIM_TIMD: Ch1, cpt1dr, cpt1dcr, cpt1x,
     HRTIM_TIMD: Ch2, cpt2dr, cpt2dcr, cpt2x,
-    
+
     HRTIM_TIME: Ch1, cpt1er, cpt1ecr, cpt1x,
     HRTIM_TIME: Ch2, cpt2er, cpt2ecr, cpt2x,
-    
+
     HRTIM_TIMF: Ch1, cpt1fr, cpt1fcr, cpt1x,
     HRTIM_TIMF: Ch2, cpt2fr, cpt2fcr, cpt2x
 }
