@@ -1,10 +1,9 @@
-use crate::hrtim::external_event::ExternalEventSource;
 use crate::stm32::{
     HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
 };
 use core::marker::PhantomData;
 
-use super::event::{EevFastOrNormal, EventSource, NeighborTimerEventSource};
+use super::event::EventSource;
 use crate::{
     gpio::{
         gpioa::{PA10, PA11, PA8, PA9},
@@ -15,80 +14,6 @@ use crate::{
     pwm::{ActiveHigh, ComplementaryImpossible, Pins, Pwm},
     stm32::HRTIM_COMMON,
 };
-
-macro_rules! hrtim_out_common {
-    ($e:ident, $register:expr, $action:ident) => {
-        match $e {
-            ExternalEventSource::Eevnt1 { .. } => $register.modify(|_r, w| w.extevnt1().$action()),
-            ExternalEventSource::Eevnt2 { .. } => $register.modify(|_r, w| w.extevnt2().$action()),
-            ExternalEventSource::Eevnt3 { .. } => $register.modify(|_r, w| w.extevnt3().$action()),
-            ExternalEventSource::Eevnt4 { .. } => $register.modify(|_r, w| w.extevnt4().$action()),
-            ExternalEventSource::Eevnt5 { .. } => $register.modify(|_r, w| w.extevnt5().$action()),
-            ExternalEventSource::Eevnt6 { .. } => $register.modify(|_r, w| w.extevnt6().$action()),
-            ExternalEventSource::Eevnt7 { .. } => $register.modify(|_r, w| w.extevnt7().$action()),
-            ExternalEventSource::Eevnt8 { .. } => $register.modify(|_r, w| w.extevnt8().$action()),
-            ExternalEventSource::Eevnt9 { .. } => $register.modify(|_r, w| w.extevnt9().$action()),
-            ExternalEventSource::Eevnt10 { .. } => {
-                $register.modify(|_r, w| w.extevnt10().$action())
-            }
-        }
-    };
-
-    ($TIMX:ident, $set_event:expr, $register:ident, $action:ident) => {{
-        let tim = unsafe { &*$TIMX::ptr() };
-
-        match $set_event {
-            EventSource::Cr1 { .. } => tim.$register.modify(|_r, w| w.cmp1().$action()),
-            EventSource::Cr2 { .. } => tim.$register.modify(|_r, w| w.cmp2().$action()),
-            EventSource::Cr3 { .. } => tim.$register.modify(|_r, w| w.cmp3().$action()),
-            EventSource::Cr4 { .. } => tim.$register.modify(|_r, w| w.cmp4().$action()),
-            EventSource::Period { .. } => tim.$register.modify(|_r, w| w.per().$action()),
-
-            EventSource::MasterCr1 { .. } => tim.$register.modify(|_r, w| w.mstcmp1().$action()),
-            EventSource::MasterCr2 { .. } => tim.$register.modify(|_r, w| w.mstcmp2().$action()),
-            EventSource::MasterCr3 { .. } => tim.$register.modify(|_r, w| w.mstcmp3().$action()),
-            EventSource::MasterCr4 { .. } => tim.$register.modify(|_r, w| w.mstcmp4().$action()),
-            EventSource::MasterPeriod { .. } => tim.$register.modify(|_r, w| w.mstper().$action()),
-
-            EventSource::ExternalEvent(EevFastOrNormal::Fast(e)) => {
-                hrtim_out_common!(e, tim.$register, $action)
-            }
-            EventSource::ExternalEvent(EevFastOrNormal::Normal(e)) => {
-                hrtim_out_common!(e, tim.$register, $action)
-            }
-
-            EventSource::NeighborTimer { n } => match n {
-                NeighborTimerEventSource::TimEvent1 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt1().$action())
-                }
-                NeighborTimerEventSource::TimEvent2 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt2().$action())
-                }
-                NeighborTimerEventSource::TimEvent3 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt3().$action())
-                }
-                NeighborTimerEventSource::TimEvent4 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt4().$action())
-                }
-                NeighborTimerEventSource::TimEvent5 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt5().$action())
-                }
-                NeighborTimerEventSource::TimEvent6 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt6().$action())
-                }
-                NeighborTimerEventSource::TimEvent7 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt7().$action())
-                }
-                NeighborTimerEventSource::TimEvent8 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt8().$action())
-                }
-                NeighborTimerEventSource::TimEvent9 { .. } => {
-                    tim.$register.modify(|_r, w| w.timevnt9().$action())
-                }
-            },
-        }
-    }};
-}
 
 macro_rules! hrtim_out {
     ($($TIMX:ident: $out_type:ident: $tXYoen:ident, $tXYodis:ident, $tXYods:ident, $setXYr:ident, $rstXYr:ident,)+) => {$(
@@ -103,18 +28,22 @@ macro_rules! hrtim_out {
                 common.odisr.write(|w| { w.$tXYodis().set_bit() });
             }
 
-            fn enable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, $TIMX>>) {
-                hrtim_out_common!($TIMX, set_event.into(), $setXYr, set_bit)
+            fn enable_set_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _set_event: &ES) {
+                let tim = unsafe { &*$TIMX::ptr() };
+                unsafe { tim.$setXYr.modify(|r, w| w.bits(r.bits() | ES::BITS)); }
             }
-            fn disable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, $TIMX>>) {
-                hrtim_out_common!($TIMX, set_event.into(), $setXYr, clear_bit)
+            fn disable_set_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _set_event: &ES) {
+                let tim = unsafe { &*$TIMX::ptr() };
+                unsafe { tim.$setXYr.modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
             }
 
-            fn enable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, $TIMX>>) {
-                hrtim_out_common!($TIMX, reset_event.into(), $rstXYr, set_bit)
+            fn enable_rst_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _reset_event: &ES) {
+                let tim = unsafe { &*$TIMX::ptr() };
+                unsafe { tim.$rstXYr.modify(|r, w| w.bits(r.bits() | ES::BITS)); }
             }
-            fn disable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, $TIMX>>) {
-                hrtim_out_common!($TIMX, reset_event.into(), $rstXYr, clear_bit)
+            fn disable_rst_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _reset_event: &ES) {
+                let tim = unsafe { &*$TIMX::ptr() };
+                unsafe { tim.$rstXYr.modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
             }
 
             fn get_state(&self) -> State {
@@ -168,19 +97,19 @@ pub trait HrOutput<PSCL, TIM> {
     ///
     /// NOTE: Enabling the same event for both SET and RESET
     /// will make that event TOGGLE the output
-    fn enable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, TIM>>);
+    fn enable_set_event<ES: EventSource<PSCL, TIM>>(&mut self, set_event: &ES);
 
     /// Stop listening to the specified event
-    fn disable_set_event(&mut self, set_event: impl Into<EventSource<PSCL, TIM>>);
+    fn disable_set_event<ES: EventSource<PSCL, TIM>>(&mut self, set_event: &ES);
 
     /// Set this output to *not* active every time the specified event occurs
     ///
     /// NOTE: Enabling the same event for both SET and RESET
     /// will make that event TOGGLE the output
-    fn enable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, TIM>>);
+    fn enable_rst_event<ES: EventSource<PSCL, TIM>>(&mut self, reset_event: &ES);
 
     /// Stop listening to the specified event
-    fn disable_rst_event(&mut self, reset_event: impl Into<EventSource<PSCL, TIM>>);
+    fn disable_rst_event<ES: EventSource<PSCL, TIM>>(&mut self, reset_event: &ES);
 
     /// Get current state of the output
     fn get_state(&self) -> State;

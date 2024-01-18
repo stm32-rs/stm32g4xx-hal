@@ -6,10 +6,6 @@ use core::marker::PhantomData;
 use super::{
     capture::{self, HrCapt},
     control::HrPwmControl,
-    event::{
-        TimerAResetEventSource, TimerBResetEventSource, TimerCResetEventSource,
-        TimerDResetEventSource, TimerEResetEventSource, TimerFResetEventSource,
-    },
 };
 
 pub struct HrTim<TIM, PSCL> {
@@ -60,7 +56,7 @@ macro_rules! hrtim_timer {
         $repie:ident,
         $icr:ident,
         $repc:ident,
-        $(($rstXr:ident, $TimerXResetEventSource:ident))*,
+        $(($rstXr:ident))*,
     )+) => {$(
         impl<PSCL> HrTimer<$TIMX, PSCL> for HrTim<$TIMX, PSCL> {
             fn get_period(&self) -> u16 {
@@ -112,35 +108,6 @@ macro_rules! hrtim_timer {
         }
 
         impl<PSCL> HrTim<$TIMX, PSCL> {
-            $(
-            /// Reset this timer every time the specified event occurs
-            ///
-            /// Behaviour depends on `timer_mode`:
-            ///
-            /// * `HrTimerMode::SingleShotNonRetriggable`: Enabling the timer enables it but does not start it.
-            ///   A first reset event starts the counting and any subsequent reset is ignored until the counter
-            ///   reaches the PER value. The PER event is then generated and the counter is stopped. A reset event
-            ///   restarts the counting from 0x0000.
-            /// * `HrTimerMode:SingleShotRetriggable`: Enabling the timer enables it but does not start it.
-            ///   A reset event starts the counting if the counter is stopped, otherwise it clears the counter.
-            ///   When the counter reaches the PER value, the PER event is generated and the counter is stopped.
-            ///   A reset event restarts the counting from 0x0000.
-            /// * `HrTimerMode::Continuous`: Enabling the timer enables and starts it simultaneously.
-            ///   When the counter reaches the PER value, it rolls-over to 0x0000 and resumes counting.
-            ///   The counter can be reset at any time
-            pub fn enable_reset_event(&mut self, set_event: $TimerXResetEventSource) {
-                let tim = unsafe { &*$TIMX::ptr() };
-
-                unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() | set_event as u32)); }
-            }
-
-            /// Stop listening to the specified event
-            pub fn disable_reset_event(&mut self, set_event: $TimerXResetEventSource) {
-                let tim = unsafe { &*$TIMX::ptr() };
-
-                unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() & !(set_event as u32))); }
-            })*
-
             pub fn set_repetition_counter(&mut self, repetition_counter: u8) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
@@ -168,15 +135,50 @@ macro_rules! hrtim_timer {
             }
         }
 
-        /// Timer Update event
-        impl<PSCL> super::capture::CaptureEvent<$TIMX, PSCL, super::capture::Ch1> for HrTim<$TIMX, PSCL> {
-            const BITS: u32 = 1 << 1;
-        }
+        $(// Only for Non-Master timers
+            impl<PSCL> HrTim<$TIMX, PSCL> {
+                /// Reset this timer every time the specified event occurs
+                ///
+                /// Behaviour depends on `timer_mode`:
+                ///
+                /// * `HrTimerMode::SingleShotNonRetriggable`: Enabling the timer enables it but does not start it.
+                ///   A first reset event starts the counting and any subsequent reset is ignored until the counter
+                ///   reaches the PER value. The PER event is then generated and the counter is stopped. A reset event
+                ///   restarts the counting from 0x0000.
+                /// * `HrTimerMode:SingleShotRetriggable`: Enabling the timer enables it but does not start it.
+                ///   A reset event starts the counting if the counter is stopped, otherwise it clears the counter.
+                ///   When the counter reaches the PER value, the PER event is generated and the counter is stopped.
+                ///   A reset event restarts the counting from 0x0000.
+                /// * `HrTimerMode::Continuous`: Enabling the timer enables and starts it simultaneously.
+                ///   When the counter reaches the PER value, it rolls-over to 0x0000 and resumes counting.
+                ///   The counter can be reset at any time
+                pub fn enable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: E) {
+                    let tim = unsafe { &*$TIMX::ptr() };
 
-        /// Timer Update event
-        impl<PSCL> super::capture::CaptureEvent<$TIMX, PSCL, super::capture::Ch2> for HrTim<$TIMX, PSCL> {
-            const BITS: u32 = 1 << 1;
-        }
+                    unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() | E::BITS)); }
+                }
+
+                /// Stop listening to the specified event
+                pub fn disable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: E) {
+                    let tim = unsafe { &*$TIMX::ptr() };
+
+                    unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() & !E::BITS)); }
+                }
+            }
+
+            /// Timer Period event
+            impl<DST, PSCL> super::event::EventSource<DST, PSCL> for HrTim<$TIMX, PSCL> {
+                // $rstXr
+                const BITS: u32 = 1 << 2;
+            }
+
+            /// Timer Update event
+            ///
+            /// TODO: What dows this mean?
+            impl<PSCL> super::capture::CaptureEvent<$TIMX, PSCL> for HrTim<$TIMX, PSCL> {
+                const BITS: u32 = 1 << 1;
+            }
+        )*
     )+}
 }
 
@@ -207,12 +209,12 @@ use super::adc_trigger::Adc6810Trigger as Adc6810;
 hrtim_timer! {
     HRTIM_MASTER: mcntr, mcnt, mper, mcen, mper, mrep, mrep, mdier, mrepie, micr, mrepc,,
 
-    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, (rstar, TimerAResetEventSource),
-    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, (rstbr, TimerBResetEventSource),
-    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, (rstcr, TimerCResetEventSource),
-    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, (rstdr, TimerDResetEventSource),
-    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, (rster, TimerEResetEventSource),
-    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, (rstfr, TimerFResetEventSource),
+    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, (rstar),
+    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, (rstbr),
+    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, (rstcr),
+    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, (rstdr),
+    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, (rster),
+    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, (rstfr),
 }
 
 hrtim_timer_adc_trigger! {
@@ -224,4 +226,8 @@ hrtim_timer_adc_trigger! {
     HRTIM_TIMD: [(Adc13: [(PER: 1 << 27),               ]), (Adc24: [(PER: 1 << 26), (RST: 1 << 27)]), (Adc579: [(PER: 23),          ]), (Adc6810: [(PER: 22), (RST: 23)])],
     HRTIM_TIME: [(Adc13: [(PER: 1 << 31),               ]), (Adc24: [                (RST: 1 << 31)]), (Adc579: [(PER: 26),          ]), (Adc6810: [                    ])],
     HRTIM_TIMF: [(Adc13: [(PER: 1 << 24), (RST: 1 << 28)]), (Adc24: [(PER: 1 << 24),               ]), (Adc579: [(PER: 30), (RST: 31)]), (Adc6810: [(PER: 31),          ])]
+}
+
+impl<DST, PSCL> super::event::TimerResetEventSource<DST, PSCL> for HrTim<HRTIM_MASTER, PSCL> {
+    const BITS: u32 = 1 << 4; // MSTPER
 }
