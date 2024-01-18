@@ -11,17 +11,42 @@ use super::event::EevFastOrNormal;
 use super::{control::HrTimCalibrated, event::EventSource};
 
 #[derive(Copy, Clone, PartialEq)]
+pub struct ExternalEventSourceInner<const N: u8, const IS_FAST: bool> {
+    _x: PhantomData<()>,
+}
+
+#[derive(Copy, Clone, PartialEq)]
 pub enum ExternalEventSource<const IS_FAST: bool> {
-    Eevnt1 { _x: PhantomData<()> },
-    Eevnt2 { _x: PhantomData<()> },
-    Eevnt3 { _x: PhantomData<()> },
-    Eevnt4 { _x: PhantomData<()> },
-    Eevnt5 { _x: PhantomData<()> },
-    Eevnt6 { _x: PhantomData<()> },
-    Eevnt7 { _x: PhantomData<()> },
-    Eevnt8 { _x: PhantomData<()> },
-    Eevnt9 { _x: PhantomData<()> },
-    Eevnt10 { _x: PhantomData<()> },
+    Eevnt1 {
+        x: ExternalEventSourceInner<1, IS_FAST>,
+    },
+    Eevnt2 {
+        x: ExternalEventSourceInner<2, IS_FAST>,
+    },
+    Eevnt3 {
+        x: ExternalEventSourceInner<3, IS_FAST>,
+    },
+    Eevnt4 {
+        x: ExternalEventSourceInner<4, IS_FAST>,
+    },
+    Eevnt5 {
+        x: ExternalEventSourceInner<5, IS_FAST>,
+    },
+    Eevnt6 {
+        x: ExternalEventSourceInner<6, IS_FAST>,
+    },
+    Eevnt7 {
+        x: ExternalEventSourceInner<7, IS_FAST>,
+    },
+    Eevnt8 {
+        x: ExternalEventSourceInner<8, IS_FAST>,
+    },
+    Eevnt9 {
+        x: ExternalEventSourceInner<9, IS_FAST>,
+    },
+    Eevnt10 {
+        x: ExternalEventSourceInner<10, IS_FAST>,
+    },
 }
 
 impl<PSCL, DST> From<ExternalEventSource<true>> for EventSource<PSCL, DST> {
@@ -70,6 +95,7 @@ pub struct EevInput<const N: u8> {
     _x: PhantomData<()>,
 }
 
+/// This is implemented for types that can be used as inputs to the eev
 /// # Safety
 /// Only implement for types that can be used as sources to eev number `EEV_N` with src bits `SRC_BITS`
 pub unsafe trait EevSrcBits<const EEV_N: u8>: Sized {
@@ -254,8 +280,8 @@ where
     }
 }
 
-pub trait ToExternalEventSource<const IS_FAST: bool> {
-    fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<IS_FAST>;
+pub trait ToExternalEventSource<const N: u8, const IS_FAST: bool> {
+    fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSourceInner<N, IS_FAST>;
 }
 
 #[derive(Copy, Clone)]
@@ -285,8 +311,13 @@ macro_rules! impl_eev1_5_to_es {
             }
         }
 
-        impl<const IS_FAST: bool> ToExternalEventSource<IS_FAST> for SourceBuilder<$N, IS_FAST> {
-            fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<IS_FAST> {
+        impl<const IS_FAST: bool> ToExternalEventSource<$N, IS_FAST>
+            for SourceBuilder<$N, IS_FAST>
+        {
+            fn finalize(
+                self,
+                _calibrated: &mut HrTimCalibrated,
+            ) -> ExternalEventSourceInner<$N, IS_FAST> {
                 let SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,
@@ -311,7 +342,7 @@ macro_rules! impl_eev1_5_to_es {
                     });
                 }
 
-                ExternalEventSource::$eev { _x: PhantomData }
+                ExternalEventSourceInner { _x: PhantomData }
             }
         }
     };
@@ -321,8 +352,11 @@ macro_rules! impl_eev6_10_to_es {
     ($eev:ident, $N:literal, $eeXsrc:ident, $eeXpol:ident, $eeXsns:ident, $eeXf:ident) => {
         impl ExternalEventBuilder6To10 for SourceBuilder<$N, false> {}
 
-        impl ToExternalEventSource<false> for SourceBuilder<$N, false> {
-            fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<false> {
+        impl ToExternalEventSource<$N, false> for SourceBuilder<$N, false> {
+            fn finalize(
+                self,
+                _calibrated: &mut HrTimCalibrated,
+            ) -> ExternalEventSourceInner<$N, false> {
                 let SourceBuilder {
                     src_bits,
                     edge_or_polarity_bits,
@@ -346,7 +380,7 @@ macro_rules! impl_eev6_10_to_es {
                     common.eecr3.modify(|_r, w| w.$eeXf().bits(filter_bits));
                 }
 
-                ExternalEventSource::$eev { _x: PhantomData }
+                ExternalEventSourceInner { _x: PhantomData }
             }
         }
     };
@@ -363,3 +397,41 @@ impl_eev6_10_to_es!(Eevnt7, 7, ee7src, ee7pol, ee7sns, ee7f);
 impl_eev6_10_to_es!(Eevnt8, 8, ee8src, ee8pol, ee8sns, ee8f);
 impl_eev6_10_to_es!(Eevnt9, 9, ee9src, ee9pol, ee9sns, ee9f);
 impl_eev6_10_to_es!(Eevnt10, 10, ee10src, ee10pol, ee10sns, ee10f);
+
+impl<const N: u8, const IS_FAST: bool, TIM, PSCL>
+    super::capture::CaptureEvent<TIM, PSCL, super::capture::Ch1>
+    for ExternalEventSourceInner<N, IS_FAST>
+{
+    const BITS: u32 = 1 << (N + 1); // EEV1 is at bit #2 etc
+}
+
+impl<const N: u8, const IS_FAST: bool, TIM, PSCL>
+    super::capture::CaptureEvent<TIM, PSCL, super::capture::Ch2>
+    for ExternalEventSourceInner<N, IS_FAST>
+{
+    const BITS: u32 = 1 << (N + 1); // EEV1 is at bit #2 etc
+}
+
+// TODO: Get rid of ExternalEventSource completely in favour of using ExternalEventSourceInner directly
+macro_rules! impl_into_ees {
+    ($($N:literal => $variant:ident),+) => {$(
+        impl<const IS_FAST: bool> Into<ExternalEventSource<IS_FAST>> for ExternalEventSourceInner<$N, IS_FAST> {
+            fn into(self) -> ExternalEventSource<IS_FAST> {
+                ExternalEventSource::$variant { x: self }
+            }
+        }
+    )+}
+}
+
+impl_into_ees! {
+    1 => Eevnt1,
+    2 => Eevnt2,
+    3 => Eevnt3,
+    4 => Eevnt4,
+    5 => Eevnt5,
+    6 => Eevnt6,
+    7 => Eevnt7,
+    8 => Eevnt8,
+    9 => Eevnt9,
+    10 => Eevnt10
+}
