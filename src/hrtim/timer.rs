@@ -35,6 +35,8 @@ pub trait HrTimer<TIM, PSCL>: Sized {
     /// Stop timer and reset counter
     fn stop_and_reset(&mut self, _hr_control: &mut HrPwmControl);
 
+    fn clear_repetition_interrupt(&mut self);
+
     /// Make a handle to this timers reset event to use as adc trigger
     fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self>;
 
@@ -105,6 +107,12 @@ macro_rules! hrtim_timer {
             fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self> {
                 super::adc_trigger::TimerPeriod(PhantomData)
             }
+
+            fn clear_repetition_interrupt(&mut self) {
+                let tim = unsafe { &*$TIMX::ptr() };
+
+                tim.$icr.write(|w| w.$repc().set_bit());
+            }
         }
 
         impl<PSCL> HrTim<$TIMX, PSCL> {
@@ -118,12 +126,6 @@ macro_rules! hrtim_timer {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 tim.$dier.modify(|_r, w| w.$repie().bit(enable));
-            }
-
-            pub fn clear_repetition_interrupt(&mut self) {
-                let tim = unsafe { &*$TIMX::ptr() };
-
-                tim.$icr.write(|w| w.$repc().set_bit());
             }
 
             pub fn capture_ch1(&mut self) -> &mut HrCapt<$TIMX, PSCL, capture::Ch1> {
