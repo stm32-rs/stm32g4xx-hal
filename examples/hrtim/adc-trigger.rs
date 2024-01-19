@@ -16,7 +16,7 @@ fn main() -> ! {
 #[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
 #[entry]
 fn main() -> ! {
-    use hal::adc::{self, config::ExternalTrigger12};
+    use hal::adc;
     use stm32g4xx_hal as hal;
 
     use defmt::info;
@@ -74,32 +74,6 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pa0 = gpioa.pa0.into_analog();
 
-    info!("Setup Adc1");
-    let mut adc = dp
-        .ADC1
-        .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
-
-    adc.set_external_trigger((
-        adc::config::TriggerMode::RisingEdge,
-        ExternalTrigger12::Hrtim_adc_trg_1,
-    ));
-    adc.enable_temperature(&dp.ADC12_COMMON);
-    adc.set_continuous(Continuous::Discontinuous);
-    adc.reset_sequence();
-    adc.configure_channel(&pa0, Sequence::One, SampleTime::Cycles_640_5);
-    adc.configure_channel(&Temperature, Sequence::Two, SampleTime::Cycles_640_5);
-
-    info!("Setup DMA");
-    let first_buffer = cortex_m::singleton!(: [u16; 10] = [0; 10]).unwrap();
-
-    let mut transfer = dma1ch1.into_circ_peripheral_to_memory_transfer(
-        adc.enable_dma(AdcDma::Continuous),
-        &mut first_buffer[..],
-        config,
-    );
-
-    transfer.start(|adc| adc.start_conversion());
-
     let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
     let pin_b: PA9<Alternate<AF13>> = gpioa.pa9.into_alternate();
 
@@ -121,22 +95,45 @@ fn main() -> ! {
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)
         .period(period)
-        // alternated every period with one being
-        // inactive and the other getting to output its wave form
-        // as normal
         .finalize(&mut hr_control);
 
     cr3.set_duty(period / 3);
     cr4.set_duty((2 * u32::from(period) / 3) as u16);
 
-    hr_control.enable_adc_trigger1_source(&cr3);
-    hr_control.enable_adc_trigger1_source(&cr4);
+    hr_control.adc_trigger1.enable_source(&cr3);
+    hr_control.adc_trigger1.enable_source(&cr4);
 
     out1.enable_rst_event(&cr1); // Set low on compare match with cr1
     out2.enable_rst_event(&cr1);
 
     out1.enable_set_event(&timer); // Set high at new period
     out2.enable_set_event(&timer);
+
+    info!("Setup Adc1");
+    let mut adc = dp
+        .ADC1
+        .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
+
+    adc.set_external_trigger((
+        adc::config::TriggerMode::RisingEdge,
+        hr_control.adc_trigger1.as_adc12_trigger(),
+    ));
+    adc.enable_temperature(&dp.ADC12_COMMON);
+    adc.set_continuous(Continuous::Discontinuous);
+    adc.reset_sequence();
+    adc.configure_channel(&pa0, Sequence::One, SampleTime::Cycles_640_5);
+    adc.configure_channel(&Temperature, Sequence::Two, SampleTime::Cycles_640_5);
+
+    info!("Setup DMA");
+    let first_buffer = cortex_m::singleton!(: [u16; 10] = [0; 10]).unwrap();
+
+    let mut transfer = dma1ch1.into_circ_peripheral_to_memory_transfer(
+        adc.enable_dma(AdcDma::Continuous),
+        &mut first_buffer[..],
+        config,
+    );
+
+    transfer.start(|adc| adc.start_conversion());
 
     out1.enable();
     out2.enable();
