@@ -245,14 +245,16 @@ macro_rules! impl_adc1234_trigger {
                     common.$adcXr.modify(|r, w| w.bits(r.bits() | T::BITS));
                 }
             }
+        }
 
-            $(
-                pub fn as_adc12_trigger(&self) -> crate::adc::config::ExternalTrigger12 {
-                    crate::adc::config::ExternalTrigger12::$variant12
-                }
-            )*
+        $(impl Into<crate::adc::config::ExternalTrigger12> for &$t {
+            fn into(self) -> crate::adc::config::ExternalTrigger12 {
+                crate::adc::config::ExternalTrigger12::$variant12
+            }
+        })*
 
-            pub fn as_adc345_trigger(&self) -> crate::adc::config::ExternalTrigger345 {
+        impl Into<crate::adc::config::ExternalTrigger345> for &$t {
+            fn into(self) -> crate::adc::config::ExternalTrigger345 {
                 crate::adc::config::ExternalTrigger345::$variant345
             }
         }
@@ -272,15 +274,20 @@ macro_rules! impl_adc5678910_trigger {
                     .adcer
                     .modify(|_r, w| w.$adcXtrg().variant(T::BITS as u8));
             }
+        }
 
-            pub fn as_adc12_trigger(&self) -> crate::adc::config::ExternalTrigger12 {
+        impl Into<crate::adc::config::ExternalTrigger12> for &$t {
+            fn into(self) -> crate::adc::config::ExternalTrigger12 {
                 crate::adc::config::ExternalTrigger12::$variant12
             }
+        }
 
-            pub fn as_adc345_trigger(&self) -> crate::adc::config::ExternalTrigger345 {
+        impl Into<crate::adc::config::ExternalTrigger345> for &$t {
+            fn into(self) -> crate::adc::config::ExternalTrigger345 {
                 crate::adc::config::ExternalTrigger345::$variant345
             }
         }
+
     )*}
 }
 

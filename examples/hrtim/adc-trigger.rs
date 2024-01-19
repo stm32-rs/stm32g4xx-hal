@@ -116,7 +116,7 @@ fn main() -> ! {
 
     adc.set_external_trigger((
         adc::config::TriggerMode::RisingEdge,
-        hr_control.adc_trigger1.as_adc12_trigger(),
+        &hr_control.adc_trigger1,
     ));
     adc.enable_temperature(&dp.ADC12_COMMON);
     adc.set_continuous(Continuous::Discontinuous);
