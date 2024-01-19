@@ -28,8 +28,10 @@ fn main() -> ! {
         delay::SYSTDelayExt,
         dma::{self, config::DmaConfig, stream::DMAExt, TransferExt},
         gpio::{gpioa::PA8, gpioa::PA9, Alternate, GpioExt, AF13},
+        hrtim::compare_register::HrCompareRegister,
         hrtim::control::HrControltExt,
         hrtim::output::HrOutput,
+        hrtim::timer::HrTimer,
         hrtim::HrPwmAdvExt,
         hrtim::Pscl4,
         pwr::PwrExt,
@@ -111,17 +113,21 @@ fn main() -> ! {
     //out1    |      |        |      |
     //        |      |        |      |
     // --------      ----------      --------
+    let period = 0xFFFF;
     let (hr_control, ..) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
     let mut hr_control = hr_control.constrain();
-    let (timer, (cr1, _cr2, cr3, cr4), (mut out1, mut out2)) = dp
+    let (mut timer, (cr1, _cr2, mut cr3, mut cr4), (mut out1, mut out2)) = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)
-        .period(0xFFFF)
+        .period(period)
         // alternated every period with one being
         // inactive and the other getting to output its wave form
         // as normal
         .finalize(&mut hr_control);
+
+    cr3.set_duty(period / 3);
+    cr4.set_duty((2 * u32::from(period) / 3) as u16);
 
     hr_control.enable_adc_trigger1_source(&cr3);
     hr_control.enable_adc_trigger1_source(&cr4);
@@ -134,6 +140,8 @@ fn main() -> ! {
 
     out1.enable();
     out2.enable();
+
+    timer.start(&mut hr_control);
 
     loop {
         let mut b = [0_u16; 4];
@@ -149,6 +157,6 @@ fn main() -> ! {
             VREF,
             adc::config::Resolution::Twelve,
         );
-        info!("temp: {}℃C", temp); // Note: Temperature seems quite low...
+        info!("temp: {}℃C", temp);
     }
 }
