@@ -2239,8 +2239,8 @@ macro_rules! adc {
 
                 /// Sets which external trigger to use and if it is disabled, rising, falling or both
                 #[inline(always)]
-                pub fn set_external_trigger(&mut self, (edge, extsel): (config::TriggerMode, $trigger_type)) {
-                    self.adc.set_external_trigger( (edge, extsel) )
+                pub fn set_external_trigger<T: Into<$trigger_type>>(&mut self, (edge, extsel): (config::TriggerMode, T)) {
+                    self.adc.set_external_trigger( (edge, extsel.into()) )
                 }
 
                 /// Sets auto delay to true or false
