@@ -31,11 +31,13 @@ fn main() -> ! {
         hrtim::control::HrControltExt,
         hrtim::output::HrOutput,
         hrtim::HrPwmAdvExt,
-        hrtim::{control::Adc13Trigger, Pscl4},
+        hrtim::Pscl4,
         pwr::PwrExt,
         rcc::{self, RccExt},
         stm32::Peripherals,
     };
+
+    const VREF: f32 = 3.3;
 
     info!("start");
 
@@ -109,14 +111,9 @@ fn main() -> ! {
     //out1    |      |        |      |
     //        |      |        |      |
     // --------      ----------      --------
-    let (hr_control, ..) = dp
-        .HRTIM_COMMON
-        .hr_control(&mut rcc)
-        .enable_adc_trigger1_source(Adc13Trigger::TimACmp3)
-        .enable_adc_trigger1_source(Adc13Trigger::TimACmp4)
-        .wait_for_calibration();
+    let (hr_control, ..) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
     let mut hr_control = hr_control.constrain();
-    let (timer, (cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
+    let (timer, (cr1, _cr2, cr3, cr4), (mut out1, mut out2)) = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)
@@ -125,6 +122,9 @@ fn main() -> ! {
         // inactive and the other getting to output its wave form
         // as normal
         .finalize(&mut hr_control);
+
+    hr_control.enable_adc_trigger1_source(&cr3);
+    hr_control.enable_adc_trigger1_source(&cr4);
 
     out1.enable_rst_event(&cr1); // Set low on compare match with cr1
     out2.enable_rst_event(&cr1);
@@ -144,7 +144,11 @@ fn main() -> ! {
 
         let millivolts = Vref::sample_to_millivolts((b[0] + b[2]) / 2);
         info!("pa3: {}mV", millivolts);
-        let temp = Temperature::temperature_to_degrees_centigrade((b[1] + b[3]) / 2);
+        let temp = Temperature::temperature_to_degrees_centigrade(
+            (b[1] + b[3]) / 2,
+            VREF,
+            adc::config::Resolution::Twelve,
+        );
         info!("temp: {}℃C", temp); // Note: Temperature seems quite low...
     }
 }
