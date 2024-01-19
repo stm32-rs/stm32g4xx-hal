@@ -28,20 +28,20 @@ macro_rules! hrtim_out {
                 common.odisr.write(|w| { w.$tXYodis().set_bit() });
             }
 
-            fn enable_set_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _set_event: &ES) {
+            fn enable_set_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _set_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
                 unsafe { tim.$setXYr.modify(|r, w| w.bits(r.bits() | ES::BITS)); }
             }
-            fn disable_set_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _set_event: &ES) {
+            fn disable_set_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _set_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
                 unsafe { tim.$setXYr.modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
             }
 
-            fn enable_rst_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _reset_event: &ES) {
+            fn enable_rst_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _reset_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
                 unsafe { tim.$rstXYr.modify(|r, w| w.bits(r.bits() | ES::BITS)); }
             }
-            fn disable_rst_event<ES: EventSource<PSCL, $TIMX>>(&mut self, _reset_event: &ES) {
+            fn disable_rst_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _reset_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
                 unsafe { tim.$rstXYr.modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
             }
@@ -97,25 +97,25 @@ pub trait HrOutput<PSCL, TIM> {
     ///
     /// NOTE: Enabling the same event for both SET and RESET
     /// will make that event TOGGLE the output
-    fn enable_set_event<ES: EventSource<PSCL, TIM>>(&mut self, set_event: &ES);
+    fn enable_set_event<ES: EventSource<TIM, PSCL>>(&mut self, set_event: &ES);
 
     /// Stop listening to the specified event
-    fn disable_set_event<ES: EventSource<PSCL, TIM>>(&mut self, set_event: &ES);
+    fn disable_set_event<ES: EventSource<TIM, PSCL>>(&mut self, set_event: &ES);
 
     /// Set this output to *not* active every time the specified event occurs
     ///
     /// NOTE: Enabling the same event for both SET and RESET
     /// will make that event TOGGLE the output
-    fn enable_rst_event<ES: EventSource<PSCL, TIM>>(&mut self, reset_event: &ES);
+    fn enable_rst_event<ES: EventSource<TIM, PSCL>>(&mut self, reset_event: &ES);
 
     /// Stop listening to the specified event
-    fn disable_rst_event<ES: EventSource<PSCL, TIM>>(&mut self, reset_event: &ES);
+    fn disable_rst_event<ES: EventSource<TIM, PSCL>>(&mut self, reset_event: &ES);
 
     /// Get current state of the output
     fn get_state(&self) -> State;
 }
 
-#[derive(Debug, PartialEq)]
+#[derive(Debug, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum State {
     Idle,
