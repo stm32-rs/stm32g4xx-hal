@@ -193,6 +193,17 @@ impl HrTimCalibrated {
             fault_4: FltMonitor4 { _x: PhantomData },
             fault_5: FltMonitor5 { _x: PhantomData },
             fault_6: FltMonitor6 { _x: PhantomData },
+
+            adc_trigger1: Adc1Trigger { _x: PhantomData },
+            adc_trigger2: Adc2Trigger { _x: PhantomData },
+            adc_trigger3: Adc3Trigger { _x: PhantomData },
+            adc_trigger4: Adc4Trigger { _x: PhantomData },
+            adc_trigger5: Adc5Trigger { _x: PhantomData },
+            adc_trigger6: Adc6Trigger { _x: PhantomData },
+            adc_trigger7: Adc7Trigger { _x: PhantomData },
+            adc_trigger8: Adc8Trigger { _x: PhantomData },
+            adc_trigger9: Adc9Trigger { _x: PhantomData },
+            adc_trigger10: Adc10Trigger { _x: PhantomData },
         }
     }
 }
@@ -207,81 +218,89 @@ pub struct HrPwmControl {
     pub fault_4: FltMonitor4,
     pub fault_5: FltMonitor5,
     pub fault_6: FltMonitor6,
+
+    pub adc_trigger1: Adc1Trigger,
+    pub adc_trigger2: Adc2Trigger,
+    pub adc_trigger3: Adc3Trigger,
+    pub adc_trigger4: Adc4Trigger,
+
+    pub adc_trigger5: Adc5Trigger,
+    pub adc_trigger6: Adc6Trigger,
+    pub adc_trigger7: Adc7Trigger,
+    pub adc_trigger8: Adc8Trigger,
+    pub adc_trigger9: Adc9Trigger,
+    pub adc_trigger10: Adc10Trigger,
+}
+
+macro_rules! impl_adc1234_trigger {
+    ($($t:ident: [$trait_:ident, $adcXr:ident, $variant345:ident $(, $variant12:ident)*]),*) => {$(
+        pub struct $t {
+            _x: PhantomData<()>,
+        }
+
+        impl $t {
+            pub fn enable_source<T: $trait_>(&mut self, _trigger: &T) {
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                unsafe {
+                    common.$adcXr.modify(|r, w| w.bits(r.bits() | T::BITS));
+                }
+            }
+
+            $(
+                pub fn as_adc12_trigger(&self) -> crate::adc::config::ExternalTrigger12 {
+                    crate::adc::config::ExternalTrigger12::$variant12
+                }
+            )*
+
+            pub fn as_adc345_trigger(&self) -> crate::adc::config::ExternalTrigger345 {
+                crate::adc::config::ExternalTrigger345::$variant345
+            }
+        }
+    )*}
+}
+
+macro_rules! impl_adc5678910_trigger {
+    ($($t:ident: [$trait_:ident, $adcXtrg:ident, $variant345:ident, $variant12:ident]),*) => {$(
+        pub struct $t {
+            _x: PhantomData<()>,
+        }
+
+        impl $t {
+            pub fn enable_source<T: $trait_>(&mut self, _trigger: &T) {
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common
+                    .adcer
+                    .modify(|_r, w| w.$adcXtrg().variant(T::BITS as u8));
+            }
+
+            pub fn as_adc12_trigger(&self) -> crate::adc::config::ExternalTrigger12 {
+                crate::adc::config::ExternalTrigger12::$variant12
+            }
+
+            pub fn as_adc345_trigger(&self) -> crate::adc::config::ExternalTrigger345 {
+                crate::adc::config::ExternalTrigger345::$variant345
+            }
+        }
+    )*}
+}
+
+impl_adc1234_trigger! {//      reg    adc345,          adc12
+    Adc1Trigger: [Adc13Trigger, adc1r, Hrtim_adc_trg_1, Hrtim_adc_trg_1],
+    Adc2Trigger: [Adc24Trigger, adc2r, Hrtim_adc_trg_2],
+    Adc3Trigger: [Adc13Trigger, adc3r, Hrtim_adc_trg_3, Hrtim_adc_trg_3],
+    Adc4Trigger: [Adc24Trigger, adc4r, Hrtim_adc_trg_4]
+}
+
+impl_adc5678910_trigger! {
+    Adc5Trigger: [Adc579Trigger,  adc5trg, Hrtim_adc_trg_5, Hrtim_adc_trg_5],
+    Adc6Trigger: [Adc6810Trigger, adc6trg, Hrtim_adc_trg_6, Hrtim_adc_trg_6],
+    Adc7Trigger: [Adc579Trigger,  adc7trg, Hrtim_adc_trg_7, Hrtim_adc_trg_7],
+    Adc8Trigger: [Adc6810Trigger, adc8trg, Hrtim_adc_trg_8, Hrtim_adc_trg_8],
+    Adc9Trigger: [Adc579Trigger,  adc9trg, Hrtim_adc_trg_9, Hrtim_adc_trg_9],
+    Adc10Trigger: [Adc6810Trigger, adc10trg, Hrtim_adc_trg_10, Hrtim_adc_trg_10]
 }
 
 use super::adc_trigger::{Adc13Trigger, Adc24Trigger, Adc579Trigger, Adc6810Trigger};
-
-impl HrPwmControl {
-    pub fn enable_adc_trigger1_source<T: Adc13Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        unsafe {
-            common.adc1r.modify(|r, w| w.bits(r.bits() | T::BITS));
-        }
-    }
-
-    pub fn enable_adc_trigger2_source<T: Adc24Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        unsafe {
-            common.adc2r.modify(|r, w| w.bits(r.bits() | T::BITS));
-        }
-    }
-
-    pub fn enable_adc_trigger3_source<T: Adc13Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        unsafe {
-            common.adc3r.modify(|r, w| w.bits(r.bits() | T::BITS));
-        }
-    }
-
-    pub fn enable_adc_trigger4_source<T: Adc24Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        unsafe {
-            common.adc4r.modify(|r, w| w.bits(r.bits() | T::BITS));
-        }
-    }
-
-    pub fn enable_adc_trigger5_source<T: Adc579Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        common
-            .adcer
-            .modify(|_r, w| w.adc5trg().variant(T::BITS as u8));
-    }
-
-    pub fn enable_adc_trigger6_source<T: Adc6810Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        common
-            .adcer
-            .modify(|_r, w| w.adc6trg().variant(T::BITS as u8));
-    }
-
-    pub fn enable_adc_trigger7_source<T: Adc579Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        common
-            .adcer
-            .modify(|_r, w| w.adc7trg().variant(T::BITS as u8));
-    }
-
-    pub fn enable_adc_trigger8_source<T: Adc6810Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        common
-            .adcer
-            .modify(|_r, w| w.adc8trg().variant(T::BITS as u8));
-    }
-
-    pub fn enable_adc_trigger9_source<T: Adc579Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        common
-            .adcer
-            .modify(|_r, w| w.adc9trg().variant(T::BITS as u8));
-    }
-
-    pub fn enable_adc_trigger10_source<T: Adc6810Trigger>(&mut self, _trigger: &T) {
-        let common = unsafe { &*HRTIM_COMMON::ptr() };
-        common
-            .adcer
-            .modify(|_r, w| w.adc10trg().variant(T::BITS as u8));
-    }
-}
 
 pub enum AdcTriggerPostscaler {
     None = 0,
