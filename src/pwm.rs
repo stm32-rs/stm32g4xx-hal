@@ -216,6 +216,8 @@ use crate::gpio::AF14;
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiof::*};
 use crate::gpio::{Alternate, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
 
+use core::mem::size_of;
+
 // This trait marks that a GPIO pin can be used with a specific timer channel
 // TIM is the timer being used
 // CHANNEL is a marker struct for the channel (or multi channels for tuples)
@@ -1540,8 +1542,7 @@ macro_rules! tim_pin_hal {
                     // In that case, 100% duty cycle is not possible, only 65535/65536
                     if arr == Self::Duty::MAX {
                         arr
-                    }
-                    else {
+                    } else {
                         arr + 1
                     }
                 }
@@ -1550,6 +1551,31 @@ macro_rules! tim_pin_hal {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     tim.$ccrx().write(|w| unsafe { w.ccr().bits(duty.into()) });
+                }
+            }
+
+            impl<COMP, POL, NPOL> embedded_hal_one::pwm::ErrorType for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+                where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
+                type Error = core::convert::Infallible;
+            }
+            impl<COMP, POL, NPOL> embedded_hal_one::pwm::SetDutyCycle for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+                where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
+                fn max_duty_cycle(&self) -> u16 {
+                    let tim = unsafe { &*$TIMX::ptr() };
+                    let arr = tim.arr.read().arr().bits() as $typ;
+                    let arr = (arr >> (8*(size_of::<$typ>() - size_of::<u16>()))) as u16;
+                    // see note above
+                    if arr == u16::MAX {
+                        arr
+                    } else {
+                        arr + 1
+                    }
+                }
+                fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+                    // hal trait always has 16 bit resolution
+                    let duty = (duty as $typ) << (8*(size_of::<$typ>() - size_of::<u16>()));
+                    let tim = unsafe { &*$TIMX::ptr() };
+                    Ok(tim.$ccrx().write(|w| unsafe { w.ccr().bits(duty.into()) }))
                 }
             }
 
@@ -1861,6 +1887,23 @@ macro_rules! lptim_hal {
                     tim.cmp.write(|w| unsafe { w.cmp().bits(duty) });
                     while !tim.isr.read().cmpok().bit_is_set() {}
                     tim.icr.write(|w| w.cmpokcf().set_bit());
+                }
+            }
+
+            impl embedded_hal_one::pwm::ErrorType for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+                type Error = core::convert::Infallible;
+            }
+            impl embedded_hal_one::pwm::SetDutyCycle for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+                fn max_duty_cycle(&self) -> u16 {
+                    let tim = unsafe { &*$TIMX::ptr() };
+                    tim.arr.read().arr().bits()
+                }
+                fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+                    let tim = unsafe { &*$TIMX::ptr() };
+
+                    tim.cmp.write(|w| unsafe { w.cmp().bits(duty) });
+                    while !tim.isr.read().cmpok().bit_is_set() {}
+                    Ok(tim.icr.write(|w| w.cmpokcf().set_bit()))
                 }
             }
         )+
