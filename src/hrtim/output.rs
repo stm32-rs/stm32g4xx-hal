@@ -1,5 +1,5 @@
 use crate::stm32::{
-    HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
+    HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
 };
 use core::marker::PhantomData;
 
@@ -179,7 +179,7 @@ pins! {
     HRTIM_TIMF: CH1: PC6<Alternate<AF13>>, CH2: PC7<Alternate<AF13>>
 }
 
-impl Pins<HRTIM_MASTER, (), ComplementaryImpossible> for () {
+impl<T> Pins<T, (), ComplementaryImpossible> for () {
     type Channel = ();
 }
 
