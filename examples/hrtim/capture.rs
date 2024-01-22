@@ -16,7 +16,7 @@ fn main() -> ! {
         hrtim::{
             capture::HrCapture, compare_register::HrCompareRegister, control::HrControltExt,
             external_event, external_event::ToExternalEventSource, output::HrOutput,
-            timer::HrTimer, HrPwmAdvExt, Pscl4,
+            timer::HrTimer, HrPwmAdvExt, Pscl128,
         },
         pwm,
         pwr::PwrExt,
@@ -47,11 +47,13 @@ fn main() -> ! {
     info!("Setup Gpio");
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
+
+    // PA8 (D7 on Nucleo G474RE)
     let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
 
-    // ...with a prescaler of 4 this gives us a HrTimer with a tick rate of 960MHz
-    // With max the max period set, this would be 960MHz/2^16 ~= 15kHz...
-    let prescaler = Pscl4;
+    // ...with a prescaler of 128 this gives us a HrTimer with a tick rate of 30MHz
+    // With max the max period set, this would be 30MHz/2^16 ~= 458Hz...
+    let prescaler = Pscl128;
 
     //        .               .
     //        .  50%          .
@@ -59,18 +61,16 @@ fn main() -> ! {
     //out1    |      |        |      |
     //        |      |        |      |
     // --------      ----------      --------
-    //        .    ^     ^
-    //        .    |     |
-    //AD samlp    pa0   temp
     let period = 0xFFFF;
     let (mut hr_control, _flt_inputs, eev_inputs) =
         dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
 
-    let eev_input3 = eev_inputs
-        .eev_input3
-        .bind(gpiob.pb7.into_pull_down_input())
-        .edge_or_polarity(external_event::EdgeOrPolarity::Polarity(
-            pwm::Polarity::ActiveHigh,
+    // PB5 (D4 on Nucleo G474RE)
+    let eev_input6 = eev_inputs
+        .eev_input6
+        .bind(gpiob.pb5.into_pull_down_input())
+        .edge_or_polarity(external_event::EdgeOrPolarity::Edge(
+            external_event::Edge::Falling,
         ))
         .finalize(&mut hr_control);
 
@@ -87,17 +87,23 @@ fn main() -> ! {
 
     cr1.set_duty(period / 2);
     timer.start(&mut hr_control);
+    out1.enable();
 
     let capture = timer.capture_ch1();
     capture.enable_interrupt(true, &mut hr_control);
-    capture.add_event(&eev_input3);
+    capture.add_event(&eev_input6);
 
+    let mut old_duty = 0;
     loop {
-        if !capture.is_pending() {
-            continue;
+        for duty in (u32::from(period) / 10)..(9 * u32::from(period) / 10) {
+            if !capture.is_pending() {
+                continue;
+            }
+            let value = capture.get_signed();
+            cr1.set_duty(duty as u16);
+            capture.clear_interrupt();
+            info!("Capture: {:?}, duty: {}, diff: {}", value, old_duty, value - old_duty as i32);
+            old_duty = duty;
         }
-        capture.clear_interrupt();
-
-        info!("Capture: {:?}", capture.get());
     }
 }
