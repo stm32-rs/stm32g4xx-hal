@@ -205,6 +205,8 @@ use crate::time::{Hertz, NanoSecond, U32Ext};
     feature = "stm32g484"
 ))]
 use crate::gpio::gpiog::*;
+#[cfg(feature = "pwm-open-drain")]
+use crate::gpio::AlternateOD;
 #[cfg(any(
     feature = "stm32g471",
     feature = "stm32g473",
@@ -214,7 +216,7 @@ use crate::gpio::gpiog::*;
 ))]
 use crate::gpio::AF14;
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiof::*};
-use crate::gpio::{Alternate, AlternateOD, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
+use crate::gpio::{Alternate, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
 
 // This trait marks that a GPIO pin can be used with a specific timer channel
 // TIM is the timer being used
