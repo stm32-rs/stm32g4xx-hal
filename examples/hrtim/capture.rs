@@ -1,16 +1,22 @@
 #![no_std]
 #![no_main]
 
+/// Example showcasing the use of the HRTIM peripheral's capture function to detect phase shift between a digital event and the output of HRTIM_TIMA
+
+#[path = "../utils/mod.rs"]
+mod utils;
+
 use cortex_m_rt::entry;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
 
+use utils::logger::info;
+
 #[entry]
 fn main() -> ! {
     use stm32g4xx_hal as hal;
 
-    use defmt::info;
     use hal::{
         gpio::{gpioa::PA8, Alternate, GpioExt, AF13},
         hrtim::{
@@ -22,6 +28,7 @@ fn main() -> ! {
         rcc::{self, RccExt},
         stm32::Peripherals,
     };
+    use info;
 
     info!("start");
 
@@ -101,7 +108,12 @@ fn main() -> ! {
             let value = capture.get_signed();
             cr1.set_duty(duty as u16);
             capture.clear_interrupt();
-            info!("Capture: {:?}, duty: {}, diff: {}", value, old_duty, value - old_duty as i32);
+            info!(
+                "Capture: {:?}, duty: {}, diff: {}",
+                value,
+                old_duty,
+                value - old_duty as i32
+            );
             old_duty = duty;
         }
     }

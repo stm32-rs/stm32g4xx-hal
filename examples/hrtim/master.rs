@@ -1,8 +1,17 @@
-//This example puts the timer in PWM mode using the specified pin with a frequency of 100Hz and a duty cycle of 50%.
-#![no_main]
 #![no_std]
+#![no_main]
+
+/// Add description
+
+#[path = "../utils/mod.rs"]
+mod utils;
 
 use cortex_m_rt::entry;
+
+use defmt_rtt as _; // global logger
+use panic_probe as _;
+
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -16,9 +25,7 @@ fn main() -> ! {
     use hal::hrtim::output::HrOutput;
     use hal::hrtim::timer::HrTimer;
     use hal::hrtim::HrPwmAdvExt;
-    use hal::hrtim::{
-        event::TimerAResetEventSource, HrTimerMode, MasterPreloadSource, PreloadSource, Pscl4,
-    };
+    use hal::hrtim::{HrTimerMode, MasterPreloadSource, PreloadSource, Pscl4};
     use hal::prelude::*;
     use hal::pwr::PwrExt;
     use hal::rcc;
@@ -89,7 +96,7 @@ fn main() -> ! {
         .finalize(&mut hr_control);
 
     // Run in sync with master timer
-    timer.enable_reset_event(TimerAResetEventSource::MasterPeriod);
+    timer.enable_reset_event(&mtimer);
 
     out1.enable_rst_event(&mcr1); // Set low on compare match with cr1
     out2.enable_rst_event(&mcr1);
@@ -101,13 +108,13 @@ fn main() -> ! {
     out2.enable();
 
     let tima = unsafe { &*stm32g4xx_hal::stm32::HRTIM_TIMA::ptr() };
-    defmt::info!("set1r: {}", tima.seta1r.read().bits());
-    defmt::info!("rst1r: {}", tima.rsta1r.read().bits());
+    info!("set1r: {}", tima.seta1r.read().bits());
+    info!("rst1r: {}", tima.rsta1r.read().bits());
 
-    defmt::info!("set2r: {}", tima.seta2r.read().bits());
-    defmt::info!("rst2r: {}", tima.rsta2r.read().bits());
+    info!("set2r: {}", tima.seta2r.read().bits());
+    info!("rst2r: {}", tima.rsta2r.read().bits());
 
-    defmt::info!("Running");
+    info!("Running");
 
     loop {
         // Step frequency from 18kHz to about 180kHz(half of that when only looking at one pin)
@@ -119,7 +126,7 @@ fn main() -> ! {
             mtimer.set_period(new_period);
             timer.set_period(new_period - 1000);
 
-            defmt::info!(
+            info!(
                 "period: {}, duty: {}, get_duty: {}, get_period: {}",
                 new_period,
                 new_period / 3,

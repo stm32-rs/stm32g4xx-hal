@@ -1,11 +1,18 @@
-//This example puts the timer in PWM mode using the specified pin with a frequency of 100Hz and a duty cycle of 50%.
-#![no_main]
 #![no_std]
+#![no_main]
+
+/// Example showcasing the use of the HRTIM peripheral together with a comparator to implement a cycle by cycle current limit.
+/// Once the comparator input exceeds the reference set by the DAC, the output is set low thus limiting the pulse width and in turn the current.
+
+#[path = "../utils/mod.rs"]
+mod utils;
 
 use cortex_m_rt::entry;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
+
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -116,17 +123,17 @@ fn main() -> ! {
         .finalize(&mut hr_control);
 
     out1.enable_rst_event(&cr1); // Set low on compare match with cr1
-    out1.enable_rst_event(eev_input4);
+    out1.enable_rst_event(&eev_input4);
     out1.enable_set_event(&timer); // Set high at new period
     cr1.set_duty(timer.get_period() / 3);
 
     out1.enable();
     timer.start(&mut hr_control);
 
-    defmt::info!("Started");
+    info!("Started");
 
     loop {
-        defmt::info!(
+        info!(
             "Comp: {}, pending: {}",
             comp1.output(),
             comp1.is_pending(&exti)
