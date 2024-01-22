@@ -18,7 +18,6 @@ fn main() -> ! {
             external_event, external_event::ToExternalEventSource, output::HrOutput,
             timer::HrTimer, HrPwmAdvExt, Pscl128,
         },
-        pwm,
         pwr::PwrExt,
         rcc::{self, RccExt},
         stm32::Peripherals,
