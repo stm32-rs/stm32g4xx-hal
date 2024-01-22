@@ -80,11 +80,12 @@ stm32g431 = ["stm32g4/stm32g431"]
 stm32g441 = ["stm32g4/stm32g441"]
 stm32g471 = ["stm32g4/stm32g471"]
 stm32g473 = ["stm32g4/stm32g473"]
-stm32g474 = ["stm32g4/stm32g474"]
+stm32g474 = ["stm32g4/stm32g474", "hrtim"]
 stm32g483 = ["stm32g4/stm32g483"]
-stm32g484 = ["stm32g4/stm32g484"]
+stm32g484 = ["stm32g4/stm32g484", "hrtim"]
 stm32g491 = ["stm32g4/stm32g491"]
 stm32g4a1 = ["stm32g4/stm32g4a1"]
+hrtim = []
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
@@ -108,32 +109,45 @@ required-features = ["stm32g474"]
 
 [[example]]
 name = "hrtim-adc-trigger"
+required-features = ["hrtim"]
 path = "examples/hrtim/adc-trigger.rs"
 
 [[example]]
+name = "hrtim-capture"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture.rs"
+
+[[example]]
 name = "hrtim-eev-comp"
+required-features = ["hrtim"]
 path = "examples/hrtim/eev-comp.rs"
 
 [[example]]
 name = "hrtim-eev"
+required-features = ["hrtim"]
 path = "examples/hrtim/eev.rs"
 
 [[example]]
 name = "hrtim-flt-comp"
+required-features = ["hrtim"]
 path = "examples/hrtim/flt-comp.rs"
 
 [[example]]
 name = "hrtim-flt"
+required-features = ["hrtim"]
 path = "examples/hrtim/flt.rs"
 
 [[example]]
 name = "hrtim"
+required-features = ["hrtim"]
 path = "examples/hrtim/hrtim.rs"
 
 [[example]]
 name = "hrtim-master"
+required-features = ["hrtim"]
 path = "examples/hrtim/master.rs"
 
 [[example]]
 name = "hrtim-simple"
+required-features = ["hrtim"]
 path = "examples/hrtim/simple.rs"
