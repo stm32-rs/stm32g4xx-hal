@@ -154,14 +154,14 @@ macro_rules! hrtim_timer {
                 /// * `HrTimerMode::Continuous`: Enabling the timer enables and starts it simultaneously.
                 ///   When the counter reaches the PER value, it rolls-over to 0x0000 and resumes counting.
                 ///   The counter can be reset at any time
-                pub fn enable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: E) {
+                pub fn enable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: &E) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() | E::BITS)); }
                 }
 
                 /// Stop listening to the specified event
-                pub fn disable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: E) {
+                pub fn disable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: &E) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() & !E::BITS)); }
@@ -230,6 +230,12 @@ hrtim_timer_adc_trigger! {
     HRTIM_TIMF: [(Adc13: [(PER: 1 << 24), (RST: 1 << 28)]), (Adc24: [(PER: 1 << 24),               ]), (Adc579: [(PER: 30), (RST: 31)]), (Adc6810: [(PER: 31),          ])]
 }
 
+/// Master Timer Period event
 impl<DST, PSCL> super::event::TimerResetEventSource<DST, PSCL> for HrTim<HRTIM_MASTER, PSCL> {
     const BITS: u32 = 1 << 4; // MSTPER
+}
+
+/// Master Timer Period event
+impl<DST, PSCL> super::event::EventSource<DST, PSCL> for HrTim<HRTIM_MASTER, PSCL> {
+    const BITS: u32 = 1 << 7; // MSTPER
 }
