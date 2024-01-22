@@ -298,6 +298,13 @@ macro_rules! impl_eev1_5_to_es {
                 ExternalEventSource { _x: PhantomData }
             }
         }
+
+        /// EEV$1 event
+        impl<const IS_FAST: bool, DST, PSCL> super::event::EventSource<DST, PSCL>
+            for ExternalEventSource<$N, IS_FAST>
+        {
+            const BITS: u32 = 1 << ($N + 20); // EEV1 is at bit 21
+        }
     };
 }
 
@@ -332,6 +339,11 @@ macro_rules! impl_eev6_10_to_es {
 
                 ExternalEventSource { _x: PhantomData }
             }
+        }
+
+        /// EEV$1 event
+        impl<DST, PSCL> super::event::EventSource<DST, PSCL> for ExternalEventSource<$N, false> {
+            const BITS: u32 = 1 << ($N + 20); // EEV1 is at bit 21
         }
     };
 }

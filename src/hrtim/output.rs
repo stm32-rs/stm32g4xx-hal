@@ -1,6 +1,4 @@
-use crate::stm32::{
-    HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
-};
+use crate::stm32::{HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF};
 use core::marker::PhantomData;
 
 use super::event::EventSource;
