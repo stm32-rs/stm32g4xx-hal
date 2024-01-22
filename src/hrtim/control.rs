@@ -247,14 +247,14 @@ macro_rules! impl_adc1234_trigger {
             }
         }
 
-        $(impl Into<crate::adc::config::ExternalTrigger12> for &$t {
-            fn into(self) -> crate::adc::config::ExternalTrigger12 {
+        $(impl From<&$t> for crate::adc::config::ExternalTrigger12 {
+            fn from(_val: &$t) -> Self {
                 crate::adc::config::ExternalTrigger12::$variant12
             }
         })*
 
-        impl Into<crate::adc::config::ExternalTrigger345> for &$t {
-            fn into(self) -> crate::adc::config::ExternalTrigger345 {
+        impl From<&$t> for crate::adc::config::ExternalTrigger345 {
+            fn from(_val: &$t) -> Self {
                 crate::adc::config::ExternalTrigger345::$variant345
             }
         }
@@ -276,14 +276,14 @@ macro_rules! impl_adc5678910_trigger {
             }
         }
 
-        impl Into<crate::adc::config::ExternalTrigger12> for &$t {
-            fn into(self) -> crate::adc::config::ExternalTrigger12 {
+        impl From<&$t> for crate::adc::config::ExternalTrigger12 {
+            fn from(_val: &$t) -> Self {
                 crate::adc::config::ExternalTrigger12::$variant12
             }
         }
 
-        impl Into<crate::adc::config::ExternalTrigger345> for &$t {
-            fn into(self) -> crate::adc::config::ExternalTrigger345 {
+        impl From<&$t> for crate::adc::config::ExternalTrigger345 {
+            fn from(_val: &$t) -> Self {
                 crate::adc::config::ExternalTrigger345::$variant345
             }
         }
