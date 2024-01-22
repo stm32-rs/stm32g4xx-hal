@@ -1,17 +1,23 @@
 #![no_std]
 #![no_main]
 
+/// Example showcasing the use of the HRTIM peripheral to trigger the ADC at various points of the switch cycle off HRTIM_TIMA
+
+#[path = "../utils/mod.rs"]
+mod utils;
+
 use cortex_m_rt::entry;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
+
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
     use hal::adc;
     use stm32g4xx_hal as hal;
 
-    use defmt::info;
     use hal::{
         adc::{
             config::{Continuous, Dma as AdcDma, SampleTime, Sequence},
