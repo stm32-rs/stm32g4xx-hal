@@ -9,14 +9,6 @@ use cortex_m_rt::entry;
 use defmt_rtt as _; // global logger
 use panic_probe as _;
 
-#[cfg(not(any(feature = "stm32g474", feature = "stm32g484")))]
-#[entry]
-fn main() -> ! {
-    #[allow(clippy::empty_loop)]
-    loop {}
-}
-
-#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
 #[entry]
 fn main() -> ! {
     use hal::gpio::gpioa::PA8;
