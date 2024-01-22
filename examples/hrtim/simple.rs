@@ -1,13 +1,17 @@
-//This example puts the timer in PWM mode using the specified pin with a frequency of 100Hz and a duty cycle of 50%.
-#![no_main]
 #![no_std]
+#![no_main]
+
+/// Example showcasing the use of the HRTIM peripheral generating two 20kHz pwm signals. One with 33% duty and the other with 50%
+
+#[path = "../utils/mod.rs"]
+mod utils;
 
 use cortex_m_rt::entry;
 
-//mod utils;
-
 use defmt_rtt as _; // global logger
 use panic_probe as _;
+
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -23,10 +27,10 @@ fn main() -> ! {
     use hal::time::RateExtU32;
     use stm32g4xx_hal as hal;
     extern crate cortex_m_rt as rt;
+
+    info!("Initializing...");
+
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-
-    defmt::info!("Initializing...");
-
     // Set system frequency to 16MHz * 75/4/2 = 150MHz
     // This would lead to HrTim running at 150MHz * 32 = 4.8GHz...
     let pwr = dp.PWR.constrain().freeze();
@@ -74,7 +78,7 @@ fn main() -> ! {
     p1.enable();
     p2.enable();
 
-    defmt::info!("Running");
+    info!("Running");
 
     loop {
         cortex_m::asm::nop()

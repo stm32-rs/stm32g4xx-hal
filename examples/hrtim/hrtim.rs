@@ -1,11 +1,17 @@
-//This example puts the timer in PWM mode using the specified pin with a frequency of 100Hz and a duty cycle of 50%.
-#![no_main]
 #![no_std]
+#![no_main]
+
+/// Add description
+
+#[path = "../utils/mod.rs"]
+mod utils;
 
 use cortex_m_rt::entry;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
+
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -26,6 +32,8 @@ fn main() -> ! {
     use hal::stm32;
     use stm32g4xx_hal as hal;
     extern crate cortex_m_rt as rt;
+
+    info!("Initializing...");
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let cp = stm32::CorePeripherals::take().expect("cannot take core");

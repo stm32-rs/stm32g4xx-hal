@@ -1,12 +1,18 @@
-//This example puts the timer in PWM mode using the specified pin with a frequency of 100Hz and a duty cycle of 50%.
-#![no_main]
 #![no_std]
+#![no_main]
+
+/// Example showcasing the use of the HRTIM peripheral together with a comparator to implement a current fault.
+/// Once the digital input goes high, the output is forced low and put into a fault state.
+
+#[path = "../utils/mod.rs"]
+mod utils;
 
 use cortex_m_rt::entry;
-//mod utils;
 
 use defmt_rtt as _; // global logger
 use panic_probe as _;
+
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -76,7 +82,7 @@ fn main() -> ! {
     //   -----------------------------------------        --------------------------
     //        .               .               .  *            .               .
     //        .               .               .  *            .               .
-    let (timer, (mut cr1, _cr2, _cr3, _cr4), mut out1) = dp
+    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1) = dp
         .HRTIM_TIMA
         .pwm_advanced(pin_a, &mut rcc)
         .prescaler(prescaler)
@@ -99,18 +105,19 @@ fn main() -> ! {
     cr1.set_duty(timer.get_period() / 3);
     //unsafe {((HRTIM_COMMON::ptr() as *mut u8).offset(0x14) as *mut u32).write_volatile(1); }
     out1.enable();
+    timer.start(&mut hr_control);
 
-    defmt::info!("Started");
+    info!("Started");
 
     loop {
         for _ in 0..5 {
             delay.delay(500_u32.millis());
-            defmt::info!("State: {}", out1.get_state());
+            info!("State: {}", out1.get_state());
         }
         if hr_control.fault_3.is_fault_active() {
             hr_control.fault_3.clear_fault(); // Clear fault every 5s
             out1.enable();
-            defmt::info!("failt cleared, and output reenabled");
+            info!("failt cleared, and output reenabled");
         }
     }
 }
