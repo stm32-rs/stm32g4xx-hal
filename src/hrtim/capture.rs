@@ -31,19 +31,26 @@ pub trait HrCapture {
     /// Get number of ticks relative to beginning of upcounting
     ///
     /// where captures during down counting count as negative (before the upcount)
+    ///
+    /// ````
+    ///              Counter
+    /// ----------------------------------   <--- period
+    /// \               ^               /
+    ///    \            |            /
+    ///       \         |         /
+    ///          \      |      /
+    /// Down count  \   |   /   Up count
+    ///                \|/
+    /// <-------------- 0 --------------> t
+    /// Negative result | positive result
+    /// ````
     fn get_signed(&self) -> i32 {
         let (value, dir) = self.get();
-        let dir_bit = dir as i32;
-        dir_bit << 31 | i32::from(value)
-    }
 
-    /// Get number of ticks relative to beginning of upcounting
-    ///
-    /// where captures during down counting count as larger (after upcount)
-    fn get_unsigned(&self) -> u32 {
-        let (value, dir) = self.get();
-        let dir_bit = dir as u32;
-        dir_bit << 16 | u32::from(value)
+        match dir {
+            CountingDirection::Up => i32::from(value),
+            CountingDirection::Down => -i32::from(value),
+        }
     }
 
     fn clear_interrupt(&mut self);
