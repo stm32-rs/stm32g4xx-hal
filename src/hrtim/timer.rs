@@ -127,14 +127,6 @@ macro_rules! hrtim_timer {
 
                 tim.$dier.modify(|_r, w| w.$repie().bit(enable));
             }
-
-            pub fn capture_ch1(&mut self) -> &mut HrCapt<$TIMX, PSCL, capture::Ch1> {
-                &mut self.capture_ch1
-            }
-
-            pub fn capture_ch2(&mut self) -> &mut HrCapt<$TIMX, PSCL, capture::Ch2> {
-                &mut self.capture_ch2
-            }
         }
 
         $(// Only for Non-Master timers
@@ -228,6 +220,16 @@ hrtim_timer_adc_trigger! {
     HRTIM_TIMD: [(Adc13: [(PER: 1 << 27),               ]), (Adc24: [(PER: 1 << 26), (RST: 1 << 27)]), (Adc579: [(PER: 23),          ]), (Adc6810: [(PER: 22), (RST: 23)])],
     HRTIM_TIME: [(Adc13: [(PER: 1 << 31),               ]), (Adc24: [                (RST: 1 << 31)]), (Adc579: [(PER: 26),          ]), (Adc6810: [                    ])],
     HRTIM_TIMF: [(Adc13: [(PER: 1 << 24), (RST: 1 << 28)]), (Adc24: [(PER: 1 << 24),               ]), (Adc579: [(PER: 30), (RST: 31)]), (Adc6810: [(PER: 31),          ])]
+}
+
+impl<TIM, PSCL> HrTim<TIM, PSCL> {
+    pub fn capture_ch1(&mut self) -> &mut HrCapt<TIM, PSCL, capture::Ch1> {
+        &mut self.capture_ch1
+    }
+
+    pub fn capture_ch2(&mut self) -> &mut HrCapt<TIM, PSCL, capture::Ch2> {
+        &mut self.capture_ch2
+    }
 }
 
 /// Master Timer Period event
