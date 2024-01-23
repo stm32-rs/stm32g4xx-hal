@@ -340,9 +340,8 @@ where
     pub fn read_exact(
         &mut self,
         dat: &mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
-    ) -> usize {
+    ) {
         let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
-        let pos = self.r_pos;
         let read = dat.len();
 
         assert!(
@@ -351,6 +350,29 @@ where
         );
 
         while self.elements_available() < read {}
+
+        self.read_unchecked(read, dat);
+    }
+
+    /// Read the direcly available data
+    pub fn read_available(
+        &mut self,
+        dat: &mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
+    ) -> &mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize] {
+        let read = self.elements_available().min(dat.len());
+
+        self.read_unchecked(read, dat);
+
+        &mut dat[0..read]
+    }
+
+    fn read_unchecked(
+        &mut self,
+        read: usize,
+        dat: &mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
+    ) {
+        let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
+        let pos = self.r_pos;
 
         fence(Ordering::SeqCst);
 
@@ -373,9 +395,6 @@ where
         }
 
         fence(Ordering::SeqCst);
-
-        // return the number of bytes read
-        read
     }
 
     /// Starts the transfer, the closure will be executed right after enabling
