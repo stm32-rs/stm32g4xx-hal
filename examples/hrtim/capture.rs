@@ -57,6 +57,9 @@ fn main() -> ! {
     // PA8 (D7 on Nucleo G474RE)
     let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
 
+    // PB5 (D4 on Nucleo G474RE)
+    let input = gpiob.pb5.into_pull_down_input();
+
     // ...with a prescaler of 128 this gives us a HrTimer with a tick rate of 30MHz
     // With max the max period set, this would be 30MHz/2^16 ~= 458Hz...
     let prescaler = Pscl128;
@@ -71,10 +74,9 @@ fn main() -> ! {
     let (mut hr_control, _flt_inputs, eev_inputs) =
         dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
 
-    // PB5 (D4 on Nucleo G474RE)
     let eev_input6 = eev_inputs
         .eev_input6
-        .bind(gpiob.pb5.into_pull_down_input())
+        .bind(input)
         .edge_or_polarity(external_event::EdgeOrPolarity::Edge(
             external_event::Edge::Falling,
         ))
