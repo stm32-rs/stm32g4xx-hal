@@ -47,6 +47,27 @@ pub trait HrTimer {
     fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self::Timer>;
 }
 
+pub trait HrSlaveTimer: HrTimer
+{
+    type CaptureCh1: super::capture::HrCapture;
+    type CaptureCh2: super::capture::HrCapture;
+
+    /// Start listening to the specified event
+    fn enable_reset_event<E: super::event::TimerResetEventSource<Self::Timer, Self::Prescaler>>(
+        &mut self,
+        _event: &E,
+    );
+
+    /// Stop listening to the specified event
+    fn disable_reset_event<E: super::event::TimerResetEventSource<Self::Timer, Self::Prescaler>>(
+        &mut self,
+        _event: &E,
+    );
+
+    fn capture_ch1(&mut self) -> &mut Self::CaptureCh1;
+    fn capture_ch2(&mut self) -> &mut Self::CaptureCh2;
+}
+
 macro_rules! hrtim_timer {
     ($(
         $TIMX:ident:
@@ -135,8 +156,11 @@ macro_rules! hrtim_timer {
             }
         }
 
-        $(// Only for Non-Master timers
-            impl<PSCL> HrTim<$TIMX, PSCL> {
+        $(
+            impl<PSCL> HrSlaveTimer for HrTim<$TIMX, PSCL> {
+                type CaptureCh1 = HrCapt<Self::Timer, Self::Prescaler, capture::Ch1>;
+                type CaptureCh2 = HrCapt<Self::Timer, Self::Prescaler, capture::Ch2>;
+
                 /// Reset this timer every time the specified event occurs
                 ///
                 /// Behaviour depends on `timer_mode`:
@@ -152,19 +176,30 @@ macro_rules! hrtim_timer {
                 /// * `HrTimerMode::Continuous`: Enabling the timer enables and starts it simultaneously.
                 ///   When the counter reaches the PER value, it rolls-over to 0x0000 and resumes counting.
                 ///   The counter can be reset at any time
-                pub fn enable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: &E) {
+                fn enable_reset_event<E: super::event::TimerResetEventSource<Self::Timer, Self::Prescaler>>(&mut self, _event: &E) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() | E::BITS)); }
                 }
 
                 /// Stop listening to the specified event
-                pub fn disable_reset_event<E: super::event::TimerResetEventSource<$TIMX, PSCL>>(&mut self, _event: &E) {
+                fn disable_reset_event<E: super::event::TimerResetEventSource<Self::Timer, Self::Prescaler>>(&mut self, _event: &E) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() & !E::BITS)); }
                 }
+
+                /// Access the timers first capture channel
+                fn capture_ch1(&mut self) -> &mut Self::CaptureCh1 {
+                    &mut self.capture_ch1
+                }
+
+                /// Access the timers second capture channel
+                fn capture_ch2(&mut self) -> &mut Self::CaptureCh2 {
+                    &mut self.capture_ch2
+                }
             }
+
 
             /// Timer Period event
             impl<DST, PSCL> super::event::EventSource<DST, PSCL> for HrTim<$TIMX, PSCL> {
@@ -226,16 +261,6 @@ hrtim_timer_adc_trigger! {
     HRTIM_TIMD: [(Adc13: [(PER: 1 << 27),               ]), (Adc24: [(PER: 1 << 26), (RST: 1 << 27)]), (Adc579: [(PER: 23),          ]), (Adc6810: [(PER: 22), (RST: 23)])],
     HRTIM_TIME: [(Adc13: [(PER: 1 << 31),               ]), (Adc24: [                (RST: 1 << 31)]), (Adc579: [(PER: 26),          ]), (Adc6810: [                    ])],
     HRTIM_TIMF: [(Adc13: [(PER: 1 << 24), (RST: 1 << 28)]), (Adc24: [(PER: 1 << 24),               ]), (Adc579: [(PER: 30), (RST: 31)]), (Adc6810: [(PER: 31),          ])]
-}
-
-impl<TIM, PSCL> HrTim<TIM, PSCL> {
-    pub fn capture_ch1(&mut self) -> &mut HrCapt<TIM, PSCL, capture::Ch1> {
-        &mut self.capture_ch1
-    }
-
-    pub fn capture_ch2(&mut self) -> &mut HrCapt<TIM, PSCL, capture::Ch2> {
-        &mut self.capture_ch2
-    }
 }
 
 /// Master Timer Period event
