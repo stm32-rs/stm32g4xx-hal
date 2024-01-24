@@ -15,7 +15,10 @@ pub struct HrTim<TIM, PSCL> {
     capture_ch2: HrCapt<TIM, PSCL, capture::Ch2>,
 }
 
-pub trait HrTimer<TIM, PSCL>: Sized {
+pub trait HrTimer {
+    type Timer;
+    type Prescaler;
+
     /// Get period of timer in number of ticks
     ///
     /// This is also the maximum duty usable for `HrCompareRegister::set_duty`
@@ -38,10 +41,10 @@ pub trait HrTimer<TIM, PSCL>: Sized {
     fn clear_repetition_interrupt(&mut self);
 
     /// Make a handle to this timers reset event to use as adc trigger
-    fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self>;
+    fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self::Timer>;
 
     /// Make a handle to this timers period event to use as adc trigger
-    fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self>;
+    fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self::Timer>;
 }
 
 macro_rules! hrtim_timer {
@@ -60,7 +63,10 @@ macro_rules! hrtim_timer {
         $repc:ident,
         $(($rstXr:ident))*,
     )+) => {$(
-        impl<PSCL> HrTimer<$TIMX, PSCL> for HrTim<$TIMX, PSCL> {
+        impl<PSCL> HrTimer for HrTim<$TIMX, PSCL> {
+            type Prescaler = PSCL;
+            type Timer = $TIMX;
+
             fn get_period(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
 
@@ -99,12 +105,12 @@ macro_rules! hrtim_timer {
             }
 
             /// Make a handle to this timers reset event to use as adc trigger
-            fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self> {
+            fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self::Timer> {
                 super::adc_trigger::TimerReset(PhantomData)
             }
 
             /// Make a handle to this timers period event to use as adc trigger
-            fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self> {
+            fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self::Timer> {
                 super::adc_trigger::TimerPeriod(PhantomData)
             }
 
