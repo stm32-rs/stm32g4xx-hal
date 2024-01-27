@@ -11,6 +11,7 @@ use hal::stm32;
 use hal::time::ExtU32;
 use hal::timer::Timer;
 use stm32g4xx_hal as hal;
+use embedded_hal_one::delay::DelayNs;
 
 use cortex_m_rt::entry;
 use utils::logger::info;
@@ -47,6 +48,6 @@ fn main() -> ! {
         info!("Toggle");
         led.toggle().unwrap();
         info!("TIM2 delay");
-        delay_tim2.delay_ms(1000_u16);
+        DelayNs::delay_ms(&mut delay_tim2, 1000);
     }
 }
