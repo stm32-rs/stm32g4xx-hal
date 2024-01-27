@@ -40,10 +40,12 @@ use crate::rcc::Clocks;
 use crate::time::MicroSecond;
 pub use cortex_m::delay::*;
 use cortex_m::peripheral::SYST;
+use fugit::ExtU32Ceil;
 
 use crate::nb::block;
 use crate::time::ExtU32;
 use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal_one::delay::DelayNs;
 
 pub trait CountDown: embedded_hal::timer::CountDown {
     fn max_period(&self) -> MicroSecond;
@@ -132,7 +134,7 @@ macro_rules! impl_delay_from_count_down_timer  {
                 T: CountDown<Time = MicroSecond>,
             {
                 fn $delay(&mut self, t: u16) {
-                    self.$delay(t as u32);
+                    $Delay::$delay(self, t as u32);
                 }
             }
 
@@ -141,7 +143,7 @@ macro_rules! impl_delay_from_count_down_timer  {
                 T: CountDown<Time = MicroSecond>,
             {
                 fn $delay(&mut self, t: u8) {
-                    self.$delay(t as u32);
+                    $Delay::$delay(self, t as u32);
                 }
             }
         )+
@@ -151,4 +153,35 @@ macro_rules! impl_delay_from_count_down_timer  {
 impl_delay_from_count_down_timer! {
     (DelayMs, delay_ms, 1_000),
     (DelayUs, delay_us, 1)
+}
+
+// TODO: decouple the timer API from embedded-hal 0.2, stm32f4xx-hal with constant timer
+// frequencies looks like a good example
+impl<T: CountDown<Time = MicroSecond>> DelayNs for DelayFromCountDownTimer<T> {
+    // From a quick look at the clock diagram timer resolution can go down to ~3ns on most timers
+    // 170MHz (PLL-R as SysClk) / 1 (AHB Prescaler) / 1 (APBx prescaler) * 2 = 340MHz timer clock
+    // TODO: the current fallback to 1us resolution is a stopgap until the module is reworked
+    fn delay_ns(&mut self, ns: u32) {
+        DelayNs::delay_us(self, ns.div_ceil(1000))
+    }
+    fn delay_us(&mut self, mut us: u32) {
+        let max_sleep = self.0.max_period();
+        let max_us = max_sleep.to_micros();
+
+        while us > max_us {
+            self.0.start(max_us.micros_at_least());
+            let _ = nb::block!(self.0.wait());
+            us -= max_us;
+        }
+        self.0.start(us.micros_at_least());
+        let _ = nb::block!(self.0.wait());
+    }
+    fn delay_ms(&mut self, mut ms: u32) {
+        const MAX_MILLIS: u32 = u32::MAX / 1000;
+        while ms > MAX_MILLIS {
+            ms -= MAX_MILLIS;
+            DelayNs::delay_us(self, MAX_MILLIS * 1000);
+        }
+        DelayNs::delay_us(self, ms * 1000);
+    }
 }
