@@ -47,6 +47,9 @@ pub trait Stream: Sealed {
     /// Get transfer complete flag.
     fn get_transfer_complete_flag() -> bool;
 
+    /// Get transfer error flag.
+    fn get_transfer_error_flag() -> bool;
+
     /// Enable the DMA stream.
     ///
     /// # Safety

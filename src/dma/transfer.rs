@@ -265,6 +265,11 @@ where
         STREAM::get_transfer_complete_flag()
     }
 
+    #[inline(always)]
+    pub fn get_transfer_error_flag(&self) -> bool {
+        STREAM::get_transfer_error_flag()
+    }
+
     /// Clear half transfer interrupt (htif) for the DMA stream.
     #[inline(always)]
     pub fn clear_half_transfer_interrupt(&mut self) {
@@ -378,6 +383,19 @@ where
         read
     }
 
+    pub fn read_available<'a>(
+        &mut self,
+        data: &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
+    ) -> &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize] {
+        let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
+        let available = self.elements_available();
+        let len = data.len().min(available).min(blen - 1);
+        let result = &mut data[0..len];
+        self.read_exact(result);
+
+        result
+    }
+
     /// Starts the transfer, the closure will be executed right after enabling
     /// the stream.
     pub fn start<F>(&mut self, f: F)
@@ -422,6 +440,11 @@ where
     #[inline(always)]
     pub fn get_transfer_complete_flag(&self) -> bool {
         self.transfer.get_transfer_complete_flag()
+    }
+
+    #[inline(always)]
+    pub fn get_transfer_error_flag(&self) -> bool {
+        self.transfer.get_transfer_error_flag()
     }
 
     /// Clear half transfer interrupt (htif) for the DMA stream.
@@ -486,6 +509,27 @@ impl_adc_overrun!(ADC3,);
     feature = "stm32g484",
 ))]
 impl_adc_overrun!(ADC4, ADC5,);
+
+macro_rules! impl_serial_timeout {
+    ($($uart:ident, )*) => {$(
+        impl<STREAM, BUF, Pin> CircTransfer<STREAM, crate::serial::Rx<crate::stm32::$uart, Pin, crate::serial::DMA>, BUF>
+        where
+            STREAM: Stream,
+            /*BUF: StaticWriteBuffer + Deref*/ {
+            pub fn timeout_lapsed(&self) -> bool {
+                self.transfer.peripheral.timeout_lapsed()
+            }
+
+            pub fn clear_timeout(&mut self) {
+                self.transfer.peripheral.clear_timeout();
+            }
+        }
+    )*};
+}
+
+impl_serial_timeout!(USART1, USART2, USART3, UART4,);
+#[cfg(not(any(feature = "stm32g431", feature = "stm32g441")))]
+impl_serial_timeout!(UART5,);
 
 pub trait TransferExt<STREAM>
 where
