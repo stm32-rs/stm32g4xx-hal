@@ -30,6 +30,7 @@ pub trait LSCOExt {
 
 impl LSCOExt for LscoPin {
     fn lsco(self, src: LSCOSrc, rcc: &mut Rcc) -> Lsco {
+        rcc.unlock_rtc();
         let src_select_bit = match src {
             LSCOSrc::LSE => {
                 rcc.enable_lse(false);
@@ -40,7 +41,6 @@ impl LSCOExt for LscoPin {
                 false
             }
         };
-        rcc.unlock_rtc();
         rcc.rb.bdcr.modify(|_, w| w.lscosel().bit(src_select_bit));
         Lsco {
             pin: self.into_alternate(),
