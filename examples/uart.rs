@@ -3,8 +3,7 @@
 #![no_main]
 #![no_std]
 
-use core::fmt::Write;
-
+use embedded_io::{Read, Write};
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::serial::FullConfig;
@@ -54,10 +53,13 @@ fn main() -> ! {
         .unwrap();
 
     writeln!(usart, "Hello USART3, yay!!\r\n").unwrap();
+    let mut read_buf = [0u8; 8];
+    usart.read_exact(&mut read_buf).unwrap();
+    usart.write_all(&read_buf).unwrap();
 
     let mut cnt = 0;
     loop {
-        match block!(usart.read()) {
+        match block!(embedded_hal::serial::Read::read(&mut usart)) {
             Ok(byte) => writeln!(usart, "{}: {}\r", cnt, byte).unwrap(),
             Err(e) => writeln!(usart, "E: {:?}\r", e).unwrap(),
         };

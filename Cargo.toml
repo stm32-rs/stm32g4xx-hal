@@ -12,13 +12,14 @@ repository = "https://github.com/stm32-rs/stm32g4xx-hal"
 version = "0.0.2"
 
 [dependencies]
-nb = "0.1.1"
+nb = "1"
 stm32g4 = "0.15.1"
 paste = "1.0"
 bitflags = "1.2"
 vcell = "0.1"
 static_assertions = "1.1"
 fugit = "0.3.5"
+embedded-io = "0.6"
 
 [dependencies.cortex-m]
 version = "0.7.7"
@@ -94,7 +95,7 @@ stm32g4a1 = ["stm32g4/stm32g4a1"]
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
-defmt-logging = ["defmt"]
+defmt-logging = ["defmt", "nb/defmt-0-3", "embedded-hal-one/defmt-03", "embedded-io/defmt-03"]
 
 [profile.dev]
 codegen-units = 1
