@@ -44,10 +44,10 @@ use fugit::ExtU32Ceil;
 
 use crate::nb::block;
 use crate::time::ExtU32;
-use embedded_hal::blocking::delay::{DelayMs, DelayUs};
-use embedded_hal_one::delay::DelayNs;
+use embedded_hal_old::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal::delay::DelayNs;
 
-pub trait CountDown: embedded_hal::timer::CountDown {
+pub trait CountDown: embedded_hal_old::timer::CountDown {
     fn max_period(&self) -> MicroSecond;
 }
 

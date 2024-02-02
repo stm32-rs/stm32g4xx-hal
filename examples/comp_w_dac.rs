@@ -18,20 +18,25 @@ fn main() -> ! {
 #[cfg(feature = "stm32g474")]
 #[entry]
 fn main() -> ! {
-    use embedded_hal::Direction;
+    use embedded_hal_old::Direction;
+    use stm32g4xx_hal as hal;
     use hal::comparator::{self, ComparatorExt, ComparatorSplit};
     use hal::dac::{Dac1IntSig1, DacExt, DacOut};
-    use hal::delay::SYSTDelayExt;
+    use hal::delay::DelayFromCountDownTimer;
+    use hal::time::ExtU32;
+    use hal::timer::Timer;
     use hal::gpio::GpioExt;
     use hal::rcc::RccExt;
     use hal::stm32;
-    use stm32g4xx_hal as hal;
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
-    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+    // let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     let mut rcc = dp.RCC.constrain();
-    let mut delay = cp.SYST.delay(&rcc.clocks);
+    // let mut delay = cp.SYST.delay(&rcc.clocks);
+    let mut delay = DelayFromCountDownTimer::new(
+        Timer::new(dp.TIM6, &rcc.clocks).start_count_down(100u32.millis()),
+    );
 
     let gpioa = dp.GPIOA.split(&mut rcc);
 

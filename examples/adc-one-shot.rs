@@ -3,7 +3,9 @@
 
 use crate::hal::{
     adc::{config::SampleTime, AdcClaim},
-    delay::SYSTDelayExt,
+    time::ExtU32,
+    timer::Timer,
+    delay::DelayFromCountDownTimer,
     pwr::PwrExt,
     rcc::Config,
     stm32::Peripherals,
@@ -13,10 +15,9 @@ use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
 
-use log::info;
-
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -25,7 +26,7 @@ fn main() -> ! {
     info!("start");
 
     let dp = Peripherals::take().unwrap();
-    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+    // let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     info!("rcc");
 
@@ -34,7 +35,10 @@ fn main() -> ! {
     let mut rcc = rcc.freeze(Config::hsi(), pwr);
 
     info!("Setup Adc1");
-    let mut delay = cp.SYST.delay(&rcc.clocks);
+    // let mut delay = cp.SYST.delay(&rcc.clocks);
+    let mut delay = DelayFromCountDownTimer::new(
+        Timer::new(dp.TIM6, &rcc.clocks).start_count_down(100u32.millis()),
+    );
     let mut adc = dp.ADC2.claim_and_configure(
         stm32g4xx_hal::adc::ClockSource::SystemClock,
         &rcc,

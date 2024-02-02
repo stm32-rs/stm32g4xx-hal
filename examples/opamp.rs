@@ -3,16 +3,21 @@
 #![no_std]
 #![no_main]
 
-use stm32g4xx_hal::adc::AdcClaim;
-use stm32g4xx_hal::adc::ClockSource;
-use stm32g4xx_hal::gpio::gpioa::*;
-use stm32g4xx_hal::gpio::Analog;
-use stm32g4xx_hal::opamp::opamp1::IntoPga as _;
-use stm32g4xx_hal::opamp::opamp2::IntoPga as _;
-use stm32g4xx_hal::opamp::NonInvertingGain;
-use stm32g4xx_hal::opamp::PgaModeInternal;
-use stm32g4xx_hal::prelude::*;
-use stm32g4xx_hal::pwr::PwrExt;
+use stm32g4xx_hal as hal;
+
+use hal::delay::DelayFromCountDownTimer;
+use hal::timer::Timer;
+use hal::time::ExtU32;
+use hal::adc::AdcClaim;
+use hal::adc::ClockSource;
+use hal::gpio::gpioa::*;
+use hal::gpio::Analog;
+use hal::opamp::opamp1::IntoPga as _;
+use hal::opamp::opamp2::IntoPga as _;
+use hal::opamp::NonInvertingGain;
+use hal::opamp::PgaModeInternal;
+use hal::prelude::*;
+use hal::pwr::PwrExt;
 
 use utils::logger::info;
 
@@ -25,7 +30,7 @@ fn main() -> ! {
 
     // take peripherals
     let dp = stm32g4xx_hal::stm32::Peripherals::take().unwrap();
-    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+    // let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     // setup clock and power
     let pwr = dp.PWR.constrain().freeze();
@@ -66,7 +71,10 @@ fn main() -> ! {
         Option::<PA6<Analog>>::None, // Do not route output to any external pin, use internal AD instead
     );
 
-    let mut delay = cp.SYST.delay(&rcc.clocks);
+    // let mut delay = cp.SYST.delay(&rcc.clocks);
+    let mut delay = DelayFromCountDownTimer::new(
+        Timer::new(dp.TIM6, &rcc.clocks).start_count_down(100u32.millis()),
+    );
     let mut adc = dp
         .ADC2
         .claim(ClockSource::SystemClock, &rcc, &mut delay, true);

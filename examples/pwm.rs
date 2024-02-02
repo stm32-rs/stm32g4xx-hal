@@ -11,6 +11,7 @@ use hal::stm32;
 use hal::time::RateExtU32;
 use stm32g4xx_hal as hal;
 extern crate cortex_m_rt as rt;
+use hal::prelude::SetDutyCycle;
 
 #[macro_use]
 mod utils;
@@ -26,7 +27,7 @@ fn main() -> ! {
 
     let mut pwm = dp.TIM1.pwm(pin, 100.Hz(), &mut rcc);
 
-    pwm.set_duty(pwm.get_max_duty() / 2);
+    let _ = pwm.set_duty_cycle(pwm.max_duty_cycle() / 2);
     pwm.enable();
 
     loop {

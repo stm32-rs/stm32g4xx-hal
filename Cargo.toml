@@ -37,13 +37,13 @@ default-features = false
 features = ["const-fn"]
 version = "0.2.5"
 
-[dependencies.embedded-hal]
-features = ["unproven"]
-version = "0.2.4"
-
-[dependencies.embedded-hal-one]
-version = "1.0.0"
+[dependencies.embedded-hal-old]
 package = "embedded-hal"
+features = ["unproven"]
+version = "0.2.7"
+
+[dependencies.embedded-hal]
+version = "1.0.0"
 
 [dependencies.embedded-dma]
 version = "0.1.2"
@@ -95,7 +95,7 @@ stm32g4a1 = ["stm32g4/stm32g4a1"]
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
-defmt-logging = ["defmt", "nb/defmt-0-3", "embedded-hal-one/defmt-03", "embedded-io/defmt-03"]
+defmt-logging = ["defmt", "nb/defmt-0-3", "embedded-hal/defmt-03", "embedded-io/defmt-03"]
 
 [profile.dev]
 codegen-units = 1
