@@ -1,6 +1,6 @@
 //! I2C
-use hal::blocking::i2c::{Read, Write, WriteRead};
-use embedded_hal_one::i2c::{ErrorKind, Operation, SevenBitAddress, TenBitAddress};
+use embedded_hal_old::blocking::i2c::{Read, Write, WriteRead};
+use embedded_hal::i2c::{ErrorKind, Operation, SevenBitAddress, TenBitAddress};
 
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*};
 #[cfg(any(
@@ -128,11 +128,11 @@ pub enum Error {
     ArbitrationLost,
 }
 
-impl embedded_hal_one::i2c::Error for Error {
-    fn kind(&self) -> embedded_hal_one::i2c::ErrorKind {
+impl embedded_hal::i2c::Error for Error {
+    fn kind(&self) -> embedded_hal::i2c::ErrorKind {
         match self {
             Self::Overrun => ErrorKind::Overrun,
-            Self::Nack => ErrorKind::NoAcknowledge(embedded_hal_one::i2c::NoAcknowledgeSource::Unknown),
+            Self::Nack => ErrorKind::NoAcknowledge(embedded_hal::i2c::NoAcknowledgeSource::Unknown),
             Self::PECError => ErrorKind::Other,
             Self::BusError => ErrorKind::Bus,
             Self::ArbitrationLost => ErrorKind::ArbitrationLoss
@@ -364,12 +364,12 @@ macro_rules! i2c {
             }
         }
 
-        impl<SDA, SCL> embedded_hal_one::i2c::ErrorType for I2c<$I2CX, SDA, SCL> {
+        impl<SDA, SCL> embedded_hal::i2c::ErrorType for I2c<$I2CX, SDA, SCL> {
             type Error = Error;
         }
 
         // TODO: custom read/write/read_write impl with hardware stop logic
-        impl<SDA, SCL> embedded_hal_one::i2c::I2c for I2c<$I2CX, SDA, SCL> {
+        impl<SDA, SCL> embedded_hal::i2c::I2c for I2c<$I2CX, SDA, SCL> {
             fn transaction(
                 &mut self,
                 address: SevenBitAddress,
@@ -386,7 +386,7 @@ macro_rules! i2c {
                 })
             }
         }
-        impl<SDA, SCL> embedded_hal_one::i2c::I2c<TenBitAddress> for I2c<$I2CX, SDA, SCL> {
+        impl<SDA, SCL> embedded_hal::i2c::I2c<TenBitAddress> for I2c<$I2CX, SDA, SCL> {
             fn transaction(
                 &mut self,
                 address: TenBitAddress,

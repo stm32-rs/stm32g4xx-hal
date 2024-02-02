@@ -1,9 +1,15 @@
-pub use hal::digital::v2::*;
-pub use hal::prelude::*;
+pub use embedded_hal::{
+    delay::DelayNs,
+    digital::{InputPin, OutputPin, StatefulOutputPin},
+    i2c::I2c,
+    pwm::SetDutyCycle,
+    spi::SpiBus,
+};
 
-pub use hal::adc::OneShot as _;
-pub use hal::watchdog::Watchdog as _;
-pub use hal::watchdog::WatchdogEnable as _;
+pub use embedded_hal_old::{
+    adc::OneShot as _,
+    watchdog::{Watchdog as _, WatchdogEnable as _},
+};
 
 // pub use crate::analog::adc::AdcExt as _;
 

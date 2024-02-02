@@ -35,7 +35,7 @@ fn main() -> ! {
 
     let buf: [u8; 1] = [0];
     loop {
-        match i2c.write(0x3c, &buf) {
+        match i2c.write(0x3Cu8, &buf) {
             Ok(_) => info!("ok"),
             Err(err) => info!("error: {:?}", err),
         }

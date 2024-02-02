@@ -6,12 +6,13 @@ use crate::dma::{
 };
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*};
 use crate::gpio::{Alternate, AlternateOD, AF12, AF5, AF7, AF8};
-use crate::prelude::*;
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::*;
 
 use cortex_m::interrupt;
 use nb::block;
+
+use embedded_hal_old::serial::Write;
 use embedded_io::{ReadReady, WriteReady};
 
 use crate::serial::config::*;
@@ -137,7 +138,7 @@ pub trait SerialExt<USART, Config> {
 
 impl<USART, TX, RX> fmt::Write for Serial<USART, TX, RX>
 where
-    Serial<USART, TX, RX>: hal::serial::Write<u8>,
+    Serial<USART, TX, RX>: embedded_hal_old::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
@@ -147,7 +148,7 @@ where
 
 impl<USART, Pin, Dma> fmt::Write for Tx<USART, Pin, Dma>
 where
-    Tx<USART, Pin, Dma>: hal::serial::Write<u8>,
+    Tx<USART, Pin, Dma>: embedded_hal_old::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
@@ -255,7 +256,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> hal::serial::Read<u8> for Rx<$USARTX, Pin, NoDMA> {
+        impl<Pin> embedded_hal_old::serial::Read<u8> for Rx<$USARTX, Pin, NoDMA> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -264,7 +265,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX> hal::serial::Read<u8> for Serial<$USARTX, TX, RX> {
+        impl<TX, RX> embedded_hal_old::serial::Read<u8> for Serial<$USARTX, TX, RX> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -330,7 +331,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> hal::serial::Write<u8> for Tx<$USARTX, Pin, NoDMA> {
+        impl<Pin> embedded_hal_old::serial::Write<u8> for Tx<$USARTX, Pin, NoDMA> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -353,7 +354,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX> hal::serial::Write<u8> for Serial<$USARTX, TX, RX> {
+        impl<TX, RX> embedded_hal_old::serial::Write<u8> for Serial<$USARTX, TX, RX> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -391,7 +392,7 @@ macro_rules! uart_shared {
                 Ok(count)
             }
             fn flush(&mut self) -> Result<(), Error> {
-                nb::block!(hal::serial::Write::<u8>::flush(self))
+                nb::block!(embedded_hal_old::serial::Write::<u8>::flush(self))
             }
         }
 

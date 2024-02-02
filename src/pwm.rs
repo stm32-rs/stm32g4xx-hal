@@ -172,7 +172,6 @@
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
-use crate::hal;
 use crate::stm32::LPTIMER1;
 use crate::stm32::RCC;
 #[cfg(any(
@@ -1497,18 +1496,14 @@ macro_rules! tim_pin_hal {
         $ccrx:ident, $typ:ident $(,$ccxne:ident, $ccxnp:ident)*),)+
     ) => {
         $(
-            impl<COMP, POL, NPOL> hal::PwmPin for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+            impl<COMP, POL, NPOL> Pwm<$TIMX, $CH, COMP, POL, NPOL>
                 where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
-                type Duty = $typ;
 
-                // You may not access self in the following methods!
-                // See unsafe above
-
-                fn disable(&mut self) {
+                pub fn disable(&mut self) {
                     self.ccer_disable();
                 }
 
-                fn enable(&mut self) {
+                pub fn enable(&mut self) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     tim.$ccmrx_output().modify(|_, w|
@@ -1519,6 +1514,23 @@ macro_rules! tim_pin_hal {
                     );
 
                     self.ccer_enable();
+                }
+            }
+            impl<COMP, POL, NPOL> embedded_hal_old::PwmPin for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+                where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
+                type Duty = $typ;
+
+                // You may not access self in the following methods!
+                // See unsafe above
+
+                #[inline]
+                fn disable(&mut self) {
+                    Pwm::<$TIMX, $CH, COMP, POL, NPOL>::disable(self)
+                }
+
+                #[inline]
+                fn enable(&mut self) {
+                    Pwm::<$TIMX, $CH, COMP, POL, NPOL>::enable(self)
                 }
 
                 fn get_duty(&self) -> Self::Duty {
@@ -1554,11 +1566,11 @@ macro_rules! tim_pin_hal {
                 }
             }
 
-            impl<COMP, POL, NPOL> embedded_hal_one::pwm::ErrorType for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+            impl<COMP, POL, NPOL> embedded_hal::pwm::ErrorType for Pwm<$TIMX, $CH, COMP, POL, NPOL>
                 where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
                 type Error = core::convert::Infallible;
             }
-            impl<COMP, POL, NPOL> embedded_hal_one::pwm::SetDutyCycle for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+            impl<COMP, POL, NPOL> embedded_hal::pwm::SetDutyCycle for Pwm<$TIMX, $CH, COMP, POL, NPOL>
                 where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
                 fn max_duty_cycle(&self) -> u16 {
                     let tim = unsafe { &*$TIMX::ptr() };
@@ -1849,7 +1861,7 @@ macro_rules! lptim_hal {
                 unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
             }
 
-            impl hal::PwmPin for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+            impl embedded_hal_old::PwmPin for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
                 type Duty = u16;
 
                 // You may not access self in the following methods!
@@ -1890,10 +1902,10 @@ macro_rules! lptim_hal {
                 }
             }
 
-            impl embedded_hal_one::pwm::ErrorType for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+            impl embedded_hal::pwm::ErrorType for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
                 type Error = core::convert::Infallible;
             }
-            impl embedded_hal_one::pwm::SetDutyCycle for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+            impl embedded_hal::pwm::SetDutyCycle for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
                 fn max_duty_cycle(&self) -> u16 {
                     let tim = unsafe { &*$TIMX::ptr() };
                     tim.arr.read().arr().bits()

@@ -59,7 +59,7 @@ fn main() -> ! {
 
     let mut cnt = 0;
     loop {
-        match block!(embedded_hal::serial::Read::read(&mut usart)) {
+        match block!(embedded_hal_old::serial::Read::read(&mut usart)) {
             Ok(byte) => writeln!(usart, "{}: {}\r", cnt, byte).unwrap(),
             Err(e) => writeln!(usart, "E: {:?}\r", e).unwrap(),
         };

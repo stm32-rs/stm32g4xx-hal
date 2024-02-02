@@ -29,11 +29,12 @@ extern crate bare_metal;
 extern crate void;
 
 pub extern crate cortex_m;
-pub extern crate embedded_hal as hal;
 pub extern crate nb;
 pub extern crate stm32g4;
 
 pub use nb::block;
+pub use embedded_hal as hal;
+pub use embedded_hal_old as hal_02;
 
 mod sealed {
     pub trait Sealed {}

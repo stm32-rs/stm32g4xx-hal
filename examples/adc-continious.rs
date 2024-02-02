@@ -6,7 +6,9 @@ use crate::hal::{
         config::{Continuous, Resolution, SampleTime, Sequence},
         AdcClaim, ClockSource, Temperature, Vref,
     },
-    delay::SYSTDelayExt,
+    time::ExtU32,
+    timer::Timer,
+    delay::DelayFromCountDownTimer,
     gpio::GpioExt,
     pwr::PwrExt,
     rcc::{Config, RccExt},
@@ -29,7 +31,7 @@ fn main() -> ! {
     info!("start");
 
     let dp = Peripherals::take().unwrap();
-    let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
+    // let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     info!("rcc");
 
@@ -42,7 +44,10 @@ fn main() -> ! {
     let pa0 = gpioa.pa0.into_analog();
 
     info!("Setup Adc1");
-    let mut delay = cp.SYST.delay(&rcc.clocks);
+    // let mut delay = cp.SYST.delay(&rcc.clocks);
+    let mut delay = DelayFromCountDownTimer::new(
+        Timer::new(dp.TIM6, &rcc.clocks).start_count_down(100u32.millis()),
+    );
     let mut adc = dp
         .ADC1
         .claim(ClockSource::SystemClock, &rcc, &mut delay, true);

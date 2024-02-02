@@ -24,7 +24,8 @@ use crate::time::Hertz;
 use core::cell::UnsafeCell;
 use core::ptr;
 
-pub use hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
+pub use embedded_hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
+use embedded_hal::spi::ErrorKind;
 
 /// SPI error
 #[derive(Debug)]
@@ -37,12 +38,12 @@ pub enum Error {
     Crc,
 }
 
-impl embedded_hal_one::spi::Error for Error {
-    fn kind(&self) -> embedded_hal_one::spi::ErrorKind {
+impl embedded_hal::spi::Error for Error {
+    fn kind(&self) -> ErrorKind {
         match self {
-            Self::Overrun => embedded_hal_one::spi::ErrorKind::Overrun,
-            Self::ModeFault => embedded_hal_one::spi::ErrorKind::ModeFault,
-            Self::Crc => embedded_hal_one::spi::ErrorKind::Other,
+            Self::Overrun => ErrorKind::Overrun,
+            Self::ModeFault => ErrorKind::ModeFault,
+            Self::Crc => ErrorKind::Other,
         }
     }
 }
@@ -260,11 +261,11 @@ macro_rules! spi {
                 }
         }
 
-        impl<PINS> embedded_hal_one::spi::ErrorType for Spi<$SPIX, PINS> {
+        impl<PINS> embedded_hal::spi::ErrorType for Spi<$SPIX, PINS> {
             type Error = Error;
         }
 
-        impl<PINS> embedded_hal_one::spi::SpiBus for Spi<$SPIX, PINS> {
+        impl<PINS> embedded_hal::spi::SpiBus<u8> for Spi<$SPIX, PINS> {
             fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
                 if words.len() == 0 { return Ok(()) }
                 // clear tx-only status in the case the previous operation was a write
@@ -345,7 +346,7 @@ macro_rules! spi {
             }
         }
 
-        impl<PINS> hal::spi::FullDuplex<u8> for Spi<$SPIX, PINS> {
+        impl<PINS> embedded_hal_old::spi::FullDuplex<u8> for Spi<$SPIX, PINS> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -369,9 +370,9 @@ macro_rules! spi {
         }
 
 
-        impl<PINS> ::hal::blocking::spi::transfer::Default<u8> for Spi<$SPIX, PINS> {}
+        impl<PINS> embedded_hal_old::blocking::spi::transfer::Default<u8> for Spi<$SPIX, PINS> {}
 
-        impl<PINS> ::hal::blocking::spi::write::Default<u8> for Spi<$SPIX, PINS> {}
+        impl<PINS> embedded_hal_old::blocking::spi::write::Default<u8> for Spi<$SPIX, PINS> {}
     }
 }
 
