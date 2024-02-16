@@ -691,14 +691,27 @@ transfer_constructor!(
     (DMA1, Stream3),
     (DMA1, Stream4),
     (DMA1, Stream5),
-    (DMA1, Stream6),
-    (DMA1, Stream7),
     (DMA2, Stream0),
     (DMA2, Stream1),
     (DMA2, Stream2),
     (DMA2, Stream3),
     (DMA2, Stream4),
     (DMA2, Stream5),
+);
+
+// Cat 3 and 4 devices
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g49a",
+))]
+transfer_constructor!(
+    (DMA1, Stream6),
+    (DMA1, Stream7),
     (DMA2, Stream6),
     (DMA2, Stream7),
 );

@@ -25,6 +25,8 @@ pub type DMAMUXRegisterBlock = stm32::dmamux::RegisterBlock;
 
 /// Trait that represents an instance of a DMA peripheral
 pub trait Instance: Deref<Target = DMARegisterBlock> + Sealed {
+    const IS_DMA1: bool;
+
     /// Gives a pointer to the RegisterBlock.
     fn ptr() -> *const DMARegisterBlock;
 
@@ -33,6 +35,8 @@ pub trait Instance: Deref<Target = DMARegisterBlock> + Sealed {
 }
 
 impl Instance for DMA1 {
+    const IS_DMA1: bool = true;
+
     #[inline(always)]
     fn ptr() -> *const DMARegisterBlock {
         DMA1::ptr()
@@ -45,6 +49,8 @@ impl Instance for DMA1 {
 }
 
 impl Instance for DMA2 {
+    const IS_DMA1: bool = false;
+
     #[inline(always)]
     fn ptr() -> *const DMARegisterBlock {
         DMA2::ptr()
@@ -178,7 +184,7 @@ macro_rules! dma_stream {
     ($(($name:ident, $number:expr,
         regs => $ccr:ident, $cparX:ident, $cmarX:ident, $cndtrX:ident,
         fields => $tcif:ident, $htif:ident, $teif:ident, $gif:ident, $tcisr:ident, $htisr:ident, $teisr:ident, $gisr:ident,
-        dmamux => $cXcr:ident,)
+        dmamux => $dma1_cXcr:ident, $dma2_cXcr:ident, )
     ),+$(,)*) => {
         $(
             impl<I: Instance> Stream for $name<I> {
@@ -294,8 +300,13 @@ macro_rules! dma_stream {
                     //NOTE(unsafe) We only access the registers that belongs to the StreamX
                     let dmamux = unsafe { &*I::mux_ptr() };
                     unsafe {
-                        dmamux.$cXcr
-                            .modify(|_, w| w.dmareq_id().bits(request_line));
+                        if I::IS_DMA1 {
+                            dmamux.$dma1_cXcr
+                                .modify(|_, w| w.dmareq_id().bits(request_line));
+                        } else {
+                            dmamux.$dma2_cXcr
+                                .modify(|_, w| w.dmareq_id().bits(request_line));
+                        };
                     }
                 }
 
@@ -504,6 +515,16 @@ macro_rules! dma_stream {
     };
 }
 
+// Cat 3 and 4 devices
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g49a",
+))]
 dma_stream!(
     // Note: the field names start from one, unlike the RM where they start from
     // zero. May need updating if it gets fixed upstream.
@@ -511,48 +532,91 @@ dma_stream!(
         Stream0, 0,
         regs => ccr1, cpar1, cmar1, cndtr1,
         fields => tcif1, htif1, teif1, gif1, tcif1, htif1, teif1, gif1,
-        dmamux => c0cr,
+        dmamux => c0cr, c8cr,
     ),
     (
         Stream1, 1,
         regs => ccr2, cpar2, cmar2, cndtr2,
         fields => tcif2, htif2, teif2, gif2, tcif2, htif2, teif2, gif2,
-        dmamux => c1cr,
+        dmamux => c1cr, c9cr,
     ),
     (
         Stream2, 2,
         regs => ccr3, cpar3, cmar3, cndtr3,
         fields => tcif3, htif3, teif3, gif3, tcif3, htif3, teif3, gif3,
-        dmamux => c2cr,
+        dmamux => c2cr, c10cr,
     ),
     (
         Stream3, 3,
         regs => ccr4, cpar4, cmar4, cndtr4,
         fields => tcif4, htif4, teif4, gif4, tcif4, htif4, teif4, gif4,
-        dmamux => c3cr,
+        dmamux => c3cr, c11cr,
     ),
     (
         Stream4, 4,
         regs => ccr5, cpar5, cmar5, cndtr5,
         fields => tcif5, htif5, teif5, gif5, tcif5, htif5, teif5, gif5,
-        dmamux => c4cr,
+        dmamux => c4cr, c12cr,
     ),
     (
         Stream5, 5,
         regs => ccr6, cpar6, cmar6, cndtr6,
         fields => tcif6, htif6, teif6, gif6, tcif6, htif6, teif6, gif6,
-        dmamux => c5cr,
+        dmamux => c5cr, c13cr,
     ),
     (
         Stream6, 6,
         regs => ccr7, cpar7, cmar7, cndtr7,
         fields => tcif7, htif7, teif7, gif7, tcif7, htif7, teif7, gif7,
-        dmamux => c6cr,
+        dmamux => c6cr, c14cr,
     ),
     (
         Stream7, 7,
         regs => ccr8, cpar8, cmar8, cndtr8,
         fields => tcif8, htif8, teif8, gif8, tcif8, htif8, teif8, gif8,
-        dmamux => c7cr,
+        dmamux => c7cr, c15cr,
+    ),
+);
+
+// Cat 2 devices
+#[cfg(any(feature = "stm32g431", feature = "stm32g441",))]
+dma_stream!(
+    // Note: the field names start from one, unlike the RM where they start from
+    // zero. May need updating if it gets fixed upstream.
+    (
+        Stream0, 0,
+        regs => ccr1, cpar1, cmar1, cndtr1,
+        fields => tcif1, htif1, teif1, gif1, tcif1, htif1, teif1, gif1,
+        dmamux => c0cr, c6cr,
+    ),
+    (
+        Stream1, 1,
+        regs => ccr2, cpar2, cmar2, cndtr2,
+        fields => tcif2, htif2, teif2, gif2, tcif2, htif2, teif2, gif2,
+        dmamux => c1cr, c7cr,
+    ),
+    (
+        Stream2, 2,
+        regs => ccr3, cpar3, cmar3, cndtr3,
+        fields => tcif3, htif3, teif3, gif3, tcif3, htif3, teif3, gif3,
+        dmamux => c2cr, c8cr,
+    ),
+    (
+        Stream3, 3,
+        regs => ccr4, cpar4, cmar4, cndtr4,
+        fields => tcif4, htif4, teif4, gif4, tcif4, htif4, teif4, gif4,
+        dmamux => c3cr, c9cr,
+    ),
+    (
+        Stream4, 4,
+        regs => ccr5, cpar5, cmar5, cndtr5,
+        fields => tcif5, htif5, teif5, gif5, tcif5, htif5, teif5, gif5,
+        dmamux => c4cr, c10cr,
+    ),
+    (
+        Stream5, 5,
+        regs => ccr6, cpar6, cmar6, cndtr6,
+        fields => tcif6, htif6, teif6, gif6, tcif6, htif6, teif6, gif6,
+        dmamux => c5cr, c11cr,
     ),
 );
