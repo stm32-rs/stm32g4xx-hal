@@ -694,6 +694,79 @@ pub mod config {
         }
     }
 
+    /// Possible oversampling shift
+    #[derive(Debug, Clone, Copy)]
+    pub enum OverSamplingShift {
+        /// No right shift
+        NoShift,
+        /// Shift of 1 toward the right
+        Shift_1,
+        /// Shift of 2 toward the right
+        Shift_2,
+        /// Shift of 3 toward the right
+        Shift_3,
+        /// Shift of 4 toward the right
+        Shift_4,
+        /// Shift of 5 toward the right
+        Shift_5,
+        /// Shift of 6 toward the right
+        Shift_6,
+        /// Shift of 7 toward the right
+        Shift_7,
+        /// Shift of 8 toward the right
+        Shift_8,
+    }
+    impl From<OverSamplingShift> for u8 {
+        fn from(oss: OverSamplingShift) -> u8 {
+            match oss {
+                OverSamplingShift::NoShift => 0,
+                OverSamplingShift::Shift_1 => 1,
+                OverSamplingShift::Shift_2 => 2,
+                OverSamplingShift::Shift_3 => 3,
+                OverSamplingShift::Shift_4 => 4,
+                OverSamplingShift::Shift_5 => 5,
+                OverSamplingShift::Shift_6 => 6,
+                OverSamplingShift::Shift_7 => 7,
+                OverSamplingShift::Shift_8 => 8,
+            }
+        }
+    }
+
+    /// Possible oversampling modes
+    #[derive(Debug, Clone, Copy)]
+    pub enum OverSampling {
+        /// Oversampling 2x
+        Ratio_2,
+        /// Oversampling 4x
+        Ratio_4,
+        /// Oversampling 8x
+        Ratio_8,
+        /// Oversampling 16x
+        Ratio_16,
+        /// Oversampling 32x
+        Ratio_32,
+        /// Oversampling 64x
+        Ratio_64,
+        /// Oversampling 128x
+        Ratio_128,
+        /// Oversampling 256x
+        Ratio_256,
+    }
+    impl From<OverSampling> for u8 {
+        fn from(os: OverSampling) -> u8 {
+            match os {
+                OverSampling::Ratio_2 => 0,
+                OverSampling::Ratio_4 => 1,
+                OverSampling::Ratio_8 => 2,
+                OverSampling::Ratio_16 => 3,
+                OverSampling::Ratio_32 => 4,
+                OverSampling::Ratio_64 => 5,
+                OverSampling::Ratio_128 => 6,
+                OverSampling::Ratio_256 => 7,
+            }
+        }
+    }
+
     /// Possible trigger modes
     #[derive(Debug, Clone, Copy)]
     pub enum TriggerMode {
@@ -1653,6 +1726,15 @@ macro_rules! adc {
                     self.adc_reg.cfgr.modify(|_, w| w.res().bits(resolution.into()));
                 }
 
+
+                /// Enable oversampling
+                #[inline(always)]
+                pub fn set_oversampling(&mut self, oversampling: config::OverSampling, shift: config::OverSamplingShift) {
+                    self.adc_reg.cfgr2.modify(|_, w| unsafe { w.ovsr().bits(oversampling.into())
+                                                      .ovss().bits(shift.into())
+                                                      .rovse().set_bit()});
+                }
+
                 /// Sets the DR register alignment to left or right
                 #[inline(always)]
                 pub fn set_align(&mut self, align: config::Align) {
@@ -2217,6 +2299,12 @@ macro_rules! adc {
                 #[inline(always)]
                 pub fn set_clock(&mut self, clock: config::Clock) {
                     self.adc.set_clock(clock)
+                }
+
+                /// Sets the oversampling
+                #[inline(always)]
+                pub fn set_oversampling(&mut self, oversampling: config::OverSampling, shift: config::OverSamplingShift) {
+                    self.adc.set_oversampling(oversampling, shift)
                 }
 
                 /// Sets the sampling resolution
