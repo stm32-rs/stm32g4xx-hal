@@ -205,6 +205,8 @@ use crate::time::{ExtU32, Hertz, NanoSecond, RateExtU32};
     feature = "stm32g484"
 ))]
 use crate::gpio::gpiog::*;
+#[cfg(feature = "pwm-open-drain")]
+use crate::gpio::AlternateOD;
 #[cfg(any(
     feature = "stm32g471",
     feature = "stm32g473",
@@ -431,117 +433,141 @@ pins_tuples! {
     (C4, C1, C2, C3)
 }
 
+macro_rules! pin_impl {
+    (CHX: #[ $( $pmeta:meta )* ] $PIN:ident, $ALT:ty, $TIMX:ty, $COMP:ty, $CHANNEL:ty) => {
+        $( #[ $pmeta ] )*
+        impl Pins<$TIMX, $CHANNEL, $COMP> for $PIN<Alternate<$ALT>> {
+            type Channel = Pwm<$TIMX, $CHANNEL, $COMP, ActiveHigh, ActiveHigh>;
+        }
+
+        $( #[ $pmeta ] )*
+        #[cfg(feature = "pwm-open-drain")]
+        impl Pins<$TIMX, $CHANNEL, $COMP> for $PIN<AlternateOD<$ALT>> {
+            type Channel = Pwm<$TIMX, $CHANNEL, $COMP, ActiveHigh, ActiveHigh>;
+        }
+    };
+
+    (CHXN: #[ $( $pmeta:meta )* ] $PIN:ident, $ALT:ty, $TIMX:ty, $CHANNEL:ty) => {
+        $( #[ $pmeta ] )*
+        impl NPins<$TIMX, $CHANNEL> for $PIN<Alternate<$ALT>> {}
+
+        $( #[ $pmeta ] )*
+        #[cfg(feature = "pwm-open-drain")]
+        impl NPins<$TIMX, $CHANNEL> for $PIN<AlternateOD<$ALT>> {}
+    };
+
+    (BRK: #[ $( $pmeta:meta )* ] $PINBRK:ident, $ALTBRK:ty, $TIMX:ty) => {
+        $( #[ $pmeta ] )*
+        impl FaultPins<$TIMX> for $PINBRK<Alternate<$ALTBRK>> {
+            const INPUT: BreakInput = BreakInput::BreakIn;
+        }
+
+        $( #[ $pmeta ] )*
+        #[cfg(feature = "pwm-open-drain")]
+        impl FaultPins<$TIMX> for $PINBRK<AlternateOD<$ALTBRK>> {
+            const INPUT: BreakInput = BreakInput::BreakIn;
+        }
+    };
+
+    (BRK2: #[ $( $pmeta:meta )* ] $PINBRK2:ident, $ALTBRK2:ty, $TIMX:ty) => {
+        $( #[ $pmeta ] )*
+        impl FaultPins<$TIMX> for $PINBRK2<Alternate<$ALTBRK2>> {
+            const INPUT: BreakInput = BreakInput::BreakIn;
+        }
+
+        $( #[ $pmeta ] )*
+        #[cfg(feature = "pwm-open-drain")]
+        impl FaultPins<$TIMX> for $PINBRK2<AlternateOD<$ALTBRK2>> {
+            const INPUT: BreakInput = BreakInput::BreakIn2;
+        }
+    };
+}
+
 // Pin definitions, mark which pins can be used with which timers and channels
 macro_rules! pins {
     // Single channel timer
-    ($($TIMX:ty: OUT: [$($OUT:ty),*])+) => {
+    ($($TIMX:ty: OUT($COMP:ty): [ $( $( #[ $pmeta1:meta ] )* $PIN1:ident: $ALT1:ty),*])+) => {
         $(
             $(
-                impl Pins<$TIMX, C1, ComplementaryImpossible> for $OUT {
-                    type Channel = Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
-                }
+                pin_impl!(CHX: #[ $( $pmeta1 )* ] $PIN1, $ALT1, $TIMX, $COMP, C1);
             )*
         )+
     };
-    // Dual channel timer $pm
+    // Dual channel timers
     ($($TIMX:ty:
-        CH1($COMP1:ty): [$($( #[ $pmeta1:meta ] )* $CH1:ty),*] CH2($COMP2:ty): [$($( #[ $pmeta2:meta ] )* $CH2:ty),*]
-        CH1N: [$($( #[ $pmeta3:meta ] )* $CH1N:ty),*] CH2N: [$($( #[ $pmeta4:meta ] )* $CH2N:ty),*] BRK: [$($( #[ $pmeta5:meta ] )* $BRK:ty),*] BRK2: [$($( #[ $pmeta6:meta ] )* $BRK2:ty),*])+) => {
+        CH1($COMP1:ty): [ $( $( #[ $pmeta1:meta ] )* $PIN1:ident: $ALT1:ty),*]
+        CH2($COMP2:ty): [ $( $( #[ $pmeta2:meta ] )* $PIN2:ident: $ALT2:ty),*]
+        CH1N: [ $( $( #[ $pmeta3:meta ] )* $PIN1N:ident: $ALT1N:ty),*]
+        CH2N: [ $( $( #[ $pmeta4:meta ] )* $PIN2N:ident: $ALT2N:ty),*]
+        BRK: [ $( $( #[ $pmeta5:meta ] )* $PINBRK:ident: $ALTBRK:ty),*]
+        BRK2: [ $( $( #[ $pmeta6:meta ] )* $PINBRK2:ident: $ALTBRK2:ty),*]
+            )+) => {
         $(
             $(
-                $( #[ $pmeta1 ] )*
-                impl Pins<$TIMX, C1, $COMP1> for $CH1 {
-                    type Channel = Pwm<$TIMX, C1, $COMP1, ActiveHigh, ActiveHigh>;
-                }
+                pin_impl!(CHX: #[ $( $pmeta1 )* ] $PIN1, $ALT1, $TIMX, $COMP1, C1);
             )*
             $(
-                $( #[ $pmeta2 ] )*
-                impl Pins<$TIMX, C2, $COMP2> for $CH2 {
-                    type Channel = Pwm<$TIMX, C2, $COMP2, ActiveHigh, ActiveHigh>;
-                }
+                pin_impl!(CHX: #[ $( $pmeta2 )* ] $PIN2, $ALT2, $TIMX, $COMP2, C2);
             )*
             $(
-                $( #[ $pmeta3 ] )*
-                impl NPins<$TIMX, C1> for $CH1N {}
+                pin_impl!(CHXN: #[ $( $pmeta3 )* ] $PIN1N, $ALT1N, $TIMX, C1);
             )*
             $(
-                $( #[ $pmeta4 ] )*
-                impl NPins<$TIMX, C2> for $CH2N {}
+                pin_impl!(CH2N: #[ $( $pmeta4 )* ] $PIN2N, $ALT2N, $TIMX, C2);
             )*
             $(
-                $( #[ $pmeta5 ] )*
-                impl FaultPins<$TIMX,> for $BRK {
-                    const INPUT: BreakInput = BreakInput::BreakIn;
-                }
+                pin_impl!(BRK: #[ $( $pmeta5 )* ] $PINBRK, $ALTBRK, $TIMX);
             )*
             $(
-                $( #[ $pmeta6 ] )*
-                impl FaultPins<$TIMX> for $BRK2 {
-                    const INPUT: BreakInput = BreakInput::BreakIn2;
-                }
+                pin_impl!(BRK2: #[ $( $pmeta6 )* ] $PINBRK2, $ALTBRK2, $TIMX);
             )*
         )+
     };
+
+
     // Quad channel timers
     ($($TIMX:ty:
-       CH1($COMP1:ty): [$($( #[ $pmeta1:meta ] )* $CH1:ty),*] CH2($COMP2:ty): [$($( #[ $pmeta2:meta ] )* $CH2:ty),*]
-       CH3($COMP3:ty): [$($( #[ $pmeta3:meta ] )* $CH3:ty),*] CH4($COMP4:ty): [$($( #[ $pmeta4:meta ] )* $CH4:ty),*]
-       CH1N: [$($( #[ $pmeta5:meta ] )* $CH1N:ty),*] CH2N: [$($( #[ $pmeta6:meta ] )* $CH2N:ty),*]
-       CH3N: [$($( #[ $pmeta7:meta ] )* $CH3N:ty),*] CH4N: [$($( #[ $pmeta8:meta ] )* $CH4N:ty),*]
-       BRK: [$($( #[ $pmeta9:meta ] )* $BRK:ty),*]
-       BRK2: [$($( #[ $pmeta10:meta ] )* $BRK2:ty),*])+) => {
+        CH1($COMP1:ty): [ $( $( #[ $pmeta1:meta ] )* $PIN1:ident: $ALT1:ty),*]
+        CH2($COMP2:ty): [ $( $( #[ $pmeta2:meta ] )* $PIN2:ident: $ALT2:ty),*]
+        CH3($COMP3:ty): [ $( $( #[ $pmeta3:meta ] )* $PIN3:ident: $ALT3:ty),*]
+        CH4($COMP4:ty): [ $( $( #[ $pmeta4:meta ] )* $PIN4:ident: $ALT4:ty),*]
+        CH1N: [ $( $( #[ $pmeta5:meta ] )* $PIN1N:ident: $ALT1N:ty),*]
+        CH2N: [ $( $( #[ $pmeta6:meta ] )* $PIN2N:ident: $ALT2N:ty),*]
+        CH3N: [ $( $( #[ $pmeta7:meta ] )* $PIN3N:ident: $ALT3N:ty),*]
+        CH4N: [ $( $( #[ $pmeta8:meta ] )* $PIN4N:ident: $ALT4N:ty),*]
+        BRK: [ $( $( #[ $pmeta9:meta ] )* $PINBRK:ident: $ALTBRK:ty),*]
+        BRK2: [ $( $( #[ $pmeta10:meta ] )* $PINBRK2:ident: $ALTBRK2:ty),*]
+)+) => {
         $(
             $(
-                $( #[ $pmeta1 ] )*
-                impl Pins<$TIMX, C1, $COMP1> for $CH1 {
-                    type Channel = Pwm<$TIMX, C1, $COMP1, ActiveHigh, ActiveHigh>;
-                }
+                pin_impl!(CHX: #[ $( $pmeta1 )* ]  $PIN1, $ALT1, $TIMX, $COMP1, C1);
             )*
             $(
-                $( #[ $pmeta2 ] )*
-                impl Pins<$TIMX, C2, $COMP2> for $CH2 {
-                    type Channel = Pwm<$TIMX, C2, $COMP2, ActiveHigh, ActiveHigh>;
-                }
+                pin_impl!(CHX:#[ $( $pmeta2 )* ] $PIN2,$ALT2,$TIMX,$COMP2, C2);
             )*
             $(
-                $( #[ $pmeta3 ] )*
-                impl Pins<$TIMX, C3, $COMP3> for $CH3 {
-                    type Channel = Pwm<$TIMX, C3, $COMP3, ActiveHigh, ActiveHigh>;
-                }
+                pin_impl!(CHX:#[ $( $pmeta3 )* ] $PIN3,$ALT3,$TIMX,$COMP3, C3);
             )*
             $(
-                $( #[ $pmeta4 ] )*
-                impl Pins<$TIMX, C4, $COMP4> for $CH4 {
-                    type Channel = Pwm<$TIMX, C4, $COMP4, ActiveHigh, ActiveHigh>;
-                }
+                pin_impl!(CHX:#[ $( $pmeta4 )* ] $PIN4,$ALT4,$TIMX,$COMP4,C4);
             )*
             $(
-                $( #[ $pmeta5 ] )*
-                impl NPins<$TIMX, C1> for $CH1N {}
+                pin_impl!(CHXN:#[ $( $pmeta5 )* ]  $PIN1N, $ALT1N, $TIMX, C1);
             )*
             $(
-                $( #[ $pmeta6 ] )*
-                impl NPins<$TIMX, C2> for $CH2N {}
+                pin_impl!(CHXN: #[ $( $pmeta6 )* ] $PIN2N, $ALT2N, $TIMX, C2);
             )*
             $(
-                $( #[ $pmeta7 ] )*
-                impl NPins<$TIMX, C3> for $CH3N {}
+                pin_impl!(CHXN: #[ $( $pmeta7 )* ] $PIN3N, $ALT3N, $TIMX, C3);
             )*
             $(
-                $( #[ $pmeta8 ] )*
-                impl NPins<$TIMX, C4> for $CH4N {}
+                pin_impl!(CHXN: #[ $( $pmeta8 )* ] $PIN4N, $ALT4N, $TIMX, C4);
             )*
             $(
-                $( #[ $pmeta9 ] )*
-                impl FaultPins<$TIMX> for $BRK {
-                    const INPUT: BreakInput = BreakInput::BreakIn;
-                }
+                pin_impl!(BRK: #[ $( $pmeta9 )* ] $PINBRK, $ALTBRK, $TIMX);
             )*
             $(
-                $( #[ $pmeta10 ] )*
-                impl FaultPins<$TIMX> for $BRK2 {
-                    const INPUT: BreakInput = BreakInput::BreakIn2;
-                }
+                pin_impl!(BRK2: #[ $( $pmeta10 )* ] $PINBRK2, $ALTBRK2, $TIMX);
             )*
         )+
     }
@@ -549,28 +575,28 @@ macro_rules! pins {
 // Single channel timers
 pins! {
     LPTIMER1:
-        OUT: [
-            PA14<Alternate<AF1>>,
-            PB2<Alternate<AF1>>,
-            PC1<Alternate<AF1>>
+        OUT(ComplementaryImpossible): [
+            PA14:AF1,
+            PB2:AF1,
+            PC1:AF1
         ]
 }
 // Dual channel timers
 pins! {
     TIM15:
         CH1(ComplementaryDisabled): [
-            PA2<Alternate<AF9>>,
-            PB14<Alternate<AF1>>,
-            PF9<Alternate<AF3>>
+            PA2: AF9,
+            PB14: AF1,
+            PF9: AF3
         ]
         CH2(ComplementaryImpossible): [
-            PA3<Alternate<AF9>>,
-            PB15<Alternate<AF1>>,
-            PF10<Alternate<AF3>>
+            PA3: AF9,
+            PB15: AF1,
+            PF10: AF3
         ]
         CH1N: [
-            PA1<Alternate<AF9>>,
-            PB15<Alternate<AF2>>,
+            PA1: AF9,
+            PB15: AF2,
             #[cfg(any(
                 feature = "stm32g471",
                 feature = "stm32g473",
@@ -578,135 +604,137 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484"
             ))]
-            PG9<Alternate<AF14>>
+            PG9: AF14
         ]
         CH2N: []
         BRK: [
-            PA9<Alternate<AF9>>,
-            PC5<Alternate<AF2>>
-        ]
+            PA9: AF9,
+            PC5: AF2
+            ]
         BRK2: []
     TIM16:
         CH1(ComplementaryDisabled): [
-            PA6<Alternate<AF1>>,
-            PA12<Alternate<AF1>>,
-            PB4<Alternate<AF1>>,
-            PB8<Alternate<AF1>>,
-            PE0<Alternate<AF4>>
+            PA6: AF1,
+            PA12:AF1,
+            PB4:AF1,
+            PB8: AF1,
+            PE0: AF4
         ]
         CH2(ComplementaryImpossible): []
         CH1N: [
-            PA13<Alternate<AF1>>,
-            PB6<Alternate<AF1>>
+            PA13: AF1,
+            PB6:AF1
         ]
         CH2N: []
         BRK: [
-            PB5<Alternate<AF1>>
+            PB5: AF1
         ]
         BRK2: []
-    TIM17:
+
+        TIM17:
         CH1(ComplementaryDisabled): [
-            PA7<Alternate<AF1>>,
-            PB5<Alternate<AF10>>,
-            PB9<Alternate<AF1>>,
-            PE1<Alternate<AF4>>
+            PA7:AF1,
+            PB5: AF10,
+            PB9:AF1,
+            PE1:AF4
         ]
         CH2(ComplementaryImpossible): []
         CH1N: [
-            PB7<Alternate<AF1>>
+            PB7:AF1
         ]
         CH2N: []
         BRK: [
-            PA10<Alternate<AF1>>,
-            PB4<Alternate<AF10>>
+            PA10:AF1,
+            PB4:AF10
         ]
         BRK2: []
+
 }
 // Quad channel timers
 pins! {
     TIM1:
         CH1(ComplementaryDisabled): [
-            PA8<Alternate<AF6>>,
-            PC0<Alternate<AF2>>,
-            PE9<Alternate<AF2>>
+            PA8:AF6,
+            PC0:AF2,
+            PE9:AF2
         ]
         CH2(ComplementaryDisabled): [
-            PA9<Alternate<AF6>>,
-            PC1<Alternate<AF2>>,
-            PE11<Alternate<AF2>>
+            PA9:AF6,
+            PC1:AF2,
+            PE11:AF2
         ]
         CH3(ComplementaryDisabled): [
-            PA10<Alternate<AF6>>,
-            PC2<Alternate<AF2>>,
-            PE13<Alternate<AF2>>
+            PA10:AF6,
+            PC2:AF2,
+            PE13:AF2
         ]
         CH4(ComplementaryDisabled): [
-            PA11<Alternate<AF11>>,
-            PC3<Alternate<AF2>>,
-            PE14<Alternate<AF2>>
+            PA11:AF11,
+            PC3:AF2,
+            PE14:AF2
         ]
         CH1N: [
-            PA7<Alternate<AF6>>,
-            PA11<Alternate<AF6>>,
-            PB13<Alternate<AF6>>,
-            PC13<Alternate<AF4>>,
-            PE8<Alternate<AF2>>
+            PA7:AF6,
+            PA11:AF6,
+            PB13:AF6,
+            PC13:AF4,
+            PE8:AF2
         ]
         CH2N: [
-            PA12<Alternate<AF6>>,
-            PB0<Alternate<AF6>>,
-            PB14<Alternate<AF6>>,
-            PE10<Alternate<AF2>>
+            PA12:AF6,
+            PB0:AF6,
+            PB14:AF6,
+            PE10:AF2
         ]
         CH3N: [
-            PB1<Alternate<AF6>>,
-            PB9<Alternate<AF12>>,
-            PB15<Alternate<AF4>>,
-            PE12<Alternate<AF2>>,
-            PF0<Alternate<AF6>>
+            PB1:AF6,
+            PB9:AF12,
+            PB15:AF4,
+            PE12:AF2,
+            PF0:AF6
         ]
         CH4N: [
-            PC5<Alternate<AF6>>,
-            PE15<Alternate<AF6>>
+            PC5:AF6,
+            PE15:AF6
         ]
         BRK: [
-            PA6<Alternate<AF6>>,
-            PA14<Alternate<AF6>>,
-            PA15<Alternate<AF9>>,
-            PB8<Alternate<AF12>>,
-            PB10<Alternate<AF12>>,
-            PB12<Alternate<AF6>>,
-            PC13<Alternate<AF2>>,
-            PE15<Alternate<AF2>>
+            PA6:AF6,
+            PA14:AF6,
+            PA15: AF9,
+            PB8:AF12,
+            PB10:AF12,
+            PB12:AF6,
+            PC13:AF2,
+            PE15:AF2
         ]
         BRK2: [
-            PA11<Alternate<AF12>>,
-            PC3<Alternate<AF6>>,
-            PE14<Alternate<AF6>>
+            PA11:AF12,
+            PC3:AF6,
+            PE14:AF6
         ]
     TIM2:
         CH1(ComplementaryImpossible): [
-            PA0<Alternate<AF1>>,
-            PA5<Alternate<AF1>>,
-            PA15<Alternate<AF1>>,
-            PD3<Alternate<AF2>>
+            PA0:AF1,
+            PA5:AF1,
+            PA15:AF1,
+            PD3:AF2
         ]
         CH2(ComplementaryImpossible): [
-            PA1<Alternate<AF1>>,
-            PB3<Alternate<AF1>>,
-            PD4<Alternate<AF2>>
+            PA1:AF1,
+            PB3:AF1,
+            PD4:AF2
         ]
         CH3(ComplementaryImpossible): [
-            PA2<Alternate<AF1>>,
-            PA9<Alternate<AF10>>,
-            PB10<Alternate<AF1>>,
-            PD7<Alternate<AF2>>
+            PA2:AF1,
+            PA9:AF10,
+            PB10:AF1,
+            PD7:AF2
         ]
         CH4(ComplementaryImpossible): [
-            PA3<Alternate<AF1>>,
-            PA10<Alternate<AF10>>,
-            PB11<Alternate<AF1>>,
-            PD6<Alternate<AF2>>
+            PA3:AF1,
+            PA10:AF10,
+            PB11:AF1,
+            PD6:AF2
         ]
         CH1N: []
         CH2N: []
@@ -716,28 +744,28 @@ pins! {
         BRK2: []
     TIM3:
         CH1(ComplementaryImpossible): [
-            PA6<Alternate<AF2>>,
-            PB4<Alternate<AF2>>,
-            PC6<Alternate<AF2>>,
-            PE2<Alternate<AF2>>
+            PA6:AF2,
+            PB4:AF2,
+            PC6:AF2,
+            PE2:AF2
         ]
         CH2(ComplementaryImpossible): [
-            PA4<Alternate<AF2>>,
-            PA7<Alternate<AF2>>,
-            PB5<Alternate<AF2>>,
-            PC7<Alternate<AF2>>,
-            PE3<Alternate<AF2>>
+            PA4:AF2,
+            PA7:AF2,
+            PB5:AF2,
+            PC7:AF2,
+            PE3:AF2
         ]
         CH3(ComplementaryImpossible): [
-            PB0<Alternate<AF2>>,
-            PC8<Alternate<AF2>>,
-            PE4<Alternate<AF2>>
+            PB0:AF2,
+            PC8:AF2,
+            PE4:AF2
         ]
         CH4(ComplementaryImpossible): [
-            PB1<Alternate<AF2>>,
-            PB7<Alternate<AF10>>,
-            PC9<Alternate<AF2>>,
-            PE5<Alternate<AF2>>
+            PB1:AF2,
+            PB7:AF10,
+            PC9:AF2,
+            PE5:AF2
         ]
         CH1N: []
         CH2N: []
@@ -747,23 +775,23 @@ pins! {
         BRK2: []
     TIM4:
         CH1(ComplementaryImpossible): [
-            PA11<Alternate<AF10>>,
-            PB6<Alternate<AF2>>,
-            PD12<Alternate<AF2>>
+            PA11:AF10,
+            PB6:AF2,
+            PD12:AF2
         ]
         CH2(ComplementaryImpossible): [
-            PA12<Alternate<AF10>>,
-            PB7<Alternate<AF2>>,
-            PD13<Alternate<AF2>>
+            PA12:AF10,
+            PB7:AF2,
+            PD13:AF2
         ]
         CH3(ComplementaryImpossible): [
-            PA13<Alternate<AF10>>,
-            PB8<Alternate<AF2>>,
-            PD14<Alternate<AF2>>
+            PA13:AF10,
+            PB8:AF2,
+            PD14:AF2
         ]
         CH4(ComplementaryImpossible): [
-            PB9<Alternate<AF2>>,
-            PD15<Alternate<AF2>>,
+            PB9:AF2,
+            PD15:AF2,
             #[cfg(any(
                 feature = "stm32g471",
                 feature = "stm32g473",
@@ -771,7 +799,7 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484"
             ))]
-            PF6<Alternate<AF2>>
+            PF6:AF2
         ]
         CH1N: []
         CH2N: []
@@ -790,24 +818,24 @@ pins! {
 pins! {
     TIM5:
         CH1(ComplementaryImpossible): [
-            PA0<Alternate<AF2>>,
-            PB2<Alternate<AF2>>,
-            PF6<Alternate<AF6>>
+            PA0:AF2,
+            PB2:AF2,
+            PF6:AF6
         ]
         CH2(ComplementaryImpossible): [
-            PA1<Alternate<AF2>>,
-            PC12<Alternate<AF1>>,
-            PF7<Alternate<AF6>>
+            PA1:AF2,
+            PC12:AF1,
+            PF7:AF6
         ]
         CH3(ComplementaryImpossible): [
-            PA2<Alternate<AF2>>,
-            PE8<Alternate<AF1>>,
-            PF8<Alternate<AF6>>
+            PA2:AF2,
+            PE8:AF1,
+            PF8:AF6
         ]
         CH4(ComplementaryImpossible): [
-            PA3<Alternate<AF2>>,
-            PE9<Alternate<AF1>>,
-            PF9<Alternate<AF6>>
+            PA3:AF2,
+            PE9:AF1,
+            PF9:AF6
         ]
         CH1N: []
         CH2N: []
@@ -819,53 +847,53 @@ pins! {
 pins! {
     TIM8:
         CH1(ComplementaryDisabled): [
-            PA15<Alternate<AF2>>,
-            PB6<Alternate<AF5>>,
-            PC6<Alternate<AF4>>
+            PA15:AF2,
+            PB6:AF5,
+            PC6:AF4
         ]
         CH2(ComplementaryDisabled): [
-            PA14<Alternate<AF5>>,
-            PB8<Alternate<AF10>>,
-            PC7<Alternate<AF4>>
+            PA14:AF5,
+            PB8:AF10,
+            PC7:AF4
         ]
         CH3(ComplementaryDisabled): [
-            PB9<Alternate<AF10>>,
-            PC8<Alternate<AF4>>
+            PB9:AF10,
+            PC8:AF4
         ]
         CH4(ComplementaryDisabled): [
-            PC9<Alternate<AF4>>,
-            PD1<Alternate<AF4>>
+            PC9:AF4,
+            PD1:AF4
         ]
         CH1N: [
-            PA7<Alternate<AF4>>,
-            PB3<Alternate<AF4>>,
-            PC10<Alternate<AF4>>
+            PA7:AF4,
+            PB3:AF4,
+            PC10:AF4
         ]
         CH2N: [
-            PB0<Alternate<AF4>>,
-            PB4<Alternate<AF4>>,
-            PC11<Alternate<AF4>>
+            PB0:AF4,
+            PB4:AF4,
+            PC11:AF4
         ]
         CH3N: [
-            PB1<Alternate<AF4>>,
-            PB5<Alternate<AF3>>,
-            PC12<Alternate<AF4>>
+            PB1:AF4,
+            PB5:AF3,
+            PC12:AF4
         ]
         CH4N: [
-            PC13<Alternate<AF4>>,
-            PD0<Alternate<AF6>>
+            PC13:AF4,
+            PD0:AF6
         ]
         BRK: [
-            PA0<Alternate<AF9>>,
-            PA6<Alternate<AF4>>,
-            PA10<Alternate<AF11>>,
-            PB7<Alternate<AF5>>,
-            PD2<Alternate<AF4>>
+            PA0:AF9,
+            PA6:AF4,
+            PA10:AF11,
+            PB7:AF5,
+            PD2:AF4
         ]
         BRK2: [
-            PB6<Alternate<AF10>>,
-            PC9<Alternate<AF6>>,
-            PD1<Alternate<AF6>>
+            PB6:AF10,
+            PC9:AF6,
+            PD1:AF6
         ]
 }
 #[cfg(any(
@@ -879,108 +907,108 @@ pins! {
 pins! {
     TIM20:
         CH1(ComplementaryDisabled): [
-            PB2<Alternate<AF3>>,
-            PE2<Alternate<AF6>>,
+            PB2:AF3,
+            PE2:AF6,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF12<Alternate<AF2>>
+            PF12:AF2
         ]
         CH2(ComplementaryDisabled): [
-            PC2<Alternate<AF6>>,
-            PE3<Alternate<AF6>>,
+            PC2:AF6,
+            PE3:AF6,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF13<Alternate<AF2>>
+            PF13:AF2
         ]
         CH3(ComplementaryDisabled): [
-            PC8<Alternate<AF6>>,
-            PF2<Alternate<AF2>>,
+            PC8:AF6,
+            PF2:AF2,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF14<Alternate<AF2>>
+            PF14:AF2
         ]
         CH4(ComplementaryDisabled): [
-            PE1<Alternate<AF4>>,
+            PE1:AF4,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF3<Alternate<AF2>>,
+            PF3:AF2,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF15<Alternate<AF2>>
+            PF15:AF2
         ]
         CH1N: [
-            PE4<Alternate<AF6>>,
+            PE4:AF6,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF4<Alternate<AF3>>,
+            PF4:AF3,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG0<Alternate<AF2>>
+            PG0:AF2
         ]
         CH2N: [
-            PE5<Alternate<AF6>>,
+            PE5:AF6,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF5<Alternate<AF2>>,
+            PF5:AF2,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG1<Alternate<AF2>>
+            PG1:AF2
         ]
         CH3N: [
-            PE6<Alternate<AF6>>,
+            PE6:AF6,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG2<Alternate<AF2>>
+            PG2:AF2
         ]
         CH4N: [
-            PE0<Alternate<AF3>>,
+            PE0:AF3,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG3<Alternate<AF6>>
+            PG3:AF6
         ]
         BRK: [
             #[cfg(any(
@@ -989,22 +1017,22 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF7<Alternate<AF2>>,
-            PF9<Alternate<AF2>>,
+            PF7:AF2,
+            PF9:AF2,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG3<Alternate<AF2>>,
+            PG3:AF2,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG6<Alternate<AF2>>
+            PG6:AF2
         ]
         BRK2: [
             #[cfg(any(
@@ -1013,15 +1041,15 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF8<Alternate<AF2>>,
-            PF10<Alternate<AF2>>,
+            PF8:AF2,
+            PF10:AF2,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG4<Alternate<AF2>>
+            PG4:AF2
         ]
 }
 
