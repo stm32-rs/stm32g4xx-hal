@@ -852,7 +852,7 @@ pins! {
             PC12<Alternate<AF4>>
         ]
         CH4N: [
-            PC13<Alternate<AF4>>,
+            PC13<Alternate<AF6>>,
             PD0<Alternate<AF6>>
         ]
         BRK: [
