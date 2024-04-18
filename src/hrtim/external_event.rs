@@ -101,17 +101,20 @@ impl_eev_input!(8: COMP = [COMP6, (COMP3, 0b10)], PINS = [(PB8, AF13)]);
 impl_eev_input!(9: COMP = [COMP5, (COMP4, 0b11)], PINS = [(PB3, AF13)]);
 impl_eev_input!(10: COMP = [COMP7], PINS = [(PC5, AF13), (PC6, AF3)]);
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum EdgeOrPolarity {
     Edge(Edge),
     Polarity(Polarity),
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum Edge {
     Rising = 0b01,
     Falling = 0b10,
     Both = 0b11,
 }
 
+#[derive(Copy, Clone, Debug, PartialEq)]
 pub enum EevSamplingFilter {
     /// No filtering, fault acts asynchronously
     ///
