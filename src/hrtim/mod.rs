@@ -592,14 +592,15 @@ macro_rules! hrtim_hal {
                 pub fn finalize(self, _control: &mut HrPwmControl) -> (
                     HrTim<$TIMX, PSCL,
                         HrCapt<$TIMX, PSCL, capture::Ch1, capture::NoDma>,
-                        HrCapt<$TIMX, PSCL, capture::Ch2, capture::NoDma>>,
-                        (
+                        HrCapt<$TIMX, PSCL, capture::Ch2, capture::NoDma>
+                    >, (
                             HrCr1<$TIMX, PSCL>,
                             HrCr2<$TIMX, PSCL>,
                             HrCr3<$TIMX, PSCL>,
                             HrCr4<$TIMX, PSCL>
                         ),
-                        OUT
+                        OUT,
+                        timer::DmaChannel<$TIMX>,
                     ) {
 
                     hrtim_finalize_body!(
@@ -754,7 +755,9 @@ macro_rules! hrtim_hal_master {
                     HrCr2<$TIMX, PSCL>,
                     HrCr3<$TIMX, PSCL>,
                     HrCr4<$TIMX, PSCL>
-                )) {
+                ),
+                timer::DmaChannel<$TIMX>,
+            ) {
 
                 hrtim_finalize_body!(self, MasterPreloadSource, $TIMX: ($timXcr, $ck_psc, $perXr, $perx, $tXcen, $rep, $rep, $dier, $repie),)
             }

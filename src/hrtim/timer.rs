@@ -16,6 +16,13 @@ pub struct HrTim<TIM, PSCL, CPT1, CPT2> {
     capture_ch2: CPT2,
 }
 
+/// This is the DMA channel of a HRTIM timer
+///
+/// Every HRTIM timer including the master timer has a DMA channel
+pub struct DmaChannel<TIM> {
+    _x: PhantomData<TIM>,
+}
+
 pub trait HrTimer {
     type Timer;
     type Prescaler: HrtimPrescaler;

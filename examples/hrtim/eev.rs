@@ -86,7 +86,7 @@ fn main() -> ! {
     //   -------------------------        ------------------------------------------
     //        .               .  *            .               .               .
     //        .               .  *            .               .               .
-    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1) = dp
+    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1, ..) = dp
         .HRTIM_TIMA
         .pwm_advanced(pin_a, &mut rcc)
         .prescaler(prescaler)

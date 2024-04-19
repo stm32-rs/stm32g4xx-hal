@@ -76,7 +76,7 @@ fn main() -> ! {
     let (hr_control, ..) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
     let mut hr_control = hr_control.constrain();
 
-    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2)) = dp
+    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), (mut out1, mut out2), ..) = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)
@@ -88,7 +88,7 @@ fn main() -> ! {
         .timer_mode(HrTimerMode::SingleShotRetriggerable)
         .finalize(&mut hr_control);
 
-    let (mut mtimer, (mut mcr1, _mcr2, _mcr3, _mcr4)) = dp
+    let (mut mtimer, (mut mcr1, _mcr2, _mcr3, _mcr4), ..) = dp
         .HRTIM_MASTER
         .pwm_advanced((), &mut rcc)
         .prescaler(prescaler)
