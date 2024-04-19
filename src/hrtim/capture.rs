@@ -50,12 +50,12 @@ pub trait HrCapture {
     /// <-------------- 0 --------------> t
     /// Negative result | positive result
     /// ````
-    fn get_signed(&self) -> i32 {
+    fn get_signed(&self, period: u16) -> i32 {
         let (value, dir) = self.get();
 
         match dir {
             CountingDirection::Up => i32::from(value),
-            CountingDirection::Down => -i32::from(value),
+            CountingDirection::Down => i32::from(period) - i32::from(value),
         }
     }
 
@@ -66,18 +66,18 @@ pub trait HrCapture {
 
 pub fn dma_value_to_dir_and_value(x: u32) -> (u16, CountingDirection) {
     let value = (x & 0xFFFF) as u16;
-    match x & 1 << 16 != 0 {
+    match x & (1 << 16) != 0 {
         true => (value, CountingDirection::Down),
         false => (value, CountingDirection::Up),
     }
 }
 
-pub fn dma_value_to_signed(x: u32) -> i32 {
+pub fn dma_value_to_signed(x: u32, period: u16) -> i32 {
     let (value, dir) = dma_value_to_dir_and_value(x);
 
     match dir {
         CountingDirection::Up => i32::from(value),
-        CountingDirection::Down => -i32::from(value),
+        CountingDirection::Down => i32::from(period) - i32::from(value),
     }
 }
 

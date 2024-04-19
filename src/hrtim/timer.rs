@@ -30,6 +30,10 @@ pub trait HrTimer {
     /// Get period of timer in number of ticks
     ///
     /// This is also the maximum duty usable for `HrCompareRegister::set_duty`
+    ///
+    /// NOTE: The effective period in number of ticks will be twice as large as
+    /// returned by this function when running in UpDown mode or PushPull mode.
+    /// 4 times as large when having both modes active
     fn get_period(&self) -> u16;
 
     /// Set period of timer in number of ticks
