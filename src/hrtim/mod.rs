@@ -13,6 +13,7 @@ pub mod timer_eev_cfg;
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
+use crate::hrtim::capture::HrCapt;
 use crate::hrtim::compare_register::{HrCr1, HrCr2, HrCr3, HrCr4};
 use crate::hrtim::fault::{FaultAction, FaultSource};
 use crate::hrtim::timer::HrTim;
@@ -588,7 +589,19 @@ macro_rules! hrtim_hal {
                 PSCL: HrtimPrescaler,
                 OUT: ToHrOut,
             {
-                pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX, PSCL>, HrCr2<$TIMX, PSCL>, HrCr3<$TIMX, PSCL>, HrCr4<$TIMX, PSCL>), OUT) {
+                pub fn finalize(self, _control: &mut HrPwmControl) -> (
+                    HrTim<$TIMX, PSCL,
+                        HrCapt<$TIMX, PSCL, capture::Ch1, capture::NoDma>,
+                        HrCapt<$TIMX, PSCL, capture::Ch2, capture::NoDma>>,
+                        (
+                            HrCr1<$TIMX, PSCL>,
+                            HrCr2<$TIMX, PSCL>,
+                            HrCr3<$TIMX, PSCL>,
+                            HrCr4<$TIMX, PSCL>
+                        ),
+                        OUT
+                    ) {
+
                     hrtim_finalize_body!(
                         self, PreloadSource,
                         $TIMX: ($timXcr, ck_pscx, $perXr, perx, $tXcen, $rep, $repx, $dier, $repie, $timXcr2, $fltXr, $eefXr1, $eefXr2, $Xeefr3, $outXr, $dtXr),
@@ -732,7 +745,17 @@ macro_rules! hrtim_hal_master {
             PSCL: HrtimPrescaler,
             OUT: ToHrOut,
         {
-            pub fn finalize(self, _control: &mut HrPwmControl) -> (HrTim<$TIMX, PSCL>, (HrCr1<$TIMX, PSCL>, HrCr2<$TIMX, PSCL>, HrCr3<$TIMX, PSCL>, HrCr4<$TIMX, PSCL>)) {
+            pub fn finalize(self, _control: &mut HrPwmControl) -> (
+                HrTim<$TIMX, PSCL,
+                    HrCapt<$TIMX, PSCL, capture::Ch1, capture::NoDma>,
+                    HrCapt<$TIMX, PSCL, capture::Ch2, capture::NoDma>,
+                >, (
+                    HrCr1<$TIMX, PSCL>,
+                    HrCr2<$TIMX, PSCL>,
+                    HrCr3<$TIMX, PSCL>,
+                    HrCr4<$TIMX, PSCL>
+                )) {
+
                 hrtim_finalize_body!(self, MasterPreloadSource, $TIMX: ($timXcr, $ck_psc, $perXr, $perx, $tXcen, $rep, $rep, $dier, $repie),)
             }
 
