@@ -23,6 +23,7 @@ fn main() -> ! {
     use hal::hrtim::compare_register::HrCompareRegister;
     use hal::hrtim::control::HrControltExt;
     use hal::hrtim::output::HrOutput;
+    use hal::hrtim::timer::HrSlaveTimer;
     use hal::hrtim::timer::HrTimer;
     use hal::hrtim::HrPwmAdvExt;
     use hal::hrtim::{HrTimerMode, MasterPreloadSource, PreloadSource, Pscl4};
