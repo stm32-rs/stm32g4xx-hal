@@ -1,12 +1,17 @@
+use crate::dma::mux::DmaMuxResources;
+use crate::dma::traits::TargetAddress;
+use crate::dma::PeripheralToMemory;
+use crate::stm32::{HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF};
 use core::marker::PhantomData;
-
-use stm32g4::stm32g474::{HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF};
 
 pub struct Ch1;
 pub struct Ch2;
 
-pub struct HrCapt<TIM, PSCL, CH> {
-    _x: PhantomData<(TIM, PSCL, CH)>,
+pub struct Dma;
+pub struct NoDma;
+
+pub struct HrCapt<TIM, PSCL, CH, DMA> {
+    _x: PhantomData<(TIM, PSCL, CH, DMA)>,
 }
 
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -58,9 +63,26 @@ pub trait HrCapture {
     fn is_pending(&self) -> bool;
 }
 
+pub fn dma_value_to_dir_and_value(x: u32) -> (u16, CountingDirection) {
+    let value = (x & 0xFFFF) as u16;
+    match x & 1 << 16 != 0 {
+        true => (value, CountingDirection::Down),
+        false => (value, CountingDirection::Up),
+    }
+}
+
+pub fn dma_value_to_signed(x: u32) -> i32 {
+    let (value, dir) = dma_value_to_dir_and_value(x);
+
+    match dir {
+        CountingDirection::Up => i32::from(value),
+        CountingDirection::Down => -i32::from(value),
+    }
+}
+
 macro_rules! impl_capture {
-    ($($TIMX:ident: $CH:ident, $cptXYr:ident, $cptXYcr:ident, $cptXx:ident, $dier:ident, $icr:ident, $isr:ident, $cptXie:ident, $cptXc:ident, $cptX:ident),+) => {
-        $(impl<PSCL> HrCapt<$TIMX, PSCL, $CH> {
+    ($($TIMX:ident: $CH:ident, $cptXYr:ident, $cptXYcr:ident, $cptXx:ident, $dier:ident, $icr:ident, $isr:ident, $cptXie:ident, $cptXde:ident, $cptXc:ident, $cptX:ident, $mux:expr),+) => {$(
+        impl<PSCL> HrCapt<$TIMX, PSCL, $CH, NoDma> {
             /// Add event to capture
             ///
             /// If multiple events are added, they will be ORed together meaning
@@ -100,12 +122,21 @@ macro_rules! impl_capture {
 
                 tim.$dier.modify(|_r, w| w.$cptXie().bit(enable));
             }
+
+            pub fn enable_dma(self) -> HrCapt<$TIMX, PSCL, $CH, Dma> {
+                let tim = unsafe { &*$TIMX::ptr() };
+                tim.$dier.modify(|_r, w| w.$cptXde().set_bit());
+                HrCapt {
+                    _x: PhantomData
+                }
+            }
         }
 
-        impl<PSCL> HrCapture for HrCapt<$TIMX, PSCL, $CH> {
+        impl<PSCL, DMA> HrCapture for HrCapt<$TIMX, PSCL, $CH, DMA> {
             fn get(&self) -> (u16, CountingDirection) {
                 let tim = unsafe { &*$TIMX::ptr() };
                 let data = tim.$cptXYr.read();
+
                 let dir = match data.dir().bit() {
                     true => CountingDirection::Down,
                     false => CountingDirection::Up,
@@ -128,26 +159,38 @@ macro_rules! impl_capture {
                 // No need for exclusive access since this is a read only register
                 tim.$isr.read().$cptX().bit()
             }
-        })+
-    };
+        }
+
+        unsafe impl<PSCL> TargetAddress<PeripheralToMemory> for HrCapt<$TIMX, PSCL, $CH, Dma> {
+            #[inline(always)]
+            fn address(&self) -> u32 {
+                let tim = unsafe { &*$TIMX::ptr() };
+                &tim.$cptXYr as *const _ as u32
+            }
+
+            type MemSize = u32;
+
+            const REQUEST_LINE: Option<u8> = Some($mux as u8);
+        }
+    )+};
 }
 
 impl_capture! {
-    HRTIM_TIMA: Ch1, cpt1ar, cpt1acr, cpt1x, timadier, timaicr, timaisr, cpt1ie, cpt1c, cpt1,
-    HRTIM_TIMA: Ch2, cpt2ar, cpt2acr, cpt2x, timadier, timaicr, timaisr, cpt2ie, cpt2c, cpt2,
+    HRTIM_TIMA: Ch1, cpt1ar, cpt1acr, cpt1x, timadier, timaicr, timaisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMA,
+    HRTIM_TIMA: Ch2, cpt2ar, cpt2acr, cpt2x, timadier, timaicr, timaisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMA,
 
-    HRTIM_TIMB: Ch1, cpt1br, cpt1bcr, cpt1x, timbdier, timbicr, timbisr, cpt1ie, cpt1c, cpt1,
-    HRTIM_TIMB: Ch2, cpt2br, cpt2bcr, cpt2x, timbdier, timbicr, timbisr, cpt2ie, cpt2c, cpt2,
+    HRTIM_TIMB: Ch1, cpt1br, cpt1bcr, cpt1x, timbdier, timbicr, timbisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMB,
+    HRTIM_TIMB: Ch2, cpt2br, cpt2bcr, cpt2x, timbdier, timbicr, timbisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMB,
 
-    HRTIM_TIMC: Ch1, cpt1cr, cpt1ccr, cpt1x, timcdier, timcicr, timcisr, cpt1ie, cpt1c, cpt1,
-    HRTIM_TIMC: Ch2, cpt2cr, cpt2ccr, cpt2x, timcdier, timcicr, timcisr, cpt2ie, cpt2c, cpt2,
+    HRTIM_TIMC: Ch1, cpt1cr, cpt1ccr, cpt1x, timcdier, timcicr, timcisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMC,
+    HRTIM_TIMC: Ch2, cpt2cr, cpt2ccr, cpt2x, timcdier, timcicr, timcisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMC,
 
-    HRTIM_TIMD: Ch1, cpt1dr, cpt1dcr, cpt1x, timddier, timdicr, timdisr, cpt1ie, cpt1c, cpt1,
-    HRTIM_TIMD: Ch2, cpt2dr, cpt2dcr, cpt2x, timddier, timdicr, timdisr, cpt2ie, cpt2c, cpt2,
+    HRTIM_TIMD: Ch1, cpt1dr, cpt1dcr, cpt1x, timddier, timdicr, timdisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMD,
+    HRTIM_TIMD: Ch2, cpt2dr, cpt2dcr, cpt2x, timddier, timdicr, timdisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMD,
 
-    HRTIM_TIME: Ch1, cpt1er, cpt1ecr, cpt1x, timedier, timeicr, timeisr, cpt1ie, cpt1c, cpt1,
-    HRTIM_TIME: Ch2, cpt2er, cpt2ecr, cpt2x, timedier, timeicr, timeisr, cpt2ie, cpt2c, cpt2,
+    HRTIM_TIME: Ch1, cpt1er, cpt1ecr, cpt1x, timedier, timeicr, timeisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIME,
+    HRTIM_TIME: Ch2, cpt2er, cpt2ecr, cpt2x, timedier, timeicr, timeisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIME,
 
-    HRTIM_TIMF: Ch1, cpt1fr, cpt1fcr, cpt1x, timfdier, timficr, timfisr, cpt1ie, cpt1c, cpt1,
-    HRTIM_TIMF: Ch2, cpt2fr, cpt2fcr, cpt2x, timfdier, timficr, timfisr, cpt2ie, cpt2c, cpt2
+    HRTIM_TIMF: Ch1, cpt1fr, cpt1fcr, cpt1x, timfdier, timficr, timfisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMF,
+    HRTIM_TIMF: Ch2, cpt2fr, cpt2fcr, cpt2x, timfdier, timficr, timfisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMF
 }

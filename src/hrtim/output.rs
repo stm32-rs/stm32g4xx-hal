@@ -15,7 +15,7 @@ use crate::{
 
 macro_rules! hrtim_out {
     ($($TIMX:ident: $out_type:ident: $tXYoen:ident, $tXYodis:ident, $tXYods:ident, $setXYr:ident, $rstXYr:ident,)+) => {$(
-        impl<PSCL> HrOutput<PSCL, $TIMX> for $out_type<$TIMX, PSCL> {
+        impl<PSCL> HrOutput<$TIMX, PSCL> for $out_type<$TIMX, PSCL> {
             fn enable(&mut self) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
                 common.oenr.write(|w| { w.$tXYoen().set_bit() });
@@ -84,7 +84,7 @@ hrtim_out! {
     HRTIM_TIMF: HrOut2: tf2oen, tf2odis, tf2ods, setf2r, rstf2r,
 }
 
-pub trait HrOutput<PSCL, TIM> {
+pub trait HrOutput<TIM, PSCL> {
     /// Enable this output
     fn enable(&mut self);
 
