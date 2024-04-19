@@ -87,7 +87,7 @@ fn main() -> ! {
         .finalize(&mut hr_control);
 
     let mut hr_control = hr_control.constrain();
-    let (timer, (mut cr1, _cr2, _cr3, _cr4), mut out1) = dp
+    let (timer, (mut cr1, _cr2, _cr3, _cr4), mut out1, dma_ch) = dp
         .HRTIM_TIMA
         .pwm_advanced(pin_a, &mut rcc)
         .prescaler(prescaler)
@@ -113,7 +113,7 @@ fn main() -> ! {
 
     let first_buffer = cortex_m::singleton!(: [u32; 16] = [0; 16]).unwrap();
     let mut transfer = streams.0.into_circ_peripheral_to_memory_transfer(
-        capture.enable_dma(),
+        capture.enable_dma(dma_ch),
         &mut first_buffer[..],
         config,
     );

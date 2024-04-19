@@ -1,3 +1,4 @@
+use super::timer;
 use crate::dma::mux::DmaMuxResources;
 use crate::dma::traits::TargetAddress;
 use crate::dma::PeripheralToMemory;
@@ -123,7 +124,8 @@ macro_rules! impl_capture {
                 tim.$dier.modify(|_r, w| w.$cptXie().bit(enable));
             }
 
-            pub fn enable_dma(self) -> HrCapt<$TIMX, PSCL, $CH, Dma> {
+            pub fn enable_dma(self, _ch: timer::DmaChannel<$TIMX>) -> HrCapt<$TIMX, PSCL, $CH, Dma> {
+                // SAFETY: We own the only insance of this timers dma channel, no one else can do this
                 let tim = unsafe { &*$TIMX::ptr() };
                 tim.$dier.modify(|_r, w| w.$cptXde().set_bit());
                 HrCapt {
