@@ -13,7 +13,7 @@ use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
 
-use log::info;
+use utils::logger::info;
 
 #[macro_use]
 mod utils;

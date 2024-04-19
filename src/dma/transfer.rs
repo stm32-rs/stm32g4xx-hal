@@ -383,14 +383,38 @@ where
         read
     }
 
+    /// Read all immediately available values without blocking
     pub fn read_available<'a>(
         &mut self,
-        data: &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
+        dst: &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
+    ) -> &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize] {
+        self.read_available_multiple(1, dst)
+    }
+
+    /// Same as [`CircTransfer::read_available`] but only read a whole multiple number of elements
+    ///
+    /// Example:
+    /// ```
+    /// ...
+    /// // There are 7 values in the buffer
+    /// assert_eq!(transfer.read_available_multiple(3, &mut dst).len(), 6);
+    ///
+    /// // There are 3 values in the buffer
+    /// assert_eq!(transfer.read_available_multiple(2, &mut dst).len(), 2);
+    ///
+    /// // There are 1 values in the buffer
+    /// assert_eq!(transfer.read_available_multiple(2, &mut dst).len(), 0);
+    /// ```
+    pub fn read_available_multiple<'a>(
+        &mut self,
+        multiple: u8,
+        dst: &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
     ) -> &'a mut [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize] {
         let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
         let available = self.elements_available();
-        let len = data.len().min(available).min(blen - 1);
-        let result = &mut data[0..len];
+        let len = dst.len().min(available).min(blen - 1);
+        let len = len - (len % usize::from(multiple));
+        let result = &mut dst[0..len];
         self.read_exact(result);
 
         result

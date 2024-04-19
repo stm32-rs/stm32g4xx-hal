@@ -12,7 +12,6 @@
     feature = "stm32g491",
     feature = "stm32g4a1"
 )))]
-
 compile_error!(
     "This crate requires one of the following features enabled:
         stm32g431
@@ -81,6 +80,9 @@ pub mod dma;
 pub mod exti;
 pub mod flash;
 pub mod gpio;
+
+#[cfg(feature = "hrtim")]
+pub mod hrtim;
 pub mod i2c;
 pub mod opamp;
 pub mod prelude;
