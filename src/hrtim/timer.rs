@@ -4,7 +4,7 @@ use crate::stm32::{
 use core::marker::PhantomData;
 
 use super::{
-    capture::{self, HrCapt},
+    capture::{self, HrCapt, HrCapture},
     control::HrPwmControl,
     HrtimPrescaler,
 };
@@ -52,7 +52,7 @@ pub trait HrTimer {
 
     fn clear_repetition_interrupt(&mut self);
 
-    /// Make a handle to this timers reset event to use as adc trigger
+    /// Make a handle to this timers reset/roll-over event to use as adc trigger
     fn as_reset_adc_trigger(&self) -> super::adc_trigger::TimerReset<Self::Timer>;
 
     /// Make a handle to this timers period event to use as adc trigger
@@ -60,8 +60,8 @@ pub trait HrTimer {
 }
 
 pub trait HrSlaveTimer: HrTimer {
-    type CaptureCh1;
-    type CaptureCh2;
+    type CptCh1;
+    type CptCh2;
 
     /// Start listening to the specified event
     fn enable_reset_event<E: super::event::TimerResetEventSource<Self::Timer, Self::Prescaler>>(
@@ -78,8 +78,11 @@ pub trait HrSlaveTimer: HrTimer {
 
 /// Trait for unsplit slave timer which still contains its capture modules
 pub trait HrSlaveTimerCpt: HrSlaveTimer {
-    fn capture_ch1(&mut self) -> &mut <Self as HrSlaveTimer>::CaptureCh1;
-    fn capture_ch2(&mut self) -> &mut <Self as HrSlaveTimer>::CaptureCh2;
+    type CaptureCh1: HrCapture;
+    type CaptureCh2: HrCapture;
+
+    fn capture_ch1(&mut self) -> &mut <Self as HrSlaveTimerCpt>::CaptureCh1;
+    fn capture_ch2(&mut self) -> &mut <Self as HrSlaveTimerCpt>::CaptureCh2;
     fn split_capture(
         self,
     ) -> (
@@ -179,8 +182,8 @@ macro_rules! hrtim_timer {
 
         $(
             impl<PSCL: HrtimPrescaler, CPT1, CPT2> HrSlaveTimer for HrTim<$TIMX, PSCL, CPT1, CPT2> {
-                type CaptureCh1 = HrCapt<Self::Timer, Self::Prescaler, capture::Ch1, capture::NoDma>;
-                type CaptureCh2 = HrCapt<Self::Timer, Self::Prescaler, capture::Ch2, capture::NoDma>;
+                type CptCh1 = HrCapt<Self::Timer, Self::Prescaler, capture::Ch1, capture::NoDma>;
+                type CptCh2 = HrCapt<Self::Timer, Self::Prescaler, capture::Ch2, capture::NoDma>;
 
                 /// Reset this timer every time the specified event occurs
                 ///
@@ -212,6 +215,9 @@ macro_rules! hrtim_timer {
             }
 
             impl<PSCL: HrtimPrescaler> HrSlaveTimerCpt for HrTim<$TIMX, PSCL, HrCapt<$TIMX, PSCL, capture::Ch1, capture::NoDma>, HrCapt<$TIMX, PSCL, capture::Ch2, capture::NoDma>> {
+                type CaptureCh1 = <Self as HrSlaveTimer>::CptCh1;
+                type CaptureCh2 = <Self as HrSlaveTimer>::CptCh2;
+
                 /// Access the timers first capture channel
                 fn capture_ch1(&mut self) -> &mut Self::CaptureCh1 {
                     &mut self.capture_ch1
