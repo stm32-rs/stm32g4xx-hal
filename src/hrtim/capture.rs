@@ -31,8 +31,72 @@ pub trait CaptureEvent<TIM, PSCL> {
     const BITS: u32;
 }
 
+/// Trait for capture channels used for capturing edges
+///
+/// ```
+/// let capture: HrCapt<_, _, _> = todo!();
+/// if capture.is_pending() {
+///     let (value, dir) = capture.get_last();
+///     capture.clear_interrupt();
+///     defmt::info!("Edge captured at counter value: {}, with: {}", value, dir);
+/// }
+/// ```
+///
+/// or alternatively
+///
+/// ```
+/// let capture: HrCapt<_, _, _> = todo!();
+/// if let Some((value, dir)) = capture.get() {
+///     defmt::info!("Edge captured at counter value: {}, with: {}", value, dir);
+/// }
+/// ```
 pub trait HrCapture {
-    fn get(&self) -> (u16, CountingDirection);
+    /// Try to get the capture value
+    ///
+    /// Returns none if edge has been captured since last time
+    ///
+    /// NOTE: This function will use [`Self::is_pending`] to chech if there is a value available and
+    /// [`Self::clear_interrupt`] to clear it.
+    fn get(&mut self) -> Option<(u16, CountingDirection)> {
+        if self.is_pending() {
+            let value = self.get_last();
+            self.clear_interrupt();
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    /// Get number of ticks relative to beginning of upcounting
+    ///
+    /// where captures during down counting count as negative (before the upcount)
+    ///
+    /// ```txt
+    ///              Counter
+    /// ----------------------------------   <--- period
+    /// \               ^               /
+    ///    \            |            /
+    ///       \         |         /
+    ///          \      |      /
+    /// Down count  \   |   /   Up count
+    ///                \|/
+    /// <-------------- 0 --------------> t
+    /// Negative result | positive result
+    /// ```
+    ///
+    /// NOTE: This function will use [`Self::is_pending`] to chech if there is a value available and
+    /// [`Self::clear_interrupt`] to clear it.
+    fn get_signed(&mut self, period: u16) -> Option<i32> {
+        if self.is_pending() {
+            let value = self.get_last_signed(period);
+            self.clear_interrupt();
+            Some(value)
+        } else {
+            None
+        }
+    }
+
+    fn get_last(&self) -> (u16, CountingDirection);
 
     /// Get number of ticks relative to beginning of upcounting
     ///
@@ -50,12 +114,13 @@ pub trait HrCapture {
     /// <-------------- 0 --------------> t
     /// Negative result | positive result
     /// ````
-    fn get_signed(&self, period: u16) -> i32 {
-        let (value, dir) = self.get();
+    fn get_last_signed(&self, period: u16) -> i32 {
+        let (value, dir) = self.get_last();
 
+        // The capture counter always counts up and restarts at period
         match dir {
             CountingDirection::Up => i32::from(value),
-            CountingDirection::Down => i32::from(period) - i32::from(value),
+            CountingDirection::Down => i32::from(value) - i32::from(period),
         }
     }
 
@@ -75,9 +140,10 @@ pub fn dma_value_to_dir_and_value(x: u32) -> (u16, CountingDirection) {
 pub fn dma_value_to_signed(x: u32, period: u16) -> i32 {
     let (value, dir) = dma_value_to_dir_and_value(x);
 
+    // The capture counter always counts up and restarts at period
     match dir {
         CountingDirection::Up => i32::from(value),
-        CountingDirection::Down => i32::from(period) - i32::from(value),
+        CountingDirection::Down => i32::from(value) - i32::from(period),
     }
 }
 
@@ -135,7 +201,7 @@ macro_rules! impl_capture {
         }
 
         impl<PSCL, DMA> HrCapture for HrCapt<$TIMX, PSCL, $CH, DMA> {
-            fn get(&self) -> (u16, CountingDirection) {
+            fn get_last(&self) -> (u16, CountingDirection) {
                 let tim = unsafe { &*$TIMX::ptr() };
                 let data = tim.$cptXYr.read();
 
