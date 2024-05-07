@@ -273,11 +273,11 @@ macro_rules! hrtim_timer_adc_trigger {
         ])),+]
     ),+) => {
         $($(
-            $(impl<PSCL, CPT1, CPT2> $AdcTrigger for super::adc_trigger::TimerReset<HrTim<$TIMX, PSCL, CPT1, CPT2>> {
+            $(impl $AdcTrigger for super::adc_trigger::TimerReset<$TIMX> {
                 const BITS: u32 = $adc_trigger_bits_reset;
             })*
 
-            $(impl<PSCL, CPT1, CPT2> $AdcTrigger for super::adc_trigger::TimerPeriod<HrTim<$TIMX, PSCL, CPT1, CPT2>> {
+            $(impl $AdcTrigger for super::adc_trigger::TimerPeriod<$TIMX> {
                 const BITS: u32 = $adc_trigger_bits_period;
             })*
         )*)*
