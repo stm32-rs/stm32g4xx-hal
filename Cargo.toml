@@ -9,7 +9,7 @@ license = "MIT/Apache-2.0"
 name = "stm32g4xx-hal"
 readme = "README.md"
 repository = "https://github.com/stm32-rs/stm32g4xx-hal"
-version = "0.0.2"
+version = "0.0.3-alpha.0"
 
 [dependencies]
 nb = "0.1.1"
@@ -129,6 +129,16 @@ required-features = ["hrtim"]
 path = "examples/hrtim/adc-trigger.rs"
 
 [[example]]
+name = "hrtim-capture-dma"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture-dma.rs"
+
+[[example]]
+name = "hrtim-capture-dma-up-down"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture-dma-up-down.rs"
+
+[[example]]
 name = "hrtim-capture"
 required-features = ["hrtim"]
 path = "examples/hrtim/capture.rs"
@@ -152,6 +162,11 @@ path = "examples/hrtim/flt-comp.rs"
 name = "hrtim-flt"
 required-features = ["hrtim"]
 path = "examples/hrtim/flt.rs"
+
+[[example]]
+name = "hrtim-flt-up-down-push-pull"
+required-features = ["hrtim"]
+path = "examples/hrtim/flt-up-down-push-pull.rs"
 
 [[example]]
 name = "hrtim"
