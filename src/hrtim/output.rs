@@ -121,6 +121,20 @@ pub enum State {
     Fault,
 }
 
+impl State {
+    pub fn is_idle(self) -> bool {
+        matches!(self, State::Idle)
+    }
+
+    pub fn is_running(self) -> bool {
+        matches!(self, State::Running)
+    }
+
+    pub fn is_fault(self) -> bool {
+        matches!(self, State::Fault)
+    }
+}
+
 pub unsafe trait ToHrOut {
     type Out<PSCL>: ToHrOut;
 }

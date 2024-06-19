@@ -360,7 +360,8 @@ macro_rules! uart_shared {
                 let config = crate::dma::config::DmaConfig::default()
                     .transfer_complete_interrupt(false)
                     .circular_buffer(false)
-                    .memory_increment(true);
+                    .memory_increment(true)
+                    .priority(crate::dma::config::Priority::Low);
                 stream.apply_config(config);
 
                 Tx {

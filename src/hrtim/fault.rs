@@ -6,8 +6,23 @@ use crate::gpio::gpiob::{PB0, PB10, PB11};
 use crate::gpio::gpioc::{PC10, PC7};
 use crate::gpio::{self, AF13, AF3};
 use crate::hrtim::control::HrPwmControl;
-use crate::pwm::FaultMonitor;
 use crate::stm32::HRTIM_COMMON;
+
+use super::control::HrPwmCtrl;
+
+/// Allows a FaultMonitor to monitor faults
+pub trait FaultMonitor {
+    fn enable_interrupt(&mut self, hr_control: &mut HrPwmCtrl);
+
+    /// Returns true if a fault is preventing PWM output
+    fn is_fault_active(&self) -> bool;
+
+    /// Clear the fault interrupt flag
+    ///
+    /// This will *NOT* resume normal PWM operation. The affected outputs need to be re-enabled to resume operation;
+    /// This will do nothing if the fault is still active.
+    fn clear_fault(&mut self);
+}
 
 pub enum FaultAction {
     /// Output never enters fault mode
@@ -227,12 +242,17 @@ pub enum FaultSamplingFilter {
 }
 
 macro_rules! impl_flt_monitor {
-    ($($t:ident: ($fltx:ident, $fltxc:ident),)+) => {$(
+    ($($t:ident: ($fltx:ident, $fltxc:ident, $fltxie:ident),)+) => {$(
         pub struct $t {
             pub(crate) _x: PhantomData<()>
         }
 
         impl FaultMonitor for $t {
+            fn enable_interrupt(&mut self, _hr_control: &mut HrPwmCtrl) {
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common.ier.modify(|_r, w| w.$fltxie().set_bit());
+            }
+
             fn is_fault_active(&self) -> bool {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
                 common.isr.read().$fltx().bit()
@@ -242,21 +262,16 @@ macro_rules! impl_flt_monitor {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
                 common.icr.write(|w| w.$fltxc().set_bit());
             }
-
-            // TODO: Should we have our own trait since it does not seem possible to implement this
-            fn set_fault(&mut self) {
-                todo!()
-            }
         }
     )+};
 }
 
 impl_flt_monitor!(
-    FltMonitorSys: (sysflt, sysfltc),
-    FltMonitor1: (flt1, flt1c),
-    FltMonitor2: (flt2, flt2c),
-    FltMonitor3: (flt3, flt3c),
-    FltMonitor4: (flt4, flt4c),
-    FltMonitor5: (flt5, flt5c),
-    FltMonitor6: (flt6, flt6c),
+    FltMonitorSys: (sysflt, sysfltc, sysflte),
+    FltMonitor1: (flt1, flt1c, flt1ie),
+    FltMonitor2: (flt2, flt2c, flt2ie),
+    FltMonitor3: (flt3, flt3c, flt3ie),
+    FltMonitor4: (flt4, flt4c, flt4ie),
+    FltMonitor5: (flt5, flt5c, flt5ie),
+    FltMonitor6: (flt6, flt6c, flt6ie),
 );
