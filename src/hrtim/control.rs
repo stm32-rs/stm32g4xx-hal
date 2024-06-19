@@ -186,6 +186,7 @@ impl HrTimCalibrated {
     pub fn constrain(self) -> HrPwmControl {
         HrPwmControl {
             _x: PhantomData,
+            control: HrPwmCtrl { _x: PhantomData },
             fault_sys: FltMonitorSys { _x: PhantomData },
             fault_1: FltMonitor1 { _x: PhantomData },
             fault_2: FltMonitor2 { _x: PhantomData },
@@ -208,8 +209,24 @@ impl HrTimCalibrated {
     }
 }
 
+impl<'a> Into<&'a mut HrPwmCtrl> for &'a mut HrPwmControl {
+    fn into(self) -> &'a mut HrPwmCtrl {
+        &mut self.control
+    }
+}
+
+/// Used as a token to guarantee unique access to resources common to multiple timers
+///
+/// An instance of this object can be obtained from [`HrPwmControl`].control
+pub struct HrPwmCtrl {
+    _x: PhantomData<()>,
+}
+
+/// Used as a token to guarantee unique access to resources common to multiple timers
 pub struct HrPwmControl {
     _x: PhantomData<()>,
+
+    pub control: HrPwmCtrl,
 
     pub fault_sys: FltMonitorSys,
     pub fault_1: FltMonitor1,

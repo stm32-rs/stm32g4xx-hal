@@ -5,7 +5,7 @@ use core::marker::PhantomData;
 
 use super::{
     capture::{self, HrCapt, HrCapture},
-    control::HrPwmControl,
+    control::HrPwmCtrl,
     HrtimPrescaler,
 };
 
@@ -42,13 +42,13 @@ pub trait HrTimer {
     fn set_period(&mut self, period: u16);
 
     /// Start timer
-    fn start(&mut self, _hr_control: &mut HrPwmControl);
+    fn start(&mut self, _hr_control: &mut HrPwmCtrl);
 
     /// Stop timer
-    fn stop(&mut self, _hr_control: &mut HrPwmControl);
+    fn stop(&mut self, _hr_control: &mut HrPwmCtrl);
 
     /// Stop timer and reset counter
-    fn stop_and_reset(&mut self, _hr_control: &mut HrPwmControl);
+    fn stop_and_reset(&mut self, _hr_control: &mut HrPwmCtrl);
 
     fn clear_repetition_interrupt(&mut self);
 
@@ -57,6 +57,21 @@ pub trait HrTimer {
 
     /// Make a handle to this timers period event to use as adc trigger
     fn as_period_adc_trigger(&self) -> super::adc_trigger::TimerPeriod<Self::Timer>;
+
+    /// Disable register updates
+    ///
+    /// Calling this function temporarily disables the transfer from preload to active registers,
+    /// whatever the selected update event. This allows to modify several registers.
+    /// The regular update event takes place once [`Self::enable_register_updates`] is called.
+    fn disable_register_updates(&mut self, _hr_control: &mut HrPwmCtrl);
+
+    /// Enable register updates
+    ///
+    /// See [`Self::disable_register_updates`].
+    ///
+    /// NOTE: Register updates are enabled by default, no need to call this
+    /// unless [`Self::disable_register_updates`] has been called.
+    fn enable_register_updates(&mut self, _hr_control: &mut HrPwmCtrl);
 }
 
 pub trait HrSlaveTimer: HrTimer {
@@ -106,6 +121,7 @@ macro_rules! hrtim_timer {
         $repie:ident,
         $icr:ident,
         $repc:ident,
+        $tXudis:ident,
         $(($rstXr:ident))*,
     )+) => {$(
         impl<PSCL: HrtimPrescaler, CPT1, CPT2> HrTimer for HrTim<$TIMX, PSCL, CPT1, CPT2> {
@@ -124,7 +140,7 @@ macro_rules! hrtim_timer {
             }
 
             /// Start timer
-            fn start(&mut self, _hr_control: &mut HrPwmControl) {
+            fn start(&mut self, _hr_control: &mut HrPwmCtrl) {
                 // Start timer
 
                 // SAFETY: Since we hold _hr_control there is no risk for a race condition
@@ -133,7 +149,7 @@ macro_rules! hrtim_timer {
             }
 
             /// Stop timer
-            fn stop(&mut self, _hr_control: &mut HrPwmControl) {
+            fn stop(&mut self, _hr_control: &mut HrPwmCtrl) {
                 // Stop counter
                 // SAFETY: Since we hold _hr_control there is no risk for a race condition
                 let master = unsafe { &*HRTIM_MASTER::ptr() };
@@ -141,7 +157,7 @@ macro_rules! hrtim_timer {
             }
 
             /// Stop timer and reset counter
-            fn stop_and_reset(&mut self, _hr_control: &mut HrPwmControl) {
+            fn stop_and_reset(&mut self, _hr_control: &mut HrPwmCtrl) {
                 self.stop(_hr_control);
 
                 // Reset counter
@@ -163,6 +179,29 @@ macro_rules! hrtim_timer {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 tim.$icr.write(|w| w.$repc().set_bit());
+            }
+
+            /// Disable register updates
+            ///
+            /// Calling this function temporarily disables the transfer from preload to active registers,
+            /// whatever the selected update event. This allows to modify several registers.
+            /// The regular update event takes place once [`Self::enable_register_updates`] is called.
+            fn disable_register_updates(&mut self, _hr_control: &mut HrPwmCtrl) {
+                use super::HRTIM_COMMON;
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common.cr1.modify(|_r, w| w.$tXudis().set_bit());
+            }
+
+            /// Enable register updates
+            ///
+            /// See [`Self::disable_register_updates`].
+            ///
+            /// NOTE: Register updates are enabled by default, no need to call this
+            /// unless [`Self::disable_register_updates`] has been called.
+            fn enable_register_updates<'a>(&mut self, _hr_control: &mut HrPwmCtrl) {
+                use super::HRTIM_COMMON;
+                let common = unsafe { &*HRTIM_COMMON::ptr() };
+                common.cr1.modify(|_r, w| w.$tXudis().clear_bit());
             }
         }
 
@@ -290,14 +329,14 @@ use super::adc_trigger::Adc579Trigger as Adc579;
 use super::adc_trigger::Adc6810Trigger as Adc6810;
 
 hrtim_timer! {
-    HRTIM_MASTER: mcntr, mcnt, mper, mcen, mper, mrep, mrep, mdier, mrepie, micr, mrepc,,
+    HRTIM_MASTER: mcntr, mcnt, mper, mcen, mper, mrep, mrep, mdier, mrepie, micr, mrepc, mudis,,
 
-    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, (rstar),
-    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, (rstbr),
-    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, (rstcr),
-    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, (rstdr),
-    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, (rster),
-    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, (rstfr),
+    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, taudis, (rstar),
+    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, tbudis, (rstbr),
+    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, tcudis, (rstcr),
+    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, tdudis, (rstdr),
+    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, teudis, (rster),
+    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, tfudis, (rstfr),
 }
 
 hrtim_timer_adc_trigger! {
