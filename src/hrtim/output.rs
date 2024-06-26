@@ -4,12 +4,13 @@ use core::marker::PhantomData;
 use super::event::EventSource;
 use crate::{
     gpio::{
+        self,
         gpioa::{PA10, PA11, PA8, PA9},
         gpiob::{PB12, PB13, PB14, PB15},
         gpioc::{PC6, PC7, PC8, PC9},
         Alternate, AF13, AF3,
     },
-    pwm::{ActiveHigh, ComplementaryImpossible, Pins, Pwm},
+    pwm::{ComplementaryImpossible, Pins},
     stm32::HRTIM_COMMON,
 };
 
@@ -135,25 +136,32 @@ impl State {
     }
 }
 
-pub unsafe trait ToHrOut {
-    type Out<PSCL>: ToHrOut;
+pub unsafe trait ToHrOut<TIM> {
+    type Out<PSCL>;
+
+    fn connect_to_hrtim(self);
 }
 
-unsafe impl<PA, PB> ToHrOut for (PA, PB)
+unsafe impl<TIM, PA, PB> ToHrOut<TIM> for (PA, PB)
 where
-    PA: ToHrOut,
-    PB: ToHrOut,
+    PA: ToHrOut<TIM>,
+    PB: ToHrOut<TIM>,
 {
     type Out<PSCL> = (PA::Out<PSCL>, PB::Out<PSCL>);
+
+    fn connect_to_hrtim(self) {
+        self.0.connect_to_hrtim();
+        self.1.connect_to_hrtim();
+    }
 }
 
 pub struct HrOut1<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 pub struct HrOut2<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 
 macro_rules! pins {
-    ($($TIMX:ty: CH1: $CH1:ty, CH2: $CH2:ty)+) => {
+    ($($TIMX:ty: CH1: $CH1:ident<$CH1_AF:ident>, CH2: $CH2:ident<$CH2_AF:ident>)+) => {
         $(
-            impl<PSCL> Pins<$TIMX, CH1<PSCL>, ComplementaryImpossible> for $CH1 {
+            /*impl<PSCL> Pins<$TIMX, CH1<PSCL>, ComplementaryImpossible> for $CH1 {
                 type Channel = Pwm<$TIMX, CH1<PSCL>, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
             }
 
@@ -161,72 +169,54 @@ macro_rules! pins {
                 type Channel = Pwm<$TIMX, CH2<PSCL>, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
             }
 
-            unsafe impl ToHrOut for $CH1 {
+            */
+            unsafe impl ToHrOut<$TIMX> for $CH1<gpio::Input<gpio::Floating>> {
                 type Out<PSCL> = HrOut1<$TIMX, PSCL>;
+
+                fn connect_to_hrtim(self) {
+                    let _: $CH1<Alternate<$CH1_AF>> = self.into_alternate();
+                }
             }
 
-            unsafe impl ToHrOut for $CH2 {
+            unsafe impl ToHrOut<$TIMX> for $CH2<gpio::Input<gpio::Floating>> {
                 type Out<PSCL> = HrOut2<$TIMX, PSCL>;
+
+                fn connect_to_hrtim(self) {
+                    let _: $CH2<Alternate<$CH2_AF>> = self.into_alternate();
+                }
             }
 
-            unsafe impl<PSCL> ToHrOut for HrOut1<$TIMX, PSCL> {
+            /*unsafe impl<PSCL> ToHrOut for HrOut1<$TIMX, PSCL> {
                 type Out<P> = HrOut1<$TIMX, P>;
             }
 
             unsafe impl<PSCL> ToHrOut for HrOut2<$TIMX, PSCL> {
                 type Out<P> = HrOut2<$TIMX, P>;
-            }
+            }*/
         )+
     }
 }
 
 pins! {
-    HRTIM_TIMA: CH1: PA8<Alternate<AF13>>, CH2: PA9<Alternate<AF13>>
+    HRTIM_TIMA: CH1: PA8<AF13>, CH2: PA9<AF13>
 
-    HRTIM_TIMB: CH1: PA10<Alternate<AF13>>, CH2: PA11<Alternate<AF13>>
-    HRTIM_TIMC: CH1: PB12<Alternate<AF13>>, CH2: PB13<Alternate<AF13>>
-    HRTIM_TIMD: CH1: PB14<Alternate<AF13>>, CH2: PB15<Alternate<AF13>>
+    HRTIM_TIMB: CH1: PA10<AF13>, CH2: PA11<AF13>
+    HRTIM_TIMC: CH1: PB12<AF13>, CH2: PB13<AF13>
+    HRTIM_TIMD: CH1: PB14<AF13>, CH2: PB15<AF13>
 
-    HRTIM_TIME: CH1: PC8<Alternate<AF3>>, CH2: PC9<Alternate<AF3>>
-    HRTIM_TIMF: CH1: PC6<Alternate<AF13>>, CH2: PC7<Alternate<AF13>>
+    HRTIM_TIME: CH1: PC8<AF3>, CH2: PC9<AF3>
+    HRTIM_TIMF: CH1: PC6<AF13>, CH2: PC7<AF13>
 }
 
 impl<T> Pins<T, (), ComplementaryImpossible> for () {
     type Channel = ();
 }
 
-unsafe impl ToHrOut for () {
+unsafe impl<T> ToHrOut<T> for () {
     type Out<PSCL> = ();
-}
 
-// automatically implement Pins trait for tuples of individual pins
-macro_rules! pins_tuples {
-    // Tuple of two pins
-    ($(($CHA:ident, $CHB:ident)),*) => {
-        $(
-            impl<TIM, PSCL, CHA, CHB, TA, TB> Pins<TIM, ($CHA<PSCL>, $CHB<PSCL>), (TA, TB)> for (CHA, CHB)
-            where
-                CHA: Pins<TIM, $CHA<PSCL>, TA>,
-                CHB: Pins<TIM, $CHB<PSCL>, TB>,
-            {
-                type Channel = (Pwm<TIM, $CHA<PSCL>, TA, ActiveHigh, ActiveHigh>, Pwm<TIM, $CHB<PSCL>, TB, ActiveHigh, ActiveHigh>);
-            }
-
-            impl<PSCL> HrtimChannel<PSCL> for ($CHA<PSCL>, $CHB<PSCL>) {}
-        )*
-    };
-}
-
-pins_tuples! {
-    (CH1, CH2),
-    (CH2, CH1)
+    fn connect_to_hrtim(self) {}
 }
 
 pub struct CH1<PSCL>(PhantomData<PSCL>);
 pub struct CH2<PSCL>(PhantomData<PSCL>);
-
-impl<PSCL> HrtimChannel<PSCL> for () {}
-pub trait HrtimChannel<PSCL> {}
-
-impl<PSCL> HrtimChannel<PSCL> for CH1<PSCL> {}
-impl<PSCL> HrtimChannel<PSCL> for CH2<PSCL> {}

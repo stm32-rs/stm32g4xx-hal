@@ -177,8 +177,3 @@ path = "examples/hrtim/hrtim.rs"
 name = "hrtim-master"
 required-features = ["hrtim"]
 path = "examples/hrtim/master.rs"
-
-[[example]]
-name = "hrtim-simple"
-required-features = ["hrtim"]
-path = "examples/hrtim/simple.rs"
