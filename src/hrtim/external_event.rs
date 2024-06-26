@@ -240,11 +240,6 @@ pub trait ToExternalEventSource<const N: u8, const IS_FAST: bool> {
     fn finalize(self, _calibrated: &mut HrTimCalibrated) -> ExternalEventSource<N, IS_FAST>;
 }
 
-#[derive(Copy, Clone)]
-struct ExternalEventMuxOut<const N: u8> {
-    _x: PhantomData<()>,
-}
-
 macro_rules! impl_eev1_5_to_es {
     ($eev:ident, $N:literal, $eeXsrc:ident, $eeXpol:ident, $eeXsns:ident, $eeXfast:ident) => {
         impl<const IS_FAST: bool> ExternalEventBuilder1To5 for SourceBuilder<$N, IS_FAST> {}

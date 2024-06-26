@@ -26,12 +26,10 @@ use fugit::HertzU64;
 use self::control::HrPwmControl;
 
 use self::deadtime::DeadtimeConfig;
-use self::output::{HrtimChannel, ToHrOut, CH1, CH2};
+use self::output::ToHrOut;
 use self::timer_eev_cfg::EevCfgs;
 
-use crate::pwm::{
-    self, Alignment, ComplementaryImpossible, Pins, Polarity, Pwm, PwmPinEnable, TimerType,
-};
+use crate::pwm::{self, Alignment, Polarity, TimerType};
 use crate::rcc::{GetBusFreq, Rcc};
 use crate::time::Hertz;
 
@@ -152,41 +150,23 @@ pub enum InterleavedMode {
     Quad,
 }
 
-// HrPwmExt trait
-/// Allows the pwm() method to be added to the peripheral register structs from the device crate
-pub trait HrPwmExt: Sized {
-    /// The requested frequency will be rounded to the nearest achievable frequency; the actual frequency may be higher or lower than requested.
-    fn pwm<PINS, T, U, V>(
-        self,
-        _pins: PINS,
-        frequency: T,
-        control: &mut HrPwmControl,
-        rcc: &mut Rcc,
-    ) -> PINS::Channel
-    where
-        PINS: Pins<Self, U, V> + ToHrOut,
-        T: Into<Hertz>,
-        U: HrtimChannel<Pscl128>;
-}
-
 pub trait HrPwmAdvExt: Sized {
     type PreloadSource;
 
-    fn pwm_advanced<PINS, CHANNEL, COMP>(
+    fn pwm_advanced<PINS>(
         self,
         _pins: PINS,
         rcc: &mut Rcc,
-    ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out<Pscl128>>
+    ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS>
     where
-        PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
-        CHANNEL: HrtimChannel<Pscl128>;
+        PINS: ToHrOut<Self>;
 }
 
 /// HrPwmBuilder is used to configure advanced HrTim PWM features
-pub struct HrPwmBuilder<TIM, PSCL, PS, OUT> {
+pub struct HrPwmBuilder<TIM, PSCL, PS, PINS> {
     _tim: PhantomData<TIM>,
     _prescaler: PhantomData<PSCL>,
-    _out: PhantomData<OUT>,
+    pins: PINS,
     timer_mode: HrTimerMode,
     counting_direction: HrCountingDirection,
     base_freq: HertzU64,
@@ -368,6 +348,9 @@ macro_rules! hrtim_finalize_body {
         //let master = unsafe { &*HRTIM_MASTER::ptr() };
         //master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
 
+        // Connect pins and let HRTIM take over control over them
+        $this.pins.connect_to_hrtim();
+
         unsafe {
             MaybeUninit::uninit().assume_init()
         }
@@ -421,17 +404,14 @@ macro_rules! hrtim_common_methods {
         }
 
         /// Set the prescaler; PWM count runs at base_frequency/(prescaler+1)
-        pub fn prescaler<P>(
-            self,
-            _prescaler: P,
-        ) -> HrPwmBuilder<$TIMX, P, $PS, <OUT as ToHrOut>::Out<P>>
+        pub fn prescaler<P>(self, _prescaler: P) -> HrPwmBuilder<$TIMX, P, $PS, PINS>
         where
             P: HrtimPrescaler,
         {
             let HrPwmBuilder {
                 _tim,
                 _prescaler: _,
-                _out,
+                pins,
                 timer_mode,
                 fault_enable_bits,
                 fault1_bits,
@@ -460,7 +440,7 @@ macro_rules! hrtim_common_methods {
             HrPwmBuilder {
                 _tim,
                 _prescaler: PhantomData,
-                _out: PhantomData,
+                pins,
                 timer_mode,
                 fault_enable_bits,
                 fault1_bits,
@@ -521,38 +501,16 @@ macro_rules! hrtim_hal {
     ($($TIMX:ident: ($timXcr:ident, $timXcr2:ident, $perXr:ident, $tXcen:ident, $rep:ident, $repx:ident, $dier:ident, $repie:ident,
         $fltXr:ident, $eefXr1:ident, $eefXr2:ident, $Xeefr3:ident, $outXr:ident, $dtXr:ident),)+) => {
         $(
-
-            // Implement HrPwmExt trait for hrtimer
-            impl HrPwmExt for $TIMX {
-                fn pwm<PINS, T, U, V>(
-                    self,
-                    pins: PINS,
-                    frequency: T,
-                    control: &mut HrPwmControl,
-                    rcc: &mut Rcc,
-                ) -> PINS::Channel
-                where
-                    PINS: Pins<Self, U, V> + ToHrOut,
-                    T: Into<Hertz>,
-                    U: HrtimChannel<Pscl128>,
-                {
-                    let _= self.pwm_advanced(pins, rcc).frequency(frequency).finalize(control);
-
-                    unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
-                }
-            }
-
             impl HrPwmAdvExt for $TIMX {
                 type PreloadSource = PreloadSource;
 
-                fn pwm_advanced<PINS, CHANNEL, COMP>(
+                fn pwm_advanced<PINS>(
                     self,
-                    _pins: PINS,
+                    pins: PINS,
                     rcc: &mut Rcc,
-                ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out<Pscl128>>
+                ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS>
                 where
-                    PINS: Pins<Self, CHANNEL, COMP> + ToHrOut,
-                    CHANNEL: HrtimChannel<Pscl128>
+                    PINS: ToHrOut<$TIMX>,
                 {
                     // TODO: That 32x factor... Is that included below, or should we
                     // do that? Also that will likely risk overflowing u32 since
@@ -562,7 +520,7 @@ macro_rules! hrtim_hal {
                     HrPwmBuilder {
                         _tim: PhantomData,
                         _prescaler: PhantomData,
-                        _out: PhantomData,
+                        pins,
                         timer_mode: HrTimerMode::Continuous,
                         fault_enable_bits: 0b000000,
                         fault1_bits: 0b00,
@@ -583,11 +541,11 @@ macro_rules! hrtim_hal {
                 }
             }
 
-            impl<PSCL, OUT>
-                HrPwmBuilder<$TIMX, PSCL, PreloadSource, OUT>
+            impl<PSCL, PINS>
+                HrPwmBuilder<$TIMX, PSCL, PreloadSource, PINS>
             where
                 PSCL: HrtimPrescaler,
-                OUT: ToHrOut,
+                PINS: ToHrOut<$TIMX>,
             {
                 pub fn finalize(self, _control: &mut HrPwmControl) -> (
                     HrTim<$TIMX, PSCL,
@@ -599,7 +557,7 @@ macro_rules! hrtim_hal {
                             HrCr3<$TIMX, PSCL>,
                             HrCr4<$TIMX, PSCL>
                         ),
-                        OUT,
+                        PINS::Out<PSCL>,
                         timer::DmaChannel<$TIMX>,
                     ) {
 
@@ -702,14 +660,13 @@ macro_rules! hrtim_hal_master {
         impl HrPwmAdvExt for $TIMX {
             type PreloadSource = MasterPreloadSource;
 
-            fn pwm_advanced<PINS, CHANNEL, COMP>(
+            fn pwm_advanced<PINS>(
                 self,
-                _pins: PINS,
+                pins: PINS,
                 rcc: &mut Rcc,
-            ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS::Out<Pscl128>>
+            ) -> HrPwmBuilder<Self, Pscl128, Self::PreloadSource, PINS>
             where
-                PINS: Pins<Self, CHANNEL, COMP> + ToHrOut, // TODO: figure out
-                CHANNEL: HrtimChannel<Pscl128>
+                PINS: ToHrOut<$TIMX>,
             {
                 // TODO: That 32x factor... Is that included below, or should we
                 // do that? Also that will likely risk overflowing u32 since
@@ -719,7 +676,7 @@ macro_rules! hrtim_hal_master {
                 HrPwmBuilder {
                     _tim: PhantomData,
                     _prescaler: PhantomData,
-                    _out: PhantomData,
+                    pins,
                     timer_mode: HrTimerMode::Continuous,
                     fault_enable_bits: 0b000000,
                     fault1_bits: 0b00,
@@ -740,11 +697,11 @@ macro_rules! hrtim_hal_master {
             }
         }
 
-        impl<PSCL, OUT>
-            HrPwmBuilder<$TIMX, PSCL, MasterPreloadSource, OUT>
+        impl<PSCL, PINS>
+            HrPwmBuilder<$TIMX, PSCL, MasterPreloadSource, PINS>
         where
             PSCL: HrtimPrescaler,
-            OUT: ToHrOut,
+            PINS: ToHrOut<$TIMX>,
         {
             pub fn finalize(self, _control: &mut HrPwmControl) -> (
                 HrTim<$TIMX, PSCL,
@@ -767,97 +724,6 @@ macro_rules! hrtim_hal_master {
     )*}
 }
 
-macro_rules! hrtim_pin_hal {
-    ($($TIMX:ident:
-        ($CH:ident, $perXr:ident, $cmpXYr:ident, $cmpYx:ident, $cmpY:ident, $tXYoen:ident, $tXYodis:ident),)+
-     ) => {
-        $(
-            impl<PSCL, COMP, POL, NPOL> hal::PwmPin for Pwm<$TIMX, $CH<PSCL>, COMP, POL, NPOL>
-                where Pwm<$TIMX, $CH<PSCL>, COMP, POL, NPOL>: PwmPinEnable {
-                type Duty = u16;
-
-                // You may not access self in the following methods!
-                // See unsafe above
-
-                fn disable(&mut self) {
-                    self.ccer_disable();
-                }
-
-                fn enable(&mut self) {
-                    self.ccer_enable();
-                }
-
-                fn get_duty(&self) -> Self::Duty {
-                    let tim = unsafe { &*$TIMX::ptr() };
-
-                    tim.$cmpXYr.read().$cmpYx().bits()
-                }
-
-                fn get_max_duty(&self) -> Self::Duty {
-                    let tim = unsafe { &*$TIMX::ptr() };
-
-                    let arr = tim.$perXr.read().perx().bits();
-
-                    // One PWM cycle is ARR+1 counts long
-                    // Valid PWM duty cycles are 0 to ARR+1
-                    // However, if ARR is 65535 on a 16-bit timer, we can't add 1
-                    // In that case, 100% duty cycle is not possible, only 65535/65536
-                    if arr == Self::Duty::MAX {
-                        arr
-                    }
-                    else {
-                        arr + 1
-                    }
-                }
-
-                /// Set duty cycle
-                ///
-                /// NOTE: Please observe limits(RM0440 "Period and compare registers min and max values"):
-                /// | Prescaler | Min duty | Max duty |
-                /// |-----------|----------|----------|
-                /// |         1 |   0x0060 |   0xFFDF |
-                /// |         2 |   0x0030 |   0xFFEF |
-                /// |         4 |   0x0018 |   0xFFF7 |
-                /// |         8 |   0x000C |   0xFFFB |
-                /// |        16 |   0x0006 |   0xFFFD |
-                /// |        32 |   0x0003 |   0xFFFD |
-                /// |        64 |   0x0003 |   0xFFFD |
-                /// |       128 |   0x0003 |   0xFFFD |
-                ///
-                /// Also, writing 0 as duty is only valid for CR1 and CR3 during a set of
-                /// specific conditions(see RM0440 "Null duty cycle exception case"):
-                /// – the output SET event is generated by the PERIOD event
-                /// – the output RESET if generated by the compare 1 (respectively compare 3) event
-                /// – the compare 1 (compare 3) event is active within the timer unit itself, and not used
-                /// for other timing units
-                fn set_duty(&mut self, duty: Self::Duty) {
-                    let tim = unsafe { &*$TIMX::ptr() };
-
-                    tim.$cmpXYr.write(|w| unsafe { w.$cmpYx().bits(duty) });
-                }
-            }
-
-            // Enable implementation for ComplementaryImpossible
-            impl<POL, NPOL, PSCL> PwmPinEnable for Pwm<$TIMX, $CH<PSCL>, ComplementaryImpossible, POL, NPOL> {
-                fn ccer_enable(&mut self) {
-                    // TODO: Should this part only be in Pwm::enable?
-                    // Enable output Y on channel X
-                    // This is a set-only register, no risk for data race
-                    let common = unsafe { &*HRTIM_COMMON::ptr() };
-                    common.oenr.write(|w| { w.$tXYoen().set_bit() });
-                }
-                fn ccer_disable(&mut self) {
-                    // TODO: Should this part only be in Pwm::disable
-                    // Disable output Y on channel X
-                    // This is a write only register, no risk for data race
-                    let common = unsafe { &*HRTIM_COMMON::ptr() };
-                    common.odisr.write(|w| { w.$tXYodis().set_bit() });
-                }
-            }
-        )+
-    }
-}
-
 hrtim_hal! {
     HRTIM_TIMA: (timacr, timacr2, perar, tacen, repar, repx, timadier, repie, fltar, eefar1, eefar2, aeefr3, outar, dtar),
     HRTIM_TIMB: (timbcr, timbcr2, perbr, tbcen, repbr, repx, timbdier, repie, fltbr, eefbr1, eefbr2, beefr3, outbr, dtbr),
@@ -869,26 +735,6 @@ hrtim_hal! {
 
 hrtim_hal_master! {
     HRTIM_MASTER: (mcr, ck_psc, mper, mper, mrep, mcen, mdier, mrepie),
-}
-
-hrtim_pin_hal! {
-    HRTIM_TIMA: (CH1, perar, cmp1ar, cmp1x, cmp1, ta1oen, ta1odis),
-    HRTIM_TIMA: (CH2, perar, cmp3ar, cmp3x, cmp3, ta2oen, ta2odis),
-
-    HRTIM_TIMB: (CH1, perbr, cmp1br, cmp1x, cmp1, tb1oen, tb1odis),
-    HRTIM_TIMB: (CH2, perbr, cmp3br, cmp3x, cmp3, tb2oen, tb2odis),
-
-    HRTIM_TIMC: (CH1, percr, cmp1cr, cmp1x, cmp1, tc1oen, tc1odis),
-    HRTIM_TIMC: (CH2, percr, cmp3cr, cmp3x, cmp3, tc2oen, tc2odis),
-
-    HRTIM_TIMD: (CH1, perdr, cmp1dr, cmp1x, cmp1, td1oen, td1odis),
-    HRTIM_TIMD: (CH2, perdr, cmp3dr, cmp3x, cmp3, td2oen, td2odis),
-
-    HRTIM_TIME: (CH1, perer, cmp1er, cmp1x, cmp1, te1oen, te1odis),
-    HRTIM_TIME: (CH2, perer, cmp3er, cmp3x, cmp3, te2oen, te2odis),
-
-    HRTIM_TIMF: (CH1, perfr, cmp1fr, cmp1x, cmp1, tf1oen, tf1odis),
-    HRTIM_TIMF: (CH2, perfr, cmp3fr, cmp3x, cmp3, tf2oen, tf2odis),
 }
 
 /// # Safety
