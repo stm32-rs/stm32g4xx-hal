@@ -85,7 +85,7 @@ impl Temperature {
     /// ## Arguments
     /// * `sample`: ADC sample taken on the [`Temperature`] channel.
     /// * `vdda`: Analog reference voltage (vref+) when the temperature
-    /// sample was taken, in volts.
+    ///     sample was taken, in volts.
     /// * `resolution`: Configured ADC resolution.
     #[inline(always)]
     pub fn temperature_to_degrees_centigrade(
@@ -110,7 +110,7 @@ impl Temperature {
     /// ## Arguments
     /// * `sample`: ADC sample taken on the [`Temperature`] channel.
     /// * `vdda`: Analog reference voltage (vref+) when the temperature
-    /// sample was taken, in millivolts.
+    ///     sample was taken, in millivolts.
     /// * `resolution`: Configured ADC resolution.
     #[inline(always)]
     pub fn temperature_to_degrees_centigrade_coarse(
@@ -1901,7 +1901,7 @@ macro_rules! adc {
                 /// * `channel` - channel to configure
                 /// * `sequence` - where in the sequence to sample the channel. Also called rank in some STM docs/code
                 /// * `sample_time` - how long to sample for. See datasheet and ref manual to work out how long you need\
-                /// to sample for at a given ADC clock frequency
+                ///     to sample for at a given ADC clock frequency
                 pub fn configure_channel<CHANNEL>(&mut self, _channel: &CHANNEL, sequence: config::Sequence, sample_time: config::SampleTime)
                 where
                     CHANNEL: Channel<stm32::$adc_type, ID=u8>
@@ -2122,6 +2122,7 @@ macro_rules! adc {
                 /// Enables the ADC clock, resets the peripheral (optionally), runs calibration and applies the supplied config
                 /// # Arguments
                 /// * `reset` - should a reset be performed. This is provided because on some devices multiple ADCs share the same common reset
+                ///
                 /// TODO: fix needing SYST
                 #[inline(always)]
                 fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>, reset: bool) -> Adc<stm32::$adc_type, Disabled> {
@@ -2407,7 +2408,7 @@ macro_rules! adc {
                 /// * `channel` - channel to configure
                 /// * `sequence` - where in the sequence to sample the channel. Also called rank in some STM docs/code
                 /// * `sample_time` - how long to sample for. See datasheet and ref manual to work out how long you need\
-                /// to sample for at a given ADC clock frequency
+                ///     to sample for at a given ADC clock frequency
                 #[inline(always)]
                 pub fn configure_channel<CHANNEL>(&mut self, channel: &CHANNEL, sequence: config::Sequence, sample_time: config::SampleTime)
                 where
