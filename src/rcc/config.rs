@@ -40,7 +40,7 @@ pub enum LSCOSrc {
 
 /// PLL clock input source
 #[derive(Clone, Copy)]
-pub enum PLLSrc {
+pub enum PllSrc {
     HSI,
     HSE(Hertz),
     HSE_BYPASS(Hertz),
@@ -304,7 +304,7 @@ impl PllNMul {
 /// PLL config
 #[derive(Clone, Copy)]
 pub struct PllConfig {
-    pub mux: PLLSrc,
+    pub mux: PllSrc,
     pub m: PllMDiv,
     pub n: PllNMul,
     pub r: Option<PllRDiv>,
@@ -315,7 +315,7 @@ pub struct PllConfig {
 impl Default for PllConfig {
     fn default() -> PllConfig {
         PllConfig {
-            mux: PLLSrc::HSI,
+            mux: PllSrc::HSI,
             m: PllMDiv::DIV_2,
             n: PllNMul::MUL_8,
             r: Some(PllRDiv::DIV_2),
