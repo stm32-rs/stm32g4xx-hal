@@ -58,9 +58,11 @@ impl defmt::Format for Time {
     fn format(&self, f: defmt::Formatter) {
         // format the bitfields of the register as struct fields
         defmt::write!(
-           f,
-           "{:02}:{:02}:{:02}",
-           self.hours, self.minutes, self.seconds
+            f,
+            "{:02}:{:02}:{:02}",
+            self.hours,
+            self.minutes,
+            self.seconds
         )
     }
 }
@@ -87,11 +89,7 @@ impl Date {
 impl defmt::Format for Date {
     fn format(&self, f: defmt::Formatter) {
         // format the bitfields of the register as struct fields
-        defmt::write!(
-           f,
-           "{:04}-{:02}-{:02}",
-           self.year, self.month, self.day
-        )
+        defmt::write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
     }
 }
 
