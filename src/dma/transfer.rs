@@ -707,7 +707,7 @@ transfer_constructor!(
     feature = "stm32g483",
     feature = "stm32g484",
     feature = "stm32g491",
-    feature = "stm32g49a",
+    feature = "stm32g4a1",
 ))]
 transfer_constructor!(
     (DMA1, Stream6),

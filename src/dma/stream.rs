@@ -523,7 +523,7 @@ macro_rules! dma_stream {
     feature = "stm32g483",
     feature = "stm32g484",
     feature = "stm32g491",
-    feature = "stm32g49a",
+    feature = "stm32g4a1",
 ))]
 dma_stream!(
     // Note: the field names start from one, unlike the RM where they start from
