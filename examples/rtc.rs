@@ -3,10 +3,10 @@
 
 use hal::{
     delay::SYSTDelayExt,
-    rcc::{Config, RccExt},
+    rcc::RccExt,
+    rtc::RtcExt,
     stm32::Peripherals,
-    time::{Time, Date, Year, Month, MonthDay, Hour, Minute, Second, ExtU32},
-    hal::prelude::*, rtc::RtcExt
+    time::{Date, ExtU32, Month, MonthDay, Time, Year},
 };
 use stm32g4xx_hal as hal;
 
@@ -28,23 +28,20 @@ fn main() -> ! {
 
     info!("rcc");
 
-    let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::hsi());
+    let mut rcc = dp.RCC.constrain();
 
     info!("Setup rtc");
     let mut delay = cp.SYST.delay(&rcc.clocks);
-    let mut rtc = dp
-        .RTC
-        .constrain(&mut rcc);
+    let mut rtc = dp.RTC.constrain(&mut rcc);
 
     info!("Setup date");
-    rtc.set_date(&Date::new(Year(2023), Month(6), MonthDay(4)));
-    rtc.set_time(&Time::new(18.hours(), 43.minutes(), 2.secs(), true));
+    rtc.set_date(&Date::new(Year(2024), Month(8), MonthDay(5)));
+    rtc.set_time(&Time::new(0.hours(), 59.minutes(), 2.secs(), true));
 
     info!("Enter Loop");
 
     loop {
-        info!("Timestamp: {} {}", rtc.get_date(), rtc.get_time());
+        info!("Timestamp: {:?} {:?}", rtc.get_date(), rtc.get_time());
         delay.delay_ms(500);
     }
 }

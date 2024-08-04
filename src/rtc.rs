@@ -1,7 +1,9 @@
 //! Real Time Clock
+use core::convert::TryInto;
+
 use crate::rcc::{RTCSrc, Rcc};
 use crate::stm32::RTC;
-use crate::time::*;
+use crate::time::{self, *};
 
 #[derive(Debug, PartialEq, Eq)]
 pub enum RtcHourFormat {
@@ -24,10 +26,10 @@ pub enum Event {
 
 #[derive(Debug, Default, PartialEq, Eq)]
 pub struct Alarm {
-    day: Option<u32>,
-    hours: Option<u32>,
-    minutes: Option<u32>,
-    seconds: Option<u32>,
+    day: Option<u8>,
+    hours: Option<u8>,
+    minutes: Option<u8>,
+    seconds: Option<u8>,
     subseconds: u16,
     subseconds_mask_bits: u8,
     use_weekday: bool,
@@ -38,29 +40,29 @@ impl Alarm {
         Self::default()
     }
 
-    pub fn set_month_day(mut self, day: u32) -> Self {
+    pub fn set_month_day(mut self, day: time::MonthDay) -> Self {
         self.use_weekday = false;
-        self.day = Some(day);
+        self.day = Some(day.0.try_into().unwrap());
         self
     }
 
-    pub fn set_week_day(mut self, day: u32) -> Self {
+    pub fn set_week_day(mut self, day: time::WeekDay) -> Self {
         self.use_weekday = true;
-        self.day = Some(day);
+        self.day = Some(day.0.try_into().unwrap());
         self
     }
 
-    pub fn set_hours(mut self, val: u32) -> Self {
+    pub fn set_hours(mut self, val: u8) -> Self {
         self.hours = Some(val);
         self
     }
 
-    pub fn set_minutes(mut self, val: u32) -> Self {
+    pub fn set_minutes(mut self, val: u8) -> Self {
         self.minutes = Some(val);
         self
     }
 
-    pub fn set_seconds(mut self, val: u32) -> Self {
+    pub fn set_seconds(mut self, val: u8) -> Self {
         self.seconds = Some(val);
         self
     }
@@ -118,7 +120,7 @@ impl Rtc {
     }
 
     pub fn set_date(&mut self, date: &Date) {
-        let (yt, yu) = bcd2_encode(date.year - 1970);
+        let (yt, yu) = bcd2_encode((date.year - 2000).try_into().unwrap());
         let (mt, mu) = bcd2_encode(date.month);
         let (dt, du) = bcd2_encode(date.day);
 
@@ -137,7 +139,7 @@ impl Rtc {
                     .yu()
                     .bits(yu)
                     .wdu()
-                    .bits(date.day as u8)
+                    .bits(date.day)
             });
         });
     }
@@ -180,7 +182,7 @@ impl Rtc {
     pub fn get_date(&self) -> Date {
         let date = self.rb.dr.read();
         Date::new(
-            (bcd2_decode(date.yt().bits(), date.yu().bits()) + 1970).year(),
+            (bcd2_decode(date.yt().bits(), date.yu().bits()) + 2000).year(),
             bcd2_decode(date.mt().bit() as u8, date.mu().bits()).month(),
             bcd2_decode(date.dt().bits(), date.du().bits()).day(),
         )
@@ -192,10 +194,10 @@ impl Rtc {
 
     pub fn set_alarm_a(&mut self, alarm: impl Into<Alarm>) {
         let alarm = alarm.into();
-        let (dt, du) = bcd2_encode(alarm.day.unwrap_or_default() as u32);
-        let (ht, hu) = bcd2_encode(alarm.hours.unwrap_or_default() as u32);
-        let (mt, mu) = bcd2_encode(alarm.minutes.unwrap_or_default() as u32);
-        let (st, su) = bcd2_encode(alarm.seconds.unwrap_or_default() as u32);
+        let (dt, du) = bcd2_encode(alarm.day.unwrap_or_default());
+        let (ht, hu) = bcd2_encode(alarm.hours.unwrap_or_default());
+        let (mt, mu) = bcd2_encode(alarm.minutes.unwrap_or_default());
+        let (st, su) = bcd2_encode(alarm.seconds.unwrap_or_default());
 
         self.modify(|rb| {
             rb.alrmassr.write(|w| unsafe {
@@ -225,10 +227,10 @@ impl Rtc {
     }
 
     pub fn set_alarm_b(&mut self, alarm: Alarm) {
-        let (dt, du) = bcd2_encode(alarm.day.unwrap_or_default() as u32);
-        let (ht, hu) = bcd2_encode(alarm.hours.unwrap_or_default() as u32);
-        let (mt, mu) = bcd2_encode(alarm.minutes.unwrap_or_default() as u32);
-        let (st, su) = bcd2_encode(alarm.seconds.unwrap_or_default() as u32);
+        let (dt, du) = bcd2_encode(alarm.day.unwrap_or_default());
+        let (ht, hu) = bcd2_encode(alarm.hours.unwrap_or_default());
+        let (mt, mu) = bcd2_encode(alarm.minutes.unwrap_or_default());
+        let (st, su) = bcd2_encode(alarm.seconds.unwrap_or_default());
 
         self.modify(|rb| {
             rb.alrmbssr.write(|w| unsafe {
@@ -354,6 +356,7 @@ pub trait RtcOutputPin {
     fn release(self) -> Self;
 }
 
+// TODO: Add support for RTC_OUT1 and RTC_OUT2
 /*macro_rules! rtc_out_pins {
     ($($pin:ty: ($af_mode:expr, $ch:expr),)+) => {
         $(
@@ -379,19 +382,13 @@ rtc_out_pins! {
     PC13<DefaultMode>: (AltFunction::AF3, false),
 }*/
 
-fn bcd2_encode(word: u32) -> (u8, u8) {
-    let mut value = word as u8;
-    let mut bcd_high: u8 = 0;
-    while value >= 10 {
-        bcd_high += 1;
-        value -= 10;
-    }
-    let bcd_low = ((bcd_high << 4) | value) as u8;
+fn bcd2_encode(word: u8) -> (u8, u8) {
+    let bcd_high = word / 10;
+    let bcd_low = word % 10;
     (bcd_high, bcd_low)
 }
 
-fn bcd2_decode(fst: u8, snd: u8) -> u32 {
-    let value = snd | fst << 4;
-    let value = (value & 0x0F) + ((value & 0xF0) >> 4) * 10;
+fn bcd2_decode(tens: u8, unit: u8) -> u32 {
+    let value = unit + 10 * tens;
     value as u32
 }

@@ -35,18 +35,19 @@ pub struct Year(pub u32);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Time {
-    pub hours: u32,
-    pub minutes: u32,
-    pub seconds: u32,
+    pub hours: u8,
+    pub minutes: u8,
+    pub seconds: u8,
     pub daylight_savings: bool,
 }
 
 impl Time {
     pub fn new(hours: Hour, minutes: Minute, seconds: Second, daylight_savings: bool) -> Self {
+        use core::convert::TryInto;
         Self {
-            hours: hours.ticks(),
-            minutes: minutes.ticks(),
-            seconds: seconds.ticks(),
+            hours: hours.ticks().try_into().unwrap(),
+            minutes: minutes.ticks().try_into().unwrap(),
+            seconds: seconds.ticks().try_into().unwrap(),
             daylight_savings,
         }
     }
@@ -66,17 +67,18 @@ impl defmt::Format for Time {
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Date {
-    pub day: u32,
-    pub month: u32,
-    pub year: u32,
+    pub year: u16,
+    pub month: u8,
+    pub day: u8,
 }
 
 impl Date {
     pub fn new(year: Year, month: Month, day: MonthDay) -> Self {
+        use core::convert::TryInto;
         Self {
-            day: day.0,
-            month: month.0,
-            year: year.0,
+            day: day.0.try_into().unwrap(),
+            month: month.0.try_into().unwrap(),
+            year: year.0.try_into().unwrap(),
         }
     }
 }
