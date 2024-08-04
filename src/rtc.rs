@@ -1,7 +1,7 @@
 //! Real Time Clock
 use core::convert::TryInto;
 
-use crate::rcc::{RTCSrc, Rcc};
+use crate::rcc::{RtcSrc, Rcc};
 use crate::stm32::RTC;
 use crate::time::{self, *};
 
@@ -108,7 +108,7 @@ pub struct Rtc {
 }
 
 impl Rtc {
-    pub fn new(rtc: RTC, src: RTCSrc, rcc: &mut Rcc) -> Self {
+    pub fn new(rtc: RTC, src: RtcSrc, rcc: &mut Rcc) -> Self {
         rcc.enable_rtc(src);
         Rtc { rb: rtc }
     }
@@ -346,7 +346,7 @@ pub trait RtcExt {
 
 impl RtcExt for RTC {
     fn constrain(self, rcc: &mut Rcc) -> Rtc {
-        Rtc::new(self, RTCSrc::LSI, rcc)
+        Rtc::new(self, RtcSrc::LSI, rcc)
     }
 }
 

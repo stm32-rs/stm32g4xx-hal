@@ -465,7 +465,7 @@ impl Rcc {
         while pwr.cr1.read().dbp().bit_is_clear() {}
     }
 
-    pub(crate) fn enable_rtc(&self, src: RTCSrc) {
+    pub(crate) fn enable_rtc(&self, src: RtcSrc) {
         self.unlock_rtc();
         self.rb
             .apb1enr1
@@ -474,9 +474,9 @@ impl Rcc {
         self.rb.bdcr.modify(|_, w| w.bdrst().set_bit());
 
         let rtc_sel = match src {
-            RTCSrc::LSE | RTCSrc::LSE_BYPASS => 0b01,
-            RTCSrc::LSI => 0b10,
-            RTCSrc::HSE | RTCSrc::HSE_BYPASS => 0b11,
+            RtcSrc::LSE | RtcSrc::LSE_BYPASS => 0b01,
+            RtcSrc::LSI => 0b10,
+            RtcSrc::HSE | RtcSrc::HSE_BYPASS => 0b11,
         };
 
         self.rb.bdcr.modify(|_, w| {
@@ -490,11 +490,11 @@ impl Rcc {
 
         self.unlock_rtc();
         match src {
-            RTCSrc::LSE => self.enable_lse(false),
-            RTCSrc::LSE_BYPASS => self.enable_lse(true),
-            RTCSrc::LSI => self.enable_lsi(),
-            RTCSrc::HSE => self.enable_hse(false),
-            RTCSrc::HSE_BYPASS => self.enable_hse(true),
+            RtcSrc::LSE => self.enable_lse(false),
+            RtcSrc::LSE_BYPASS => self.enable_lse(true),
+            RtcSrc::LSI => self.enable_lsi(),
+            RtcSrc::HSE => self.enable_hse(false),
+            RtcSrc::HSE_BYPASS => self.enable_hse(true),
         };
     }
 }

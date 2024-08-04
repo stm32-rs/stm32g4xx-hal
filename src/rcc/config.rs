@@ -48,7 +48,7 @@ pub enum PLLSrc {
 
 /// RTC clock input source
 #[derive(Clone, Copy)]
-pub enum RTCSrc {
+pub enum RtcSrc {
     LSE,
     LSE_BYPASS,
     LSI,
