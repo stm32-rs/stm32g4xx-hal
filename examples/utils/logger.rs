@@ -33,7 +33,7 @@ cfg_if::cfg_if! {
                     InterruptSync::new(
                         // We must not use Peripherals::steal() here to get an ITM instance, as the
                         // code might expect to be able to call Peripherals::take() later on.
-                        ItmDest::new(core::mem::transmute(()))
+                        ItmDest::new(core::mem::transmute::<(), stm32g4xx_hal::stm32::ITM>(()))
                     )
                 },
             };
