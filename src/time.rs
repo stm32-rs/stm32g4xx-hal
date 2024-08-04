@@ -35,19 +35,18 @@ pub struct Year(pub u32);
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Time {
-    pub hours: u8,
-    pub minutes: u8,
-    pub seconds: u8,
+    pub hours: Hour,
+    pub minutes: Minute,
+    pub seconds: Second,
     pub daylight_savings: bool,
 }
 
 impl Time {
     pub fn new(hours: Hour, minutes: Minute, seconds: Second, daylight_savings: bool) -> Self {
-        use core::convert::TryInto;
         Self {
-            hours: hours.ticks().try_into().unwrap(),
-            minutes: minutes.ticks().try_into().unwrap(),
-            seconds: seconds.ticks().try_into().unwrap(),
+            hours,
+            minutes,
+            seconds,
             daylight_savings,
         }
     }
@@ -60,28 +59,23 @@ impl defmt::Format for Time {
         defmt::write!(
             f,
             "{:02}:{:02}:{:02}",
-            self.hours,
-            self.minutes,
-            self.seconds
+            self.hours.ticks(),
+            self.minutes.ticks(),
+            self.seconds.ticks()
         )
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Date {
-    pub year: u16,
-    pub month: u8,
-    pub day: u8,
+    pub year: Year,
+    pub month: Month,
+    pub day: MonthDay,
 }
 
 impl Date {
     pub fn new(year: Year, month: Month, day: MonthDay) -> Self {
-        use core::convert::TryInto;
-        Self {
-            day: day.0.try_into().unwrap(),
-            month: month.0.try_into().unwrap(),
-            year: year.0.try_into().unwrap(),
-        }
+        Self { day, month, year }
     }
 }
 
@@ -89,7 +83,13 @@ impl Date {
 impl defmt::Format for Date {
     fn format(&self, f: defmt::Formatter) {
         // format the bitfields of the register as struct fields
-        defmt::write!(f, "{:04}-{:02}-{:02}", self.year, self.month, self.day)
+        defmt::write!(
+            f,
+            "{:04}-{:02}-{:02}",
+            self.year.0,
+            self.month.0,
+            self.day.0
+        )
     }
 }
 

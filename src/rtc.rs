@@ -1,7 +1,7 @@
 //! Real Time Clock
 use core::convert::TryInto;
 
-use crate::rcc::{RtcSrc, Rcc};
+use crate::rcc::{Rcc, RtcSrc};
 use crate::stm32::RTC;
 use crate::time::{self, *};
 
@@ -52,18 +52,18 @@ impl Alarm {
         self
     }
 
-    pub fn set_hours(mut self, val: u8) -> Self {
-        self.hours = Some(val);
+    pub fn set_hours(mut self, val: time::Hour) -> Self {
+        self.hours = Some(val.ticks().try_into().unwrap());
         self
     }
 
-    pub fn set_minutes(mut self, val: u8) -> Self {
-        self.minutes = Some(val);
+    pub fn set_minutes(mut self, val: time::Minute) -> Self {
+        self.minutes = Some(val.ticks().try_into().unwrap());
         self
     }
 
-    pub fn set_seconds(mut self, val: u8) -> Self {
-        self.seconds = Some(val);
+    pub fn set_seconds(mut self, val: time::Second) -> Self {
+        self.seconds = Some(val.ticks().try_into().unwrap());
         self
     }
 
@@ -120,9 +120,9 @@ impl Rtc {
     }
 
     pub fn set_date(&mut self, date: &Date) {
-        let (yt, yu) = bcd2_encode((date.year - 2000).try_into().unwrap());
-        let (mt, mu) = bcd2_encode(date.month);
-        let (dt, du) = bcd2_encode(date.day);
+        let (yt, yu) = bcd2_encode((date.year.0 - 2000).try_into().unwrap());
+        let (mt, mu) = bcd2_encode(date.month.0.try_into().unwrap());
+        let (dt, du) = bcd2_encode(date.day.0.try_into().unwrap());
 
         self.modify(|rb| {
             rb.dr.write(|w| unsafe {
@@ -139,15 +139,15 @@ impl Rtc {
                     .yu()
                     .bits(yu)
                     .wdu()
-                    .bits(date.day)
+                    .bits(date.day.0.try_into().unwrap())
             });
         });
     }
 
     pub fn set_time(&mut self, time: &Time) {
-        let (ht, hu) = bcd2_encode(time.hours);
-        let (mnt, mnu) = bcd2_encode(time.minutes);
-        let (st, su) = bcd2_encode(time.seconds);
+        let (ht, hu) = bcd2_encode(time.hours.ticks().try_into().unwrap());
+        let (mnt, mnu) = bcd2_encode(time.minutes.ticks().try_into().unwrap());
+        let (st, su) = bcd2_encode(time.seconds.ticks().try_into().unwrap());
         self.modify(|rb| {
             rb.tr.write(|w| unsafe {
                 w.ht()
