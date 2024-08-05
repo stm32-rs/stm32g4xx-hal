@@ -27,7 +27,7 @@ fn main() -> ! {
 
     let mut pwm = dp.TIM1.pwm(pin, 100.Hz(), &mut rcc);
 
-    let _ = pwm.set_duty_cycle(pwm.max_duty_cycle() / 2);
+    let _ = pwm.set_duty_cycle_percent(50);
     pwm.enable();
 
     loop {
