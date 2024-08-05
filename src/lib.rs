@@ -88,6 +88,7 @@ pub mod pwm;
 pub mod pwr;
 // pub mod qei;
 pub mod rcc;
+pub mod rtc;
 // pub mod rng;
 pub mod serial;
 pub mod signature;
