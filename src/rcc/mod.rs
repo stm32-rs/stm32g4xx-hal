@@ -244,15 +244,15 @@ impl Rcc {
 
         // Enable the input clock feeding the PLL
         let (pll_input_freq, pll_src_bits) = match pll_cfg.mux {
-            PLLSrc::HSI => {
+            PllSrc::HSI => {
                 self.enable_hsi();
                 (HSI_FREQ, 0b10)
             }
-            PLLSrc::HSE(freq) => {
+            PllSrc::HSE(freq) => {
                 self.enable_hse(false);
                 (freq.raw(), 0b11)
             }
-            PLLSrc::HSE_BYPASS(freq) => {
+            PllSrc::HSE_BYPASS(freq) => {
                 self.enable_hse(true);
                 (freq.raw(), 0b11)
             }
