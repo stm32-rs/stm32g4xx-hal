@@ -74,6 +74,8 @@ cortex-m-log = { version = "0.7", features = ["log-integration"] }
 cfg-if = "0.1.10"
 mpu6050 = "0.1.4"
 bme680 = "0.6.0"
+sh1106 = { git = "https://github.com/techmccat/sh1106.git", branch = "hal-1", version = "0.5.0" }
+embedded-graphics = "0.8.0"
 embedded-sdmmc = "0.3.0"
 
 #TODO: Separate feature sets
