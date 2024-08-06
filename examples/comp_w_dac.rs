@@ -11,15 +11,15 @@ use rt::entry;
 #[entry]
 fn main() -> ! {
     use embedded_hal_old::Direction;
-    use stm32g4xx_hal as hal;
     use hal::comparator::{self, ComparatorExt, ComparatorSplit};
     use hal::dac::{Dac1IntSig1, DacExt, DacOut};
     use hal::delay::DelayFromCountDownTimer;
-    use hal::time::ExtU32;
-    use hal::timer::Timer;
     use hal::gpio::GpioExt;
     use hal::rcc::RccExt;
     use hal::stm32;
+    use hal::time::ExtU32;
+    use hal::timer::Timer;
+    use stm32g4xx_hal as hal;
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     // let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");

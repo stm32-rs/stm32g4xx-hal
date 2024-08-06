@@ -7,11 +7,11 @@ extern crate cortex_m_rt as rt;
 
 use core::fmt::Write;
 
-use stm32g4xx_hal as hal;
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::serial::*;
 use hal::{rcc, stm32};
+use stm32g4xx_hal as hal;
 // TODO: switch to embedded-hal-nb
 use hal::hal_02::serial::Read;
 

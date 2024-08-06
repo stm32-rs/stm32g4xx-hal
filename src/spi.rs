@@ -24,8 +24,8 @@ use crate::time::Hertz;
 use core::cell::UnsafeCell;
 use core::ptr;
 
-pub use embedded_hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
 use embedded_hal::spi::ErrorKind;
+pub use embedded_hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
 
 /// SPI error
 #[derive(Debug)]
@@ -309,7 +309,7 @@ macro_rules! spi {
                     *r = nb::block!(self.nb_read())?;
                 }
                 read[common_len-1] = nb::block!(self.nb_read())?;
-                
+
                 if read.len() > common_len {
                     self.read(&mut read[common_len..])
                 } else {
@@ -325,7 +325,7 @@ macro_rules! spi {
                 for rw in cells.windows(2) {
                     let r = &rw[0];
                     let w = &rw[1];
-                    
+
                     nb::block!(self.nb_write(w.get()))?;
                     r.set(nb::block!(self.nb_read())?);
                 }

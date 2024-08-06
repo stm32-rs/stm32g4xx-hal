@@ -3,12 +3,12 @@
 
 use crate::hal::{
     adc::{config::SampleTime, AdcClaim},
-    time::ExtU32,
-    timer::Timer,
     delay::DelayFromCountDownTimer,
     pwr::PwrExt,
     rcc::Config,
     stm32::Peripherals,
+    time::ExtU32,
+    timer::Timer,
 };
 use hal::prelude::*;
 use stm32g4xx_hal as hal;
