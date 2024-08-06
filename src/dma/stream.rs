@@ -508,28 +508,15 @@ macro_rules! dma_stream {
     };
 }
 
-
 dma_stream!(
     // Note: the field names start from one, unlike the RM where they start from
     // zero. May need updating if it gets fixed upstream.
-    (
-        Stream0, 0, 1
-    ),
-    (
-        Stream1, 1, 2
-    ),
-    (
-        Stream2, 2, 3
-    ),
-    (
-        Stream3, 3, 4
-    ),
-    (
-        Stream4, 4, 5
-    ),
-    (
-        Stream5, 5, 6
-    ),
+    (Stream0, 0, 1),
+    (Stream1, 1, 2),
+    (Stream2, 2, 3),
+    (Stream3, 3, 4),
+    (Stream4, 4, 5),
+    (Stream5, 5, 6),
 );
 
 // Cat 3 and 4 devices
@@ -545,10 +532,6 @@ dma_stream!(
 dma_stream!(
     // Note: the field names start from one, unlike the RM where they start from
     // zero. May need updating if it gets fixed upstream.
-    (
-        Stream6, 6, 7
-    ),
-    (
-        Stream7, 7, 8
-    ),
+    (Stream6, 6, 7),
+    (Stream7, 7, 8),
 );
