@@ -93,7 +93,7 @@ impl IndependentWatchdog {
         }
         self.iwdg
             .winr()
-            .write(|w| unsafe { w.win().bits(Self::MAX_COUNTER_VALUE as u16) } );
+            .write(|w| unsafe { w.win().bits(Self::MAX_COUNTER_VALUE as u16) });
 
         // Calculate the counter values
         let reload_value = max_window_time.to_millis() * (Self::CLOCK_SPEED / 1000)
@@ -105,7 +105,9 @@ impl IndependentWatchdog {
         while self.iwdg.sr().read().rvu().bit_is_set() {
             cortex_m::asm::nop();
         }
-        self.iwdg.rlr().write(|w| unsafe { w.rl().bits(reload_value as u16) });
+        self.iwdg
+            .rlr()
+            .write(|w| unsafe { w.rl().bits(reload_value as u16) });
 
         self.feed();
         // Enable register access
