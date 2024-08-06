@@ -5,11 +5,9 @@
 
 use stm32g4xx_hal as hal;
 
-use hal::delay::DelayFromCountDownTimer;
-use hal::timer::Timer;
-use hal::time::ExtU32;
 use hal::adc::AdcClaim;
 use hal::adc::ClockSource;
+use hal::delay::DelayFromCountDownTimer;
 use hal::gpio::gpioa::*;
 use hal::gpio::Analog;
 use hal::opamp::opamp1::IntoPga as _;
@@ -18,6 +16,8 @@ use hal::opamp::NonInvertingGain;
 use hal::opamp::PgaModeInternal;
 use hal::prelude::*;
 use hal::pwr::PwrExt;
+use hal::time::ExtU32;
+use hal::timer::Timer;
 
 use utils::logger::info;
 

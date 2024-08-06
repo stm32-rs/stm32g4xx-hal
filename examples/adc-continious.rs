@@ -6,14 +6,14 @@ use crate::hal::{
         config::{Continuous, Resolution, SampleTime, Sequence},
         AdcClaim, ClockSource, Temperature, Vref,
     },
-    time::ExtU32,
-    timer::Timer,
     delay::DelayFromCountDownTimer,
     gpio::GpioExt,
     pwr::PwrExt,
     rcc::{Config, RccExt},
     signature::{VrefCal, VDDA_CALIB},
     stm32::Peripherals,
+    time::ExtU32,
+    timer::Timer,
 };
 use stm32g4xx_hal as hal;
 

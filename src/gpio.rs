@@ -728,7 +728,7 @@ macro_rules! gpio {
                 impl<MODE> embedded_hal::digital::ErrorType for $PXi<Input<MODE>> {
                     type Error = core::convert::Infallible;
                 }
-                
+
                 impl<MODE> embedded_hal::digital::InputPin for $PXi<Input<MODE>> {
                     fn is_high(&mut self) -> Result<bool, Self::Error> {
                         let is_high = !self.is_low()?;

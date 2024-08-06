@@ -101,7 +101,10 @@ impl U32Ext for u32 {
     }
 }
 
-pub fn duration<const NOM: u32, const DENOM: u32>(hz: Hertz, cycles: u32) -> Duration<u32, NOM, DENOM> {
+pub fn duration<const NOM: u32, const DENOM: u32>(
+    hz: Hertz,
+    cycles: u32,
+) -> Duration<u32, NOM, DENOM> {
     let cycles = cycles as u64;
     let clk = hz.raw() as u64;
     let us = cycles.saturating_mul(DENOM as u64) / clk / NOM as u64;

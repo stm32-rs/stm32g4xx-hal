@@ -3,6 +3,7 @@
 #![no_main]
 #![no_std]
 
+use embedded_hal::delay::DelayNs;
 use hal::delay::DelayFromCountDownTimer;
 use hal::prelude::*;
 use hal::pwr::PwrExt;
@@ -11,7 +12,6 @@ use hal::stm32;
 use hal::time::ExtU32;
 use hal::timer::Timer;
 use stm32g4xx_hal as hal;
-use embedded_hal::delay::DelayNs;
 
 use cortex_m_rt::entry;
 use utils::logger::info;

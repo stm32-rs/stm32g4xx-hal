@@ -12,6 +12,7 @@ use hal::{
     gpio::gpioa::PA7,
     gpio::Alternate,
     gpio::AF5,
+    hal_02::spi::FullDuplex,
     prelude::*,
     pwr::PwrExt,
     rcc::Config,
@@ -19,7 +20,6 @@ use hal::{
     stm32::Peripherals,
     time::{ExtU32, RateExtU32},
     timer::Timer,
-    hal_02::spi::FullDuplex,
 };
 
 use cortex_m_rt::entry;

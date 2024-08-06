@@ -10,11 +10,11 @@
 
 use embedded_hal_old::Direction;
 use hal::dac::{DacExt, DacOut, GeneratorConfig};
+use hal::delay::DelayFromCountDownTimer;
 use hal::gpio::GpioExt;
 use hal::rcc::RccExt;
 use hal::time::ExtU32;
 use hal::timer::Timer;
-use hal::delay::DelayFromCountDownTimer;
 use stm32g4xx_hal as hal;
 mod utils;
 extern crate cortex_m_rt as rt;

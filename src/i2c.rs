@@ -1,6 +1,6 @@
 //! I2C
-use embedded_hal_old::blocking::i2c::{Read, Write, WriteRead};
 use embedded_hal::i2c::{ErrorKind, Operation, SevenBitAddress, TenBitAddress};
+use embedded_hal_old::blocking::i2c::{Read, Write, WriteRead};
 
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*};
 #[cfg(any(
@@ -135,7 +135,7 @@ impl embedded_hal::i2c::Error for Error {
             Self::Nack => ErrorKind::NoAcknowledge(embedded_hal::i2c::NoAcknowledgeSource::Unknown),
             Self::PECError => ErrorKind::Other,
             Self::BusError => ErrorKind::Bus,
-            Self::ArbitrationLost => ErrorKind::ArbitrationLoss
+            Self::ArbitrationLost => ErrorKind::ArbitrationLoss,
         }
     }
 }

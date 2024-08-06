@@ -10,8 +10,6 @@ use crate::hal::{
         config::{Continuous, Dma as AdcDma, SampleTime, Sequence},
         AdcClaim, ClockSource, Temperature, Vref,
     },
-    time::ExtU32,
-    timer::Timer,
     delay::DelayFromCountDownTimer,
     dma::{config::DmaConfig, stream::DMAExt, TransferExt},
     gpio::GpioExt,
@@ -19,6 +17,8 @@ use crate::hal::{
     rcc::{Config, RccExt},
     signature::{VrefCal, VDDA_CALIB},
     stm32::Peripherals,
+    time::ExtU32,
+    timer::Timer,
 };
 use stm32g4xx_hal as hal;
 

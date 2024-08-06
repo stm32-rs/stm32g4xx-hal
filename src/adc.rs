@@ -20,10 +20,8 @@ use crate::{
 };
 use core::fmt;
 use core::marker::PhantomData;
-use embedded_hal_old::{
-    adc::{Channel, OneShot},
-};
 use embedded_hal::delay::DelayNs;
+use embedded_hal_old::adc::{Channel, OneShot};
 
 use self::config::ExternalTrigger12;
 
