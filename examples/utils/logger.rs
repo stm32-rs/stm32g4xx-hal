@@ -1,9 +1,11 @@
 #![allow(unsafe_code)]
 cfg_if::cfg_if! {
     if #[cfg(all(feature = "log-rtt", feature = "defmt"))] {
+        #[allow(unused_imports)]
         pub use defmt::{info, trace, warn, debug, error};
 
     } else {
+        #[allow(unused_imports)]
         pub use log::{info, trace, warn, debug, error};
     }
 }
@@ -31,7 +33,7 @@ cfg_if::cfg_if! {
                     InterruptSync::new(
                         // We must not use Peripherals::steal() here to get an ITM instance, as the
                         // code might expect to be able to call Peripherals::take() later on.
-                        ItmDest::new(core::mem::transmute(()))
+                        ItmDest::new(core::mem::transmute::<(), stm32g4xx_hal::stm32::ITM>(()))
                     )
                 },
             };
@@ -56,7 +58,9 @@ cfg_if::cfg_if! {
     else if #[cfg(all(feature = "log-rtt"/*, feature = "defmt"*/))] {
         use defmt_rtt as _; // global logger
         use panic_probe as _;
+        #[allow(unused_imports)]
         pub use defmt::Logger;
+        #[allow(unused_imports)]
         pub use defmt::println;
 
         #[allow(dead_code)]

@@ -60,12 +60,76 @@ pub struct Vbat;
 /// Core temperature internal signal
 pub struct Temperature;
 impl Temperature {
-    /// Convert a raw sample from `Temperature` to deg C
+    /// Precompute the inverse of `VTEMP_CAL_VREFANALOG`, in volts,
+    /// for floating point calculations
+    const INV_VREFANALOG_VOLTS: f32 = 1000. / VDDA_CALIB as f32;
+    /// Temperature at which temperature sensor has been calibrated in production
+    /// for data into [`VtempCal30`] (tolerance: +-5 DegC) (unit: DegC).
+    const VTEMP_CAL_T30: u16 = 30;
+    /// Temperature at which temperature sensor has been calibrated in production
+    /// for data into [`VtempCal130`] (tolerance: +-5 DegC) (unit: DegC).
+    const VTEMP_CAL_T130: u16 = 130;
+
+    /// Convert a sample to 12 bits. Reference voltages were captured at 12 bits.
+    const fn to_12b(sample: u16, resolution: config::Resolution) -> u16 {
+        match resolution {
+            config::Resolution::Six => sample << 6,
+            config::Resolution::Eight => sample << 4,
+            config::Resolution::Ten => sample << 2,
+            config::Resolution::Twelve => sample,
+        }
+    }
+
+    /// Convert a raw sample from `Temperature` to deg C.
+    ///
+    /// ## Arguments
+    /// * `sample`: ADC sample taken on the [`Temperature`] channel.
+    /// * `vdda`: Analog reference voltage (vref+) when the temperature
+    ///     sample was taken, in volts.
+    /// * `resolution`: Configured ADC resolution.
     #[inline(always)]
-    pub fn temperature_to_degrees_centigrade(sample: u16) -> f32 {
-        ((130.0 - 30.0) / (VtempCal130::get().read() as f32 - VtempCal30::get().read() as f32)
-            * (sample as f32 - VtempCal30::get().read() as f32))
-            + 30.0
+    pub fn temperature_to_degrees_centigrade(
+        sample: u16,
+        vdda: f32,
+        resolution: config::Resolution,
+    ) -> f32 {
+        // Reference measurements were taken at 12 bits
+        let sample_12b = Self::to_12b(sample, resolution);
+
+        // Normalize for the difference in VDDA
+        let sample_normalized = sample_12b as f32 * (vdda * Self::INV_VREFANALOG_VOLTS);
+
+        ((sample_normalized - VtempCal30::get().read() as f32)
+            * ((Self::VTEMP_CAL_T130 - Self::VTEMP_CAL_T30) as f32))
+            / ((VtempCal130::get().read() - VtempCal30::get().read()) as f32)
+            + Self::VTEMP_CAL_T30 as f32
+    }
+
+    /// Convert a raw sample from `Temperature` to deg C
+    ///
+    /// ## Arguments
+    /// * `sample`: ADC sample taken on the [`Temperature`] channel.
+    /// * `vdda`: Analog reference voltage (vref+) when the temperature
+    ///     sample was taken, in millivolts.
+    /// * `resolution`: Configured ADC resolution.
+    #[inline(always)]
+    pub fn temperature_to_degrees_centigrade_coarse(
+        sample: u16,
+        vdda: u32,
+        resolution: config::Resolution,
+    ) -> i16 {
+        // Reference measurements were taken at 12 bits
+        let sample_12b = Self::to_12b(sample, resolution);
+
+        // Normalize for the difference in VDDA
+        let sample_normalized = ((sample_12b as u32 * vdda) / VDDA_CALIB) as u16;
+
+        let t = ((sample_normalized as i32 - VtempCal30::get().read() as i32)
+            * ((Self::VTEMP_CAL_T130 - Self::VTEMP_CAL_T30) as i32))
+            / ((VtempCal130::get().read() - VtempCal30::get().read()) as i32)
+            + Self::VTEMP_CAL_T30 as i32;
+
+        t as i16
     }
 }
 
@@ -626,6 +690,79 @@ pub mod config {
                 ExternalTrigger345::Lp_timeout => 0b11101,
                 ExternalTrigger345::Tim_7_trgo => 0b11110,
                 // Reserved => 0b11111
+            }
+        }
+    }
+
+    /// Possible oversampling shift
+    #[derive(Debug, Clone, Copy)]
+    pub enum OverSamplingShift {
+        /// No right shift
+        NoShift,
+        /// Shift of 1 toward the right
+        Shift_1,
+        /// Shift of 2 toward the right
+        Shift_2,
+        /// Shift of 3 toward the right
+        Shift_3,
+        /// Shift of 4 toward the right
+        Shift_4,
+        /// Shift of 5 toward the right
+        Shift_5,
+        /// Shift of 6 toward the right
+        Shift_6,
+        /// Shift of 7 toward the right
+        Shift_7,
+        /// Shift of 8 toward the right
+        Shift_8,
+    }
+    impl From<OverSamplingShift> for u8 {
+        fn from(oss: OverSamplingShift) -> u8 {
+            match oss {
+                OverSamplingShift::NoShift => 0,
+                OverSamplingShift::Shift_1 => 1,
+                OverSamplingShift::Shift_2 => 2,
+                OverSamplingShift::Shift_3 => 3,
+                OverSamplingShift::Shift_4 => 4,
+                OverSamplingShift::Shift_5 => 5,
+                OverSamplingShift::Shift_6 => 6,
+                OverSamplingShift::Shift_7 => 7,
+                OverSamplingShift::Shift_8 => 8,
+            }
+        }
+    }
+
+    /// Possible oversampling modes
+    #[derive(Debug, Clone, Copy)]
+    pub enum OverSampling {
+        /// Oversampling 2x
+        Ratio_2,
+        /// Oversampling 4x
+        Ratio_4,
+        /// Oversampling 8x
+        Ratio_8,
+        /// Oversampling 16x
+        Ratio_16,
+        /// Oversampling 32x
+        Ratio_32,
+        /// Oversampling 64x
+        Ratio_64,
+        /// Oversampling 128x
+        Ratio_128,
+        /// Oversampling 256x
+        Ratio_256,
+    }
+    impl From<OverSampling> for u8 {
+        fn from(os: OverSampling) -> u8 {
+            match os {
+                OverSampling::Ratio_2 => 0,
+                OverSampling::Ratio_4 => 1,
+                OverSampling::Ratio_8 => 2,
+                OverSampling::Ratio_16 => 3,
+                OverSampling::Ratio_32 => 4,
+                OverSampling::Ratio_64 => 5,
+                OverSampling::Ratio_128 => 6,
+                OverSampling::Ratio_256 => 7,
             }
         }
     }
@@ -1589,6 +1726,15 @@ macro_rules! adc {
                     self.adc_reg.cfgr.modify(|_, w| w.res().bits(resolution.into()));
                 }
 
+
+                /// Enable oversampling
+                #[inline(always)]
+                pub fn set_oversampling(&mut self, oversampling: config::OverSampling, shift: config::OverSamplingShift) {
+                    self.adc_reg.cfgr2.modify(|_, w| unsafe { w.ovsr().bits(oversampling.into())
+                                                      .ovss().bits(shift.into())
+                                                      .rovse().set_bit()});
+                }
+
                 /// Sets the DR register alignment to left or right
                 #[inline(always)]
                 pub fn set_align(&mut self, align: config::Align) {
@@ -1755,7 +1901,7 @@ macro_rules! adc {
                 /// * `channel` - channel to configure
                 /// * `sequence` - where in the sequence to sample the channel. Also called rank in some STM docs/code
                 /// * `sample_time` - how long to sample for. See datasheet and ref manual to work out how long you need\
-                /// to sample for at a given ADC clock frequency
+                ///     to sample for at a given ADC clock frequency
                 pub fn configure_channel<CHANNEL>(&mut self, _channel: &CHANNEL, sequence: config::Sequence, sample_time: config::SampleTime)
                 where
                     CHANNEL: Channel<stm32::$adc_type, ID=u8>
@@ -1976,6 +2122,7 @@ macro_rules! adc {
                 /// Enables the ADC clock, resets the peripheral (optionally), runs calibration and applies the supplied config
                 /// # Arguments
                 /// * `reset` - should a reset be performed. This is provided because on some devices multiple ADCs share the same common reset
+                ///
                 /// TODO: fix needing SYST
                 #[inline(always)]
                 fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>, reset: bool) -> Adc<stm32::$adc_type, Disabled> {
@@ -2155,6 +2302,12 @@ macro_rules! adc {
                     self.adc.set_clock(clock)
                 }
 
+                /// Sets the oversampling
+                #[inline(always)]
+                pub fn set_oversampling(&mut self, oversampling: config::OverSampling, shift: config::OverSamplingShift) {
+                    self.adc.set_oversampling(oversampling, shift)
+                }
+
                 /// Sets the sampling resolution
                 #[inline(always)]
                 pub fn set_resolution(&mut self, resolution: config::Resolution) {
@@ -2255,7 +2408,7 @@ macro_rules! adc {
                 /// * `channel` - channel to configure
                 /// * `sequence` - where in the sequence to sample the channel. Also called rank in some STM docs/code
                 /// * `sample_time` - how long to sample for. See datasheet and ref manual to work out how long you need\
-                /// to sample for at a given ADC clock frequency
+                ///     to sample for at a given ADC clock frequency
                 #[inline(always)]
                 pub fn configure_channel<CHANNEL>(&mut self, channel: &CHANNEL, sequence: config::Sequence, sample_time: config::SampleTime)
                 where

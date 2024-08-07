@@ -244,15 +244,15 @@ impl Rcc {
 
         // Enable the input clock feeding the PLL
         let (pll_input_freq, pll_src_bits) = match pll_cfg.mux {
-            PLLSrc::HSI => {
+            PllSrc::HSI => {
                 self.enable_hsi();
                 (HSI_FREQ, 0b10)
             }
-            PLLSrc::HSE(freq) => {
+            PllSrc::HSE(freq) => {
                 self.enable_hse(false);
                 (freq.raw(), 0b11)
             }
-            PLLSrc::HSE_BYPASS(freq) => {
+            PllSrc::HSE_BYPASS(freq) => {
                 self.enable_hse(true);
                 (freq.raw(), 0b11)
             }
@@ -439,6 +439,61 @@ impl Rcc {
         self.rb.csr.modify(|_, w| w.lsion().set_bit());
         while self.rb.csr.read().lsirdy().bit_is_clear() {}
     }
+
+    pub fn get_reset_reason(&self) -> ResetReason {
+        let csr = self.rb.csr.read();
+
+        ResetReason {
+            low_power: csr.lpwrstf().bit(),
+            window_watchdog: csr.wwdgrstf().bit(),
+            independent_watchdog: csr.iwdgrstf().bit(),
+            software: csr.sftrstf().bit(),
+            brown_out: csr.borrstf().bit(),
+            reset_pin: csr.pinrstf().bit(),
+            option_byte: csr.oblrstf().bit(),
+        }
+    }
+
+    pub fn clear_reset_reason(&mut self) {
+        self.rb.csr.modify(|_, w| w.rmvf().set_bit());
+    }
+}
+
+pub struct ResetReason {
+    /// Low-power reset flag
+    ///
+    /// Set by hardware when a reset occurs to illegal Stop, Standby or Shutdown mode entry.
+    pub low_power: bool,
+
+    /// Window watchdog reset flag
+    ///
+    /// Set by hardware when a window watchdog reset occurs.
+    pub window_watchdog: bool,
+
+    /// Independent window watchdog reset flag
+    ///
+    /// Set by hardware when an independent watchdog reset occurs.
+    pub independent_watchdog: bool,
+
+    /// Software reset flag
+    ///
+    /// Set by hardware when a software reset occurs.
+    pub software: bool,
+
+    /// Brown out reset flag
+    ///
+    /// Set by hardware when a brown out reset occurs.
+    pub brown_out: bool,
+
+    /// Pin reset flag
+    ///
+    /// Set by hardware when a reset from the NRST pin occurs.
+    pub reset_pin: bool,
+
+    /// Option byte loader reset flag
+    ///
+    /// Set by hardware when a reset from the Option Byte loading occurs.
+    pub option_byte: bool,
 }
 
 /// Extension trait that constrains the `RCC` peripheral

@@ -5,7 +5,6 @@
 #![no_std]
 
 use crate::hal::{
-    block,
     delay::DelayFromCountDownTimer,
     gpio::gpioa::PA5,
     gpio::gpioa::PA6,
@@ -22,7 +21,6 @@ use crate::hal::{
 };
 
 use cortex_m_rt::entry;
-use log::info;
 use stm32g4xx_hal as hal;
 use stm32g4xx_hal::dma::config::DmaConfig;
 use stm32g4xx_hal::dma::stream::DMAExt;
@@ -49,18 +47,19 @@ fn main() -> ! {
     let miso: PA6<Alternate<AF5>> = gpioa.pa6.into_alternate();
     let mosi: PA7<Alternate<AF5>> = gpioa.pa7.into_alternate();
 
-    let mut spi = dp
+    let spi = dp
         .SPI1
         .spi((sclk, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
-    let mut streams = dp.DMA1.split(&rcc);
+    let streams = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()
         .transfer_complete_interrupt(false)
         .circular_buffer(true)
         .memory_increment(true);
 
     let mut buf: [u8; BUFFER_SIZE] = [0; BUFFER_SIZE];
-    for index in 0..BUFFER_SIZE {
-        buf[index] = index as u8;
+    /* Set a some datas */
+    for (index, item) in buf.iter_mut().enumerate().take(BUFFER_SIZE) {
+        *item = index as u8;
     }
     let dma_buf = cortex_m::singleton!(: [u8; BUFFER_SIZE] = buf).unwrap();
     let mut transfer_dma =
