@@ -101,16 +101,18 @@ impl U32Ext for u32 {
     }
 }
 
+/// Converts clock cycles at a given frequency into a Duration with arbitrary fraction
 pub fn duration<const NOM: u32, const DENOM: u32>(
     hz: Hertz,
     cycles: u32,
 ) -> Duration<u32, NOM, DENOM> {
     let cycles = cycles as u64;
     let clk = hz.raw() as u64;
-    let us = cycles.saturating_mul(DENOM as u64) / clk / NOM as u64;
-    Duration::<u32, NOM, DENOM>::from_ticks(us as u32)
+    let duration_ticks = cycles.saturating_mul(DENOM as u64) / clk / NOM as u64;
+    Duration::<u32, NOM, DENOM>::from_ticks(duration_ticks as u32)
 }
 
+/// Converts a Duration with arbitrary fraction into a number of cycles at the specified frequency
 pub fn cycles<const NOM: u32, const DENOM: u32>(ms: Duration<u32, NOM, DENOM>, clk: Hertz) -> u32 {
     assert!(ms.ticks() > 0);
     let clk = clk.raw() as u64;
