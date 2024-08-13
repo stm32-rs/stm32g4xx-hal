@@ -1,9 +1,9 @@
 //! Delay providers
 //!
 //! There are currently two delay providers. In general you should prefer to use
-//! [Delay](Delay), however if you do not have access to `SYST` you can use
-//! [DelayFromCountDownTimer](DelayFromCountDownTimer) with any timer that
-//! implements the [CountDown](embedded_hal::timer::CountDown) trait. This can be
+//! [Delay], however if you do not have access to `SYST` you can use
+//! [DelayFromCountDownTimer] with any timer that
+//! implements the [CountDown](embedded_hal_old::timer::CountDown) trait. This can be
 //! useful if you're using [RTIC](https://rtic.rs)'s schedule API, which occupies
 //! the `SYST` peripheral.
 //!
