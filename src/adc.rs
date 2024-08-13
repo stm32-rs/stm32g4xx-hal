@@ -1,5 +1,5 @@
 //! Analog to digital converter configuration.
-//! https://github.com/stm32-rs/stm32l4xx-hal/blob/master/src/adc.rs
+//! <https://github.com/stm32-rs/stm32l4xx-hal/blob/master/src/adc.rs>
 
 #![deny(missing_docs)]
 
@@ -310,7 +310,8 @@ pub mod config {
     pub enum ClockMode {
         /// (Asynchronous clock mode), adc_ker_ck. generated at product level (refer to Section 6: Reset and clock control (RCC)
         Asynchronous,
-        /// (Synchronous clock mode). adc_hclk/1 This configuration must be enabled only if the AHB clock prescaler is set to 1 (HPRE[3:0] = 0xxx in RCC_CFGR register) and if the system clock has a 50% duty cycle.
+        /// (Synchronous clock mode). adc_hclk/1
+        /// This configuration must be enabled only if the AHB clock prescaler is set to 1 (HPRE\[3:0\] = 0xxx in RCC_CFGR register) and if the system clock has a 50% duty cycle.
         Synchronous_Div_1,
         /// Synchronous clock mode. adc_hclk/2
         Synchronous_Div_2,
@@ -1166,9 +1167,9 @@ impl<ADC: TriggerType> Conversion<ADC> {
         !self.is_active()
     }
 
-    /// Converts from Conversion<C, E> to Option<C>.
+    /// Converts from `Conversion<C, E>` to `Option<C>`.
     ///
-    /// Converts self into an Option<C>, consuming self, and discarding the adc, if it is stopped.
+    /// Converts self into an `Option<C>`, consuming self, and discarding the adc, if it is stopped.
     #[inline(always)]
     pub fn active(self) -> Option<Adc<ADC, Active>> {
         match self {
@@ -1177,9 +1178,9 @@ impl<ADC: TriggerType> Conversion<ADC> {
         }
     }
 
-    /// Converts from Conversion<C, E> to Option<E>.
+    /// Converts from `Conversion<C, E>` to `Option<E>`.
     ///
-    /// Converts self into an Option<E>, consuming self, and discarding the adc, if it is still active.
+    /// Converts self into an `Option<E>`, consuming self, and discarding the adc, if it is still active.
     #[inline(always)]
     pub fn stopped(self) -> Option<Adc<ADC, Configured>> {
         match self {
