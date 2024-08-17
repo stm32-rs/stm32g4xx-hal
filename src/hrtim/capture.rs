@@ -102,7 +102,7 @@ pub trait HrCapture {
     ///
     /// where captures during down counting count as negative (before the upcount)
     ///
-    /// ````
+    /// ```
     ///              Counter
     /// ----------------------------------   <--- period
     /// \               ^               /
@@ -113,7 +113,7 @@ pub trait HrCapture {
     ///                \|/
     /// <-------------- 0 --------------> t
     /// Negative result | positive result
-    /// ````
+    /// ```
     fn get_last_signed(&self, period: u16) -> i32 {
         let (value, dir) = self.get_last();
 
@@ -159,7 +159,7 @@ macro_rules! impl_capture {
 
                 // SAFETY: We are the only one with access to cptXYcr
                 unsafe {
-                    tim.$cptXYcr.modify(|r, w| w.bits(r.bits() | E::BITS));
+                    tim.$cptXYcr().modify(|r, w| w.bits(r.bits() | E::BITS));
                 }
             }
 
@@ -169,7 +169,7 @@ macro_rules! impl_capture {
 
                 // SAFETY: We are the only one with access to cptXYcr
                 unsafe {
-                    tim.$cptXYcr.modify(|r, w| w.bits(r.bits() & !E::BITS));
+                    tim.$cptXYcr().modify(|r, w| w.bits(r.bits() & !E::BITS));
                 }
             }
 
@@ -178,7 +178,7 @@ macro_rules! impl_capture {
                 // SAFETY: We are the only one with access to cptXYcr
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$cptXYcr.modify(|_, w| w.swcpt().set_bit());
+                tim.$cptXYcr().modify(|_, w| w.swcpt().set_bit());
             }
 
             // TODO: It would be sufficient to instead of hr_control only require exclusive access to the owning timer
@@ -187,13 +187,13 @@ macro_rules! impl_capture {
             pub fn enable_interrupt(&mut self, enable: bool, _hr_control: &mut super::HrPwmControl) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$dier.modify(|_r, w| w.$cptXie().bit(enable));
+                tim.$dier().modify(|_r, w| w.$cptXie().bit(enable));
             }
 
             pub fn enable_dma(self, _ch: timer::DmaChannel<$TIMX>) -> HrCapt<$TIMX, PSCL, $CH, Dma> {
                 // SAFETY: We own the only insance of this timers dma channel, no one else can do this
                 let tim = unsafe { &*$TIMX::ptr() };
-                tim.$dier.modify(|_r, w| w.$cptXde().set_bit());
+                tim.$dier().modify(|_r, w| w.$cptXde().set_bit());
                 HrCapt {
                     _x: PhantomData
                 }
@@ -203,7 +203,7 @@ macro_rules! impl_capture {
         impl<PSCL, DMA> HrCapture for HrCapt<$TIMX, PSCL, $CH, DMA> {
             fn get_last(&self) -> (u16, CountingDirection) {
                 let tim = unsafe { &*$TIMX::ptr() };
-                let data = tim.$cptXYr.read();
+                let data = tim.$cptXYr().read();
 
                 let dir = match data.dir().bit() {
                     true => CountingDirection::Down,
@@ -218,14 +218,14 @@ macro_rules! impl_capture {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 // No need for exclusive access since this is a write only register
-                tim.$icr.write(|w| w.$cptXc().set_bit());
+                tim.$icr().write(|w| w.$cptXc().set_bit());
             }
 
             fn is_pending(&self) -> bool {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 // No need for exclusive access since this is a read only register
-                tim.$isr.read().$cptX().bit()
+                tim.$isr().read().$cptX().bit()
             }
         }
 
@@ -233,7 +233,7 @@ macro_rules! impl_capture {
             #[inline(always)]
             fn address(&self) -> u32 {
                 let tim = unsafe { &*$TIMX::ptr() };
-                &tim.$cptXYr as *const _ as u32
+                &tim.$cptXYr() as *const _ as u32
             }
 
             type MemSize = u32;

@@ -222,7 +222,7 @@ macro_rules! hrtim_finalize_body {
         };
 
         // Write prescaler and any special modes
-        tim.$timXcr.modify(|_r, w| unsafe {
+        tim.$timXcr().modify(|_r, w| unsafe {
             w
                 // Enable Continuous mode
                 .cont().bit($this.timer_mode == HrTimerMode::Continuous)
@@ -241,27 +241,27 @@ macro_rules! hrtim_finalize_body {
         });
 
         $(
-            tim.$timXcr2.modify(|_r, w|
+            tim.$timXcr2().modify(|_r, w|
                 // Set counting direction
                 w.udm().bit($this.counting_direction == HrCountingDirection::UpDown)
             );
 
             // Only available for timers with outputs(not HRTIM_MASTER)
-            let _ = tim.$outXr;
-            tim.$timXcr.modify(|_r, w|
+            let _ = tim.$outXr();
+            tim.$timXcr().modify(|_r, w|
                 // Push-Pull mode
                 w.pshpll().bit($this.enable_push_pull)
             );
         )*
 
         // Write period
-        tim.$perXr.write(|w| unsafe { w.$perx().bits(period as u16) });
+        tim.$perXr().write(|w| unsafe { w.$perx().bits(period as u16) });
 
         // Enable fault sources and lock configuration
         $(unsafe {
             // Enable fault sources
             let fault_enable_bits = $this.fault_enable_bits as u32;
-            tim.$fltXr.write(|w| w
+            tim.$fltXr().write(|w| w
                 .flt1en().bit(fault_enable_bits & (1 << 0) != 0)
                 .flt2en().bit(fault_enable_bits & (1 << 1) != 0)
                 .flt3en().bit(fault_enable_bits & (1 << 2) != 0)
@@ -271,9 +271,9 @@ macro_rules! hrtim_finalize_body {
             );
 
             // ... and lock configuration
-            tim.$fltXr.modify(|_r, w| w.fltlck().set_bit());
+            tim.$fltXr().modify(|_r, w| w.fltlck().set_bit());
 
-            tim.$outXr.modify(|_r, w| w
+            tim.$outXr().modify(|_r, w| w
                 // Set actions on fault for both outputs
                 .fault1().bits($this.fault1_bits)
                 .fault2().bits($this.fault2_bits)
@@ -293,7 +293,7 @@ macro_rules! hrtim_finalize_body {
 
                 // SAFETY: DeadtimeConfig makes sure rising and falling values are valid
                 // and DeadtimePrescaler has its own garantuee
-                tim.$dtXr.modify(|_r, w| w
+                tim.$dtXr().modify(|_r, w| w
                     .dtprsc().bits(prescaler as u8)
                     .dtrx().bits(deadtime_rising_value)
                     .sdtrx().bit(deadtime_rising_sign)
@@ -306,26 +306,26 @@ macro_rules! hrtim_finalize_body {
                     .dtrlkx().set_bit()
                     .dtrslkx().set_bit()
                 );
-                tim.$outXr.modify(|_r, w| w.dten().set_bit());
+                tim.$outXr().modify(|_r, w| w.dten().set_bit());
             }
 
             // External event configs
             let eev_cfg = $this.eev_cfg.clone();
-            tim.$eefXr1.write(|w| w
+            tim.$eefXr1().write(|w| w
                 .ee1ltch().bit(eev_cfg.eev1.latch_bit).ee1fltr().bits(eev_cfg.eev1.filter_bits)
                 .ee2ltch().bit(eev_cfg.eev2.latch_bit).ee2fltr().bits(eev_cfg.eev2.filter_bits)
                 .ee3ltch().bit(eev_cfg.eev3.latch_bit).ee3fltr().bits(eev_cfg.eev3.filter_bits)
                 .ee4ltch().bit(eev_cfg.eev4.latch_bit).ee4fltr().bits(eev_cfg.eev4.filter_bits)
                 .ee5ltch().bit(eev_cfg.eev5.latch_bit).ee5fltr().bits(eev_cfg.eev5.filter_bits)
             );
-            tim.$eefXr2.write(|w| w
+            tim.$eefXr2().write(|w| w
                 .ee6ltch().bit(eev_cfg.eev6.latch_bit).ee6fltr().bits(eev_cfg.eev6.filter_bits)
                 .ee7ltch().bit(eev_cfg.eev7.latch_bit).ee7fltr().bits(eev_cfg.eev7.filter_bits)
                 .ee8ltch().bit(eev_cfg.eev8.latch_bit).ee8fltr().bits(eev_cfg.eev8.filter_bits)
                 .ee9ltch().bit(eev_cfg.eev9.latch_bit).ee9fltr().bits(eev_cfg.eev9.filter_bits)
                 .ee10ltch().bit(eev_cfg.eev10.latch_bit).ee10fltr().bits(eev_cfg.eev10.filter_bits)
             );
-            tim.$Xeefr3.write(|w| w
+            tim.$Xeefr3().write(|w| w
                 .eevace().bit(eev_cfg.event_counter_enable_bit)
                 // External Event A Counter Reset"]
                 //.eevacres().bit()
@@ -339,10 +339,10 @@ macro_rules! hrtim_finalize_body {
         hrtim_finalize_body!($PreloadSource, $this, tim, $timXcr);
 
         // Set repetition counter
-        unsafe { tim.$rep.write(|w| w.$repx().bits($this.repetition_counter)); }
+        unsafe { tim.$rep().write(|w| w.$repx().bits($this.repetition_counter)); }
 
         // Enable interrupts
-        tim.$dier.modify(|_r, w| w.$repie().bit($this.enable_repetition_interrupt));
+        tim.$dier().modify(|_r, w| w.$repie().bit($this.enable_repetition_interrupt));
 
         // Start timer
         //let master = unsafe { &*HRTIM_MASTER::ptr() };
@@ -359,19 +359,19 @@ macro_rules! hrtim_finalize_body {
     (PreloadSource, $this:expr, $tim:expr, $timXcr:ident) => {{
         match $this.preload_source {
             Some(PreloadSource::OnCounterReset) => {
-                $tim.$timXcr.modify(|_r, w| w
+                $tim.$timXcr().modify(|_r, w| w
                     .tx_rstu().set_bit()
                     .preen().set_bit()
                 )
             },
             Some(PreloadSource::OnMasterTimerUpdate) => {
-                $tim.$timXcr.modify(|_r, w| w
+                $tim.$timXcr().modify(|_r, w| w
                     .mstu().set_bit()
                     .preen().set_bit()
                 )
             }
             Some(PreloadSource::OnRepetitionUpdate) => {
-                $tim.$timXcr.modify(|_r, w| w
+                $tim.$timXcr().modify(|_r, w| w
                     .tx_repu().set_bit()
                     .preen().set_bit()
                 )
@@ -383,7 +383,7 @@ macro_rules! hrtim_finalize_body {
     (MasterPreloadSource, $this:expr, $tim:expr, $timXcr:ident) => {{
         match $this.preload_source {
             Some(MasterPreloadSource::OnMasterRepetitionUpdate) => {
-                $tim.$timXcr.modify(|_r, w| w
+                $tim.$timXcr().modify(|_r, w| w
                     .mrepu().set_bit()
                     .preen().set_bit()
                 )

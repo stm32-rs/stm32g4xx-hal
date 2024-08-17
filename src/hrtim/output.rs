@@ -19,30 +19,30 @@ macro_rules! hrtim_out {
         impl<PSCL> HrOutput<$TIMX, PSCL> for $out_type<$TIMX, PSCL> {
             fn enable(&mut self) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.oenr.write(|w| { w.$tXYoen().set_bit() });
+                common.oenr().write(|w| { w.$tXYoen().set_bit() });
             }
 
             fn disable(&mut self) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.odisr.write(|w| { w.$tXYodis().set_bit() });
+                common.odisr().write(|w| { w.$tXYodis().set_bit() });
             }
 
             fn enable_set_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _set_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
-                unsafe { tim.$setXYr.modify(|r, w| w.bits(r.bits() | ES::BITS)); }
+                unsafe { tim.$setXYr().modify(|r, w| w.bits(r.bits() | ES::BITS)); }
             }
             fn disable_set_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _set_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
-                unsafe { tim.$setXYr.modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
+                unsafe { tim.$setXYr().modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
             }
 
             fn enable_rst_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _reset_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
-                unsafe { tim.$rstXYr.modify(|r, w| w.bits(r.bits() | ES::BITS)); }
+                unsafe { tim.$rstXYr().modify(|r, w| w.bits(r.bits() | ES::BITS)); }
             }
             fn disable_rst_event<ES: EventSource<$TIMX, PSCL>>(&mut self, _reset_event: &ES) {
                 let tim = unsafe { &*$TIMX::ptr() };
-                unsafe { tim.$rstXYr.modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
+                unsafe { tim.$rstXYr().modify(|r, w| w.bits(r.bits() & !ES::BITS)); }
             }
 
             fn get_state(&self) -> State {
@@ -51,8 +51,8 @@ macro_rules! hrtim_out {
 
                 unsafe {
                     let common = &*HRTIM_COMMON::ptr();
-                    ods = common.odsr.read().$tXYods().bit_is_set();
-                    oen = common.oenr.read().$tXYoen().bit_is_set();
+                    ods = common.odsr().read().$tXYods().bit_is_set();
+                    oen = common.oenr().read().$tXYoen().bit_is_set();
                 }
 
                 match (oen, ods) {

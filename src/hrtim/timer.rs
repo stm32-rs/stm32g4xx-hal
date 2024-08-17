@@ -131,12 +131,12 @@ macro_rules! hrtim_timer {
             fn get_period(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$perXr.read().$perx().bits()
+                tim.$perXr().read().$perx().bits()
             }
             fn set_period(&mut self, period: u16) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$perXr.write(|w| unsafe { w.$perx().bits(period as u16) });
+                tim.$perXr().write(|w| unsafe { w.$perx().bits(period as u16) });
             }
 
             /// Start timer
@@ -145,7 +145,7 @@ macro_rules! hrtim_timer {
 
                 // SAFETY: Since we hold _hr_control there is no risk for a race condition
                 let master = unsafe { &*HRTIM_MASTER::ptr() };
-                master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
+                master.mcr().modify(|_r, w| { w.$tXcen().set_bit() });
             }
 
             /// Stop timer
@@ -153,7 +153,7 @@ macro_rules! hrtim_timer {
                 // Stop counter
                 // SAFETY: Since we hold _hr_control there is no risk for a race condition
                 let master = unsafe { &*HRTIM_MASTER::ptr() };
-                master.mcr.modify(|_r, w| { w.$tXcen().set_bit() });
+                master.mcr().modify(|_r, w| { w.$tXcen().set_bit() });
             }
 
             /// Stop timer and reset counter
@@ -162,7 +162,7 @@ macro_rules! hrtim_timer {
 
                 // Reset counter
                 let tim = unsafe { &*$TIMX::ptr() };
-                unsafe { tim.$cntXr.write(|w| w.$cntx().bits(0)); }
+                unsafe { tim.$cntXr().write(|w| w.$cntx().bits(0)); }
             }
 
             /// Make a handle to this timers reset event to use as adc trigger
@@ -178,7 +178,7 @@ macro_rules! hrtim_timer {
             fn clear_repetition_interrupt(&mut self) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$icr.write(|w| w.$repc().set_bit());
+                tim.$icr().write(|w| w.$repc().set_bit());
             }
 
             /// Disable register updates
@@ -189,7 +189,7 @@ macro_rules! hrtim_timer {
             fn disable_register_updates(&mut self, _hr_control: &mut HrPwmCtrl) {
                 use super::HRTIM_COMMON;
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.cr1.modify(|_r, w| w.$tXudis().set_bit());
+                common.cr1().modify(|_r, w| w.$tXudis().set_bit());
             }
 
             /// Enable register updates
@@ -201,7 +201,7 @@ macro_rules! hrtim_timer {
             fn enable_register_updates<'a>(&mut self, _hr_control: &mut HrPwmCtrl) {
                 use super::HRTIM_COMMON;
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.cr1.modify(|_r, w| w.$tXudis().clear_bit());
+                common.cr1().modify(|_r, w| w.$tXudis().clear_bit());
             }
         }
 
@@ -209,13 +209,13 @@ macro_rules! hrtim_timer {
             pub fn set_repetition_counter(&mut self, repetition_counter: u8) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                unsafe { tim.$rep.write(|w| w.$repx().bits(repetition_counter)); }
+                unsafe { tim.$rep().write(|w| w.$repx().bits(repetition_counter)); }
             }
 
             pub fn enable_repetition_interrupt(&mut self, enable: bool) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$dier.modify(|_r, w| w.$repie().bit(enable));
+                tim.$dier().modify(|_r, w| w.$repie().bit(enable));
             }
         }
 
@@ -242,14 +242,14 @@ macro_rules! hrtim_timer {
                 fn enable_reset_event<E: super::event::TimerResetEventSource<Self::Timer, Self::Prescaler>>(&mut self, _event: &E) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() | E::BITS)); }
+                    unsafe { tim.$rstXr().modify(|r, w| w.bits(r.bits() | E::BITS)); }
                 }
 
                 /// Stop listening to the specified event
                 fn disable_reset_event<E: super::event::TimerResetEventSource<Self::Timer, Self::Prescaler>>(&mut self, _event: &E) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
-                    unsafe { tim.$rstXr.modify(|r, w| w.bits(r.bits() & !E::BITS)); }
+                    unsafe { tim.$rstXr().modify(|r, w| w.bits(r.bits() & !E::BITS)); }
                 }
             }
 
