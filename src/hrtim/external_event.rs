@@ -281,7 +281,7 @@ macro_rules! impl_eev1_5_to_es {
                 // SAFETY: Thanks to, `HrTimCalibrated`, we know we have exclusive access to the register,
                 //         we also know no timers are started.
                 unsafe {
-                    common.eecr1.modify(|_r, w| {
+                    common.eecr1().modify(|_r, w| {
                         w.$eeXsrc()
                             .bits(src_bits)
                             .$eeXpol()
@@ -324,7 +324,7 @@ macro_rules! impl_eev6_10_to_es {
                 // SAFETY: Thanks to, `HrTimCalibrated`, we know we have exclusive access to the register,
                 //         we also know no timers are started.
                 unsafe {
-                    common.eecr2.modify(|_r, w| {
+                    common.eecr2().modify(|_r, w| {
                         w.$eeXsrc()
                             .bits(src_bits)
                             .$eeXpol()
@@ -332,7 +332,7 @@ macro_rules! impl_eev6_10_to_es {
                             .$eeXsns()
                             .bits(edge_or_polarity_bits)
                     });
-                    common.eecr3.modify(|_r, w| w.$eeXf().bits(filter_bits));
+                    common.eecr3().modify(|_r, w| w.$eeXf().bits(filter_bits));
                 }
 
                 ExternalEventSource { _x: PhantomData }

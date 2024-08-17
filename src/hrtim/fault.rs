@@ -115,8 +115,8 @@ macro_rules! impl_faults {
                 unsafe {
                     let common = &*HRTIM_COMMON::ptr();
 
-                    common.fltinr2.modify(|_r, w| w.$fltWsrc_1().bit(src_bits & 0b10 != 0));
-                    common.$fltinrZ.modify(|_r, w| w
+                    common.fltinr2().modify(|_r, w| w.$fltWsrc_1().bit(src_bits & 0b10 != 0));
+                    common.$fltinrZ().modify(|_r, w| w
                         .$fltWsrc_0().bit(src_bits & 0b01 != 0)
                         .$fltWp().bit(is_active_high)
                         .$fltWf().bits(filter_bits)
@@ -124,7 +124,7 @@ macro_rules! impl_faults {
                     );
 
                     // ... and lock configuration
-                    common.$fltinrZ.modify(|_r, w| w.$fltWlck().set_bit());
+                    common.$fltinrZ().modify(|_r, w| w.$fltWlck().set_bit());
                 }
 
                 $source {
@@ -250,17 +250,17 @@ macro_rules! impl_flt_monitor {
         impl FaultMonitor for $t {
             fn enable_interrupt(&mut self, _hr_control: &mut HrPwmCtrl) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.ier.modify(|_r, w| w.$fltxie().set_bit());
+                common.ier().modify(|_r, w| w.$fltxie().set_bit());
             }
 
             fn is_fault_active(&self) -> bool {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.isr.read().$fltx().bit()
+                common.isr().read().$fltx().bit()
             }
 
             fn clear_fault(&mut self) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.icr.write(|w| w.$fltxc().set_bit());
+                common.icr().write(|w| w.$fltxc().set_bit());
             }
         }
     )+};

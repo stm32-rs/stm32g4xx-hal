@@ -40,12 +40,12 @@ macro_rules! hrtim_cr_helper {
             fn get_duty(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$cmpXYr.read().$cmpYx().bits()
+                tim.$cmpXYr().read().$cmpYx().bits()
             }
             fn set_duty(&mut self, duty: u16) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$cmpXYr.write(|w| unsafe { w.$cmpYx().bits(duty) });
+                tim.$cmpXYr().write(|w| unsafe { w.$cmpYx().bits(duty) });
             }
         }
 

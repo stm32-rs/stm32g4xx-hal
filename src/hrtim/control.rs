@@ -27,7 +27,7 @@ impl HrControltExt for HRTIM_COMMON {
 
         // Start calibration procedure
         common
-            .dllcr
+            .dllcr()
             .write(|w| w.cal().set_bit().calen().clear_bit());
 
         HrTimOngoingCalibration {
@@ -93,12 +93,12 @@ impl HrTimOngoingCalibration {
             // with f_hrtim at 170MHz, these settings leads to
             // a period of about 6.2ms
             common
-                .dllcr
+                .dllcr()
                 .modify(|_r, w| w.calrte().bits(0b00).cal().set_bit().calen().clear_bit());
-            common.fltinr2.write(|w| w.fltsd().bits(flt_divider as u8));
-            common.eecr3.write(|w| w.eevsd().bits(eev_divider as u8));
+            common.fltinr2().write(|w| w.fltsd().bits(flt_divider as u8));
+            common.eecr3().write(|w| w.eevsd().bits(eev_divider as u8));
 
-            common.adcps1.write(|w| {
+            common.adcps1().write(|w| {
                 w.adc1psc()
                     .bits(adc_trigger1_postscaler as u8)
                     .adc2psc()
@@ -111,7 +111,7 @@ impl HrTimOngoingCalibration {
                     .bits(adc_trigger5_postscaler as u8)
             });
 
-            common.adcps2.write(|w| {
+            common.adcps2().write(|w| {
                 w.adc6psc()
                     .bits(adc_trigger6_postscaler as u8)
                     .adc7psc()
@@ -130,7 +130,7 @@ impl HrTimOngoingCalibration {
 
     pub fn wait_for_calibration(self) -> (HrTimCalibrated, FaultInputs, EevInputs) {
         let common = unsafe { &*HRTIM_COMMON::ptr() };
-        while common.isr.read().dllrdy().bit_is_clear() {
+        while common.isr().read().dllrdy().bit_is_clear() {
             // Wait until ready
         }
 
@@ -259,7 +259,7 @@ macro_rules! impl_adc1234_trigger {
             pub fn enable_source<T: $trait_>(&mut self, _trigger: &T) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
                 unsafe {
-                    common.$adcXr.modify(|r, w| w.bits(r.bits() | T::BITS));
+                    common.$adcXr().modify(|r, w| w.bits(r.bits() | T::BITS));
                 }
             }
         }
@@ -288,8 +288,8 @@ macro_rules! impl_adc5678910_trigger {
             pub fn enable_source<T: $trait_>(&mut self, _trigger: &T) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
                 common
-                    .adcer
-                    .modify(|_r, w| w.$adcXtrg().variant(T::BITS as u8));
+                    .adcer()
+                    .modify(|_r, w| unsafe { w.$adcXtrg().bits(T::BITS as u8) });
             }
         }
 
