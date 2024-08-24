@@ -106,3 +106,7 @@ lto = true
 [[example]]
 name = "flash_with_rtic"
 required-features = ["stm32g474"]
+
+[[example]]
+name = "cordic"
+required-features = ["defmt"]
