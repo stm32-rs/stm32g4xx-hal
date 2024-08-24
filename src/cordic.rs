@@ -824,7 +824,7 @@ where
 {
     /// Release the CORDIC resource binding as a noop.
     ///
-    /// # Safety:
+    /// # Safety
     ///
     /// The CORDIC peripheral is not reset.
     #[inline]
