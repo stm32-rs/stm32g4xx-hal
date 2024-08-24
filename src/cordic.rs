@@ -11,7 +11,7 @@
 //!     let pwr = dp.PWR.constrain().freeze();
 //!     let mut rcc = dp.RCC.freeze(Config::hsi(), pwr);
 //!
-//!     let cordic = dp
+//!     let mut cordic = dp
 //!         .CORDIC
 //!         .constrain(&mut rcc)
 //!         .freeze::<Q15, Q31, SinCos, P60>(); // 16 bit arguments, 32 bit results, compute sine and cosine, 60 iterations
