@@ -74,6 +74,7 @@ pub mod adc;
 pub mod bb;
 pub mod can;
 pub mod comparator;
+pub mod cordic;
 // pub mod crc;
 pub mod dac;
 pub mod delay;

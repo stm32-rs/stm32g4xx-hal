@@ -19,6 +19,7 @@ bitflags = "1.2"
 vcell = "0.1"
 static_assertions = "1.1"
 fugit = "0.3.5"
+fixed = "1.28.0"
 
 [dependencies.cortex-m]
 version = "0.7.7"
