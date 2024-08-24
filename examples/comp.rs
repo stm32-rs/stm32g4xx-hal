@@ -13,14 +13,6 @@ extern crate cortex_m_rt as rt;
 
 use rt::entry;
 
-#[cfg(not(feature = "stm32g474"))]
-#[entry]
-fn main() -> ! {
-    #[allow(clippy::empty_loop)]
-    loop {} // TODO: add support for more devices
-}
-
-#[cfg(feature = "stm32g474")]
 #[entry]
 fn main() -> ! {
     use hal::comparator::{ComparatorExt, ComparatorSplit, Config, Hysteresis, RefintInput};
