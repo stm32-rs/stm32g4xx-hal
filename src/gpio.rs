@@ -17,6 +17,15 @@ pub trait GpioExt {
     fn split(self, rcc: &mut Rcc) -> Self::Parts;
 }
 
+/// Type state for a gpio pin frozen to its current mode
+/// 
+/// The into_alternate/analog/{x}_input/output can not be called on a pin with this state.
+/// The pin is thus guaranteed to stay as this type as long as the program is running.
+pub struct IsFrozen;
+
+/// See [IsFrozen]
+pub struct IsNotFrozen;
+
 /// Input mode (type state)
 pub struct Input<MODE> {
     _mode: PhantomData<MODE>,
@@ -260,7 +269,7 @@ macro_rules! gpio {
                     rcc.rb.ahb2enr.modify(|_, w| w.$iopxenr().set_bit());
                     Parts {
                         $(
-                            $pxi: $PXi { _mode: PhantomData },
+                            $pxi: $PXi { _mode: PhantomData, _frozen_state: PhantomData },
                         )+
                     }
                 }
@@ -338,48 +347,49 @@ macro_rules! gpio {
             exti_erased!($PXx<Input<MODE>>, $Pxn);
 
             $(
-                pub struct $PXi<MODE> {
+                pub struct $PXi<MODE, F = IsNotFrozen> {
                     _mode: PhantomData<MODE>,
+                    _frozen_state: PhantomData<F>,
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl Into<$PXi<Input<PullDown>>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Input<PullDown>> {
+                impl<F> Into<$PXi<Input<PullDown>, F>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Input<PullDown>, F> {
                         self.into_pull_down_input()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl Into<$PXi<Input<PullUp>>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Input<PullUp>> {
+                impl<F> Into<$PXi<Input<PullUp>, F>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Input<PullUp>, F> {
                         self.into_pull_up_input()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl Into<$PXi<Analog>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Analog> {
+                impl<F> Into<$PXi<Analog, F>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Analog, F> {
                         self.into_analog()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl Into<$PXi<Output<OpenDrain>>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Output<OpenDrain>> {
+                impl<F> Into<$PXi<Output<OpenDrain>, F>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Output<OpenDrain>, F> {
                         self.into_open_drain_output()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl Into<$PXi<Output<PushPull>>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Output<PushPull>> {
+                impl<F> Into<$PXi<Output<PushPull>, F>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Output<PushPull>, F> {
                         self.into_push_pull_output()
                     }
                 }
 
-                impl<MODE> $PXi<MODE> {
+                impl<MODE> $PXi<MODE, IsNotFrozen> {
                     /// Configures the pin to operate as a floating input pin
-                    pub fn into_floating_input(self) -> $PXi<Input<Floating>> {
+                    pub fn into_floating_input<F>(self) -> $PXi<Input<Floating>, F> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -390,11 +400,11 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b11 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as a pulled down input pin
-                    pub fn into_pull_down_input(self) -> $PXi<Input<PullDown>> {
+                    pub fn into_pull_down_input<F>(self) -> $PXi<Input<PullDown>, F> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -405,11 +415,11 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b11 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as a pulled up input pin
-                    pub fn into_pull_up_input(self) -> $PXi<Input<PullUp>> {
+                    pub fn into_pull_up_input<F>(self) -> $PXi<Input<PullUp>, F> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -420,11 +430,11 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b11 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as an analog pin
-                    pub fn into_analog(self) -> $PXi<Analog> {
+                    pub fn into_analog<F>(self) -> $PXi<Analog, F> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -435,11 +445,11 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b11 << offset))
                             });
                         }
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as an open drain output pin
-                    pub fn into_open_drain_output(self) -> $PXi<Output<OpenDrain>> {
+                    pub fn into_open_drain_output<F>(self) -> $PXi<Output<OpenDrain>, F> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -453,11 +463,11 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as an push pull output pin
-                    pub fn into_push_pull_output(self) -> $PXi<Output<PushPull>> {
+                    pub fn into_push_pull_output<F>(self) -> $PXi<Output<PushPull>, F> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -471,13 +481,13 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin as external trigger
                     pub fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> $PXi<MODE> {
                         exti.listen(Event::from_code($i), edge);
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Set pin speed
@@ -491,7 +501,7 @@ macro_rules! gpio {
                         self
                     }
 
-                    pub fn into_alternate<const A: u8>(self) -> $PXi<Alternate<A>> {
+                    pub fn into_alternate<const A: u8, F>(self) -> $PXi<Alternate<A>, F> {
                         let mode = A as u32;
                         let offset = 2 * $i;
                         let offset2 = 4 * $i;
@@ -514,10 +524,10 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b1 << $i))
                             });
                         }
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
-                    pub fn into_alternate_open_drain<const A: u8>(self) -> $PXi<AlternateOD<A>> {
+                    pub fn into_alternate_open_drain<const A: u8, F>(self) -> $PXi<AlternateOD<A>, F> {
                         let mode = A as u32;
                         let offset = 2 * $i;
                         let offset2 = 4 * $i;
@@ -540,11 +550,15 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
                             });
                         }
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
+                    }
+                    
+                    pub fn freeze(self) -> $PXi<MODE, IsFrozen> {
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
                 }
 
-                impl<MODE> $PXi<Output<MODE>> {
+                impl<MODE> $PXi<Output<MODE>, IsNotFrozen> {
                     /// Erases the pin number from the type
                     ///
                     /// This is useful when you want to collect the pins into an array where you
@@ -554,7 +568,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> OutputPin for $PXi<Output<MODE>> {
+                impl<MODE, F> OutputPin for $PXi<Output<MODE>, F> {
                     type Error = ();
 
                     fn set_high(&mut self) -> Result<(), ()> {
@@ -570,7 +584,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> StatefulOutputPin for $PXi<Output<MODE>> {
+                impl<MODE, F> StatefulOutputPin for $PXi<Output<MODE>, F> {
                     fn is_set_high(&self) -> Result<bool, ()> {
                         let is_set_high = !self.is_set_low()?;
                         Ok(is_set_high)
@@ -583,10 +597,10 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> toggleable::Default for $PXi<Output<MODE>> {
+                impl<MODE, F> toggleable::Default for $PXi<Output<MODE>, F> {
                 }
 
-                impl<MODE> InputPin for $PXi<Output<MODE>> {
+                impl<MODE, F> InputPin for $PXi<Output<MODE>, F> {
                     type Error = ();
 
                     fn is_high(&self) -> Result<bool, ()> {
@@ -601,7 +615,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> $PXi<Input<MODE>> {
+                impl<MODE> $PXi<Input<MODE>, IsNotFrozen> {
                     /// Erases the pin number from the type
                     ///
                     /// This is useful when you want to collect the pins into an array where you
@@ -611,7 +625,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> InputPin for $PXi<Input<MODE>> {
+                impl<MODE, F> InputPin for $PXi<Input<MODE>, F> {
                     type Error = ();
 
                     fn is_high(&self) -> Result<bool, ()> {

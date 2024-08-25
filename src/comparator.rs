@@ -14,7 +14,7 @@ use crate::gpio::{
     gpiob::{PB0, PB1, PB14, PB15, PB2, PB6, PB7, PB8, PB9},
     gpioc::PC2,
     gpiof::PF4,
-    Analog, OpenDrain, Output, PushPull, SignalEdge, AF2, AF3, AF8,
+    Analog, Alternate, AlternateOD, SignalEdge, AF2, AF3, AF8,
 };
 
 #[cfg(any(
@@ -486,9 +486,7 @@ macro_rules! impl_comparator {
             /// Configures a GPIO pin to output the signal of the comparator
             ///
             /// Multiple GPIO pins may be configured as the output simultaneously.
-            pub fn output_pin<P: OutputPin<$COMP>>(&self, pin: P) {
-                pin.setup();
-            }
+            pub fn output_pin<P: OutputPin<$COMP>>(&self, _pin: P) {}
         }
     };
 }
@@ -587,22 +585,16 @@ impl ComparatorSplit for COMP {
     }
 }
 
-pub trait OutputPin<COMP> {
-    fn setup(self);
-}
+pub trait OutputPin<COMP> {}
 
 #[allow(unused_macros)] // TODO: add support for more devices
 macro_rules! output_pin {
-    ($COMP:ident, $pin:ident, $AF:ident, $mode_t:ident, $into:ident) => {
-        impl OutputPin<$COMP> for $pin<Output<$mode_t>> {
-            fn setup(self) {
-                self.$into::<$AF>();
-            }
-        }
+    ($COMP:ident, $pin:ident, $AF:ident, $mode_t:ident) => {
+        impl OutputPin<$COMP> for $pin<$mode_t<$AF>> {}
     };
     ($($COMP:ident: $pin:ident, $AF:ident,)+) => {$(
-        output_pin!($COMP, $pin, $AF, PushPull, into_alternate);
-        output_pin!($COMP, $pin, $AF, OpenDrain, into_alternate_open_drain);
+        output_pin!($COMP, $pin, $AF, Alternate);
+        output_pin!($COMP, $pin, $AF, AlternateOD);
     )+};
 }
 
