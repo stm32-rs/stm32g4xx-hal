@@ -41,8 +41,8 @@ cfg_if::cfg_if! {
 
         #[allow(unused_macros)]
         macro_rules! println {
-            ($($tt:tt)*) => {
-                log::info!($($tt,)*);
+            ($($arg:tt)+) => {
+                log::info!($($arg)+);
             };
         }
 
@@ -90,8 +90,11 @@ cfg_if::cfg_if! {
 
         #[allow(unused_macros)]
         macro_rules! println {
-            ($($tt:tt)*) => {
-                cortex_m_semihosting::hprintln!($($tt,)*).unwrap();
+            ($s:expr) => {
+                cortex_m_semihosting::hprintln!($s).unwrap();
+            };
+            ($s:expr, $($tt:tt)*) => {
+                cortex_m_semihosting::hprintln!($s, $($tt)*).unwrap();
             };
         }
 
