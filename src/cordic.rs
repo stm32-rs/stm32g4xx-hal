@@ -103,7 +103,7 @@ pub mod types {
             /// Configure the resource to be represented
             /// by this type-state.
             #[inline]
-            fn set<const O: u8>(w: crate::stm32::cordic::csr::ARGSIZE_W<O>) {
+            fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::ARGSIZE_W<OFFSET>) {
                 w.variant(Self::RAW);
             }
         }
@@ -137,7 +137,7 @@ pub mod types {
             /// Configure the resource to be represented
             /// by this type-state.
             #[inline]
-            fn set<const O: u8>(w: crate::stm32::cordic::csr::RESSIZE_W<O>) {
+            fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::RESSIZE_W<OFFSET>) {
                 w.variant(Self::RAW);
             }
         }
@@ -225,7 +225,7 @@ pub mod func {
             type Raw = crate::stm32::cordic::csr::NARGS_A;
 
             pub(crate) trait State<T> {
-                fn set<const O: u8>(w: crate::stm32::cordic::csr::NARGS_W<O>);
+                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NARGS_W<OFFSET>);
             }
 
             impl<Arg, Count> State<Arg> for NReg<Arg, Count>
@@ -233,11 +233,15 @@ pub mod func {
                 Arg: types::arg::State,
                 Count: data_count::Property<Arg>,
             {
-                fn set<const O: u8>(w: crate::stm32::cordic::csr::NARGS_W<O>) {
-                    w.variant(match (Arg::RAW, Count::COUNT) {
-                        (types::arg::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
-                        (_, _) => Raw::Num1,
-                    });
+                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NARGS_W<OFFSET>) {
+                    w.variant(
+                        const {
+                            match (Arg::RAW, Count::COUNT) {
+                                (types::arg::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
+                                (_, _) => Raw::Num1,
+                            }
+                        },
+                    );
                 }
             }
         }
@@ -248,7 +252,7 @@ pub mod func {
             type Raw = crate::stm32::cordic::csr::NRES_A;
 
             pub(crate) trait State<T> {
-                fn set<const O: u8>(w: crate::stm32::cordic::csr::NRES_W<O>);
+                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NRES_W<OFFSET>);
             }
 
             impl<Res, Count> State<Res> for NReg<Res, Count>
@@ -256,11 +260,15 @@ pub mod func {
                 Res: types::res::State,
                 Count: data_count::Property<Res>,
             {
-                fn set<const O: u8>(w: crate::stm32::cordic::csr::NRES_W<O>) {
-                    w.variant(match (Res::RAW, Count::COUNT) {
-                        (types::res::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
-                        (_, _) => Raw::Num1,
-                    });
+                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NRES_W<OFFSET>) {
+                    w.variant(
+                        const {
+                            match (Res::RAW, Count::COUNT) {
+                                (types::res::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
+                                (_, _) => Raw::Num1,
+                            }
+                        },
+                    );
                 }
             }
         }
@@ -279,7 +287,7 @@ pub mod func {
             /// Configure the resource to be represented
             /// by this type-state.
             #[inline]
-            fn set<const O: u8>(w: crate::stm32::cordic::csr::SCALE_W<O>) {
+            fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::SCALE_W<OFFSET>) {
                 w.bits(<Self as State>::RAW);
             }
         }
@@ -458,7 +466,7 @@ pub mod func {
         /// Configure the resource to be represented
         /// by this type-state.
         #[inline]
-        fn set<const O: u8>(w: crate::stm32::cordic::csr::FUNC_W<O>) {
+        fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::FUNC_W<OFFSET>) {
             w.variant(Self::RAW);
         }
     }
@@ -510,7 +518,6 @@ pub mod func {
     /// Arctangent of x.
     ///
     /// This function can be scaled by 0-7.
-
     pub struct ATan<Scale: scale::State> {
         _scale: PhantomData<Scale>,
     }
@@ -525,14 +532,12 @@ pub mod func {
     /// Natural logarithm of x.
     ///
     /// This function can be scaled by 1-4.
-
     pub struct Ln<Scale: scale::State> {
         _scale: PhantomData<Scale>,
     }
     /// Square root of x.
     ///
     /// This function can be scaled by 0-2.
-
     pub struct Sqrt<Scale: scale::State> {
         _scale: PhantomData<Scale>,
     }
@@ -656,7 +661,7 @@ pub mod prec {
 
         /// Configure the resource to be represented
         /// by this type-state.
-        fn set<const O: u8>(w: crate::stm32::cordic::csr::PRECISION_W<O>);
+        fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::PRECISION_W<OFFSET>);
     }
 
     /// 4 iterations.
@@ -697,7 +702,7 @@ pub mod prec {
                     const BITS: u8 = $BITS;
 
                     #[inline]
-                    fn set<const O: u8>(w: crate::stm32::cordic::csr::PRECISION_W<O>) {
+                    fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::PRECISION_W<OFFSET>) {
                         // SAFETY: reliant on valid type-state
                         // implementations.
                         unsafe { w.bits(<Self as State>::BITS) };
