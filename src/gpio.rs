@@ -353,43 +353,43 @@ macro_rules! gpio {
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl<F> Into<$PXi<Input<PullDown>, F>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Input<PullDown>, F> {
+                impl Into<$PXi<Input<PullDown>>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Input<PullDown>> {
                         self.into_pull_down_input()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl<F> Into<$PXi<Input<PullUp>, F>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Input<PullUp>, F> {
+                impl Into<$PXi<Input<PullUp>>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Input<PullUp>> {
                         self.into_pull_up_input()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl<F> Into<$PXi<Analog, F>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Analog, F> {
+                impl Into<$PXi<Analog>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Analog, IsNotFrozen> {
                         self.into_analog()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl<F> Into<$PXi<Output<OpenDrain>, F>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Output<OpenDrain>, F> {
+                impl Into<$PXi<Output<OpenDrain>>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Output<OpenDrain>> {
                         self.into_open_drain_output()
                     }
                 }
 
                 #[allow(clippy::from_over_into)]
-                impl<F> Into<$PXi<Output<PushPull>, F>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Output<PushPull>, F> {
+                impl Into<$PXi<Output<PushPull>>> for $PXi<DefaultMode> {
+                    fn into(self) -> $PXi<Output<PushPull>> {
                         self.into_push_pull_output()
                     }
                 }
 
                 impl<MODE> $PXi<MODE, IsNotFrozen> {
                     /// Configures the pin to operate as a floating input pin
-                    pub fn into_floating_input<F>(self) -> $PXi<Input<Floating>, F> {
+                    pub fn into_floating_input(self) -> $PXi<Input<Floating>> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -404,7 +404,7 @@ macro_rules! gpio {
                     }
 
                     /// Configures the pin to operate as a pulled down input pin
-                    pub fn into_pull_down_input<F>(self) -> $PXi<Input<PullDown>, F> {
+                    pub fn into_pull_down_input(self) -> $PXi<Input<PullDown>> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -419,7 +419,7 @@ macro_rules! gpio {
                     }
 
                     /// Configures the pin to operate as a pulled up input pin
-                    pub fn into_pull_up_input<F>(self) -> $PXi<Input<PullUp>, F> {
+                    pub fn into_pull_up_input(self) -> $PXi<Input<PullUp>> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -449,7 +449,7 @@ macro_rules! gpio {
                     }
 
                     /// Configures the pin to operate as an open drain output pin
-                    pub fn into_open_drain_output<F>(self) -> $PXi<Output<OpenDrain>, F> {
+                    pub fn into_open_drain_output(self) -> $PXi<Output<OpenDrain>> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -467,7 +467,7 @@ macro_rules! gpio {
                     }
 
                     /// Configures the pin to operate as an push pull output pin
-                    pub fn into_push_pull_output<F>(self) -> $PXi<Output<PushPull>, F> {
+                    pub fn into_push_pull_output(self) -> $PXi<Output<PushPull>> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());

@@ -43,7 +43,7 @@ fn main() -> ! {
         &rcc.clocks,
     );
 
-    let led2 = gpioa.pa0.into_push_pull_output();
+    let led2 = gpioa.pa0.into_alternate();
     // Configure PA12 to the comparator's alternate function so it gets
     // changed directly by the comparator.
     comp.output_pin(led2);
