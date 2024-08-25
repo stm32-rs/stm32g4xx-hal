@@ -232,7 +232,7 @@ macro_rules! hal_ext_trgo {
         $(
             impl Timer<$TIM> {
                 pub fn set_trigger_source(&mut self, trigger_source: TriggerSource) {
-                    self.tim.cr2.modify(|_, w| unsafe {w.$mms().bits(trigger_source as u8)});
+                    self.tim.cr2().modify(|_, w| unsafe {w.$mms().bits(trigger_source as u8)});
                 }
             }
         )+
@@ -253,7 +253,7 @@ macro_rules! hal {
                     match event {
                         Event::TimeOut => {
                             // Enable update event interrupt
-                            self.tim.dier.write(|w| w.uie().set_bit());
+                            self.tim.dier().write(|w| w.uie().set_bit());
                         }
                     }
                 }
@@ -266,7 +266,7 @@ macro_rules! hal {
                     match event {
                         Event::TimeOut => {
                             // Clear interrupt flag
-                            self.tim.sr.write(|w| w.uif().clear_bit());
+                            self.tim.sr().write(|w| w.uif().clear_bit());
                         }
                     }
                 }
@@ -276,7 +276,7 @@ macro_rules! hal {
                     match event {
                         Event::TimeOut => {
                             // Enable update event interrupt
-                            self.tim.dier.write(|w| w.uie().clear_bit());
+                            self.tim.dier().write(|w| w.uie().clear_bit());
                         }
                     }
                 }
@@ -284,7 +284,7 @@ macro_rules! hal {
                 /// Releases the TIM peripheral
                 pub fn release(self) -> $TIM {
                     // pause counter
-                    self.tim.cr1.modify(|_, w| w.cen().clear_bit());
+                    self.tim.cr1().modify(|_, w| w.cen().clear_bit());
                     self.tim
                 }
             }
@@ -297,33 +297,33 @@ macro_rules! hal {
                     T: Into<MicroSecond>,
                 {
                     // pause
-                    self.tim.cr1.modify(|_, w| w.cen().clear_bit());
+                    self.tim.cr1().modify(|_, w| w.cen().clear_bit());
                     // reset counter
-                    self.tim.cnt.reset();
+                    self.tim.cnt().reset();
 
                     let ticks = crate::time::cycles(timeout.into(), self.clk);
 
                     let psc = u16((ticks - 1) / (1 << 16)).unwrap();
-                    self.tim.psc.write(|w| unsafe {w.psc().bits(psc)} );
+                    self.tim.psc().write(|w| unsafe {w.psc().bits(psc)} );
 
                     // TODO: TIM2 and TIM5 are 32 bit
                     let arr = u16(ticks / u32(psc + 1)).unwrap();
-                    self.tim.arr.write(|w| unsafe { w.bits(u32(arr)) });
+                    self.tim.arr().write(|w| unsafe { w.bits(u32(arr)) });
 
                     // Trigger update event to load the registers
-                    self.tim.cr1.modify(|_, w| w.urs().set_bit());
-                    self.tim.egr.write(|w| w.ug().set_bit());
-                    self.tim.cr1.modify(|_, w| w.urs().clear_bit());
+                    self.tim.cr1().modify(|_, w| w.urs().set_bit());
+                    self.tim.egr().write(|w| w.ug().set_bit());
+                    self.tim.cr1().modify(|_, w| w.urs().clear_bit());
 
                     // start counter
-                    self.tim.cr1.modify(|_, w| w.cen().set_bit());
+                    self.tim.cr1().modify(|_, w| w.cen().set_bit());
                 }
 
                 fn wait(&mut self) -> nb::Result<(), Void> {
-                    if self.tim.sr.read().uif().bit_is_clear() {
+                    if self.tim.sr().read().uif().bit_is_clear() {
                         Err(nb::Error::WouldBlock)
                     } else {
-                        self.tim.sr.modify(|_, w| w.uif().clear_bit());
+                        self.tim.sr().modify(|_, w| w.uif().clear_bit());
                         Ok(())
                     }
                 }
@@ -341,14 +341,14 @@ macro_rules! hal {
                 type Error = Error;
 
                 fn cancel(&mut self) -> Result<(), Self::Error> {
-                    // let is_counter_enabled = self.tim.cr1.read().cen().is_enabled();
-                    let is_counter_enabled = self.tim.cr1.read().cen().bit_is_set();
+                    // let is_counter_enabled = self.tim.cr1().read().cen().is_enabled();
+                    let is_counter_enabled = self.tim.cr1().read().cen().bit_is_set();
                     if !is_counter_enabled {
                         return Err(Self::Error::Disabled);
                     }
 
                     // disable counter
-                    self.tim.cr1.modify(|_, w| w.cen().clear_bit());
+                    self.tim.cr1().modify(|_, w| w.cen().clear_bit());
                     Ok(())
                 }
             }

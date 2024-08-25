@@ -22,8 +22,8 @@ jobs:
           - stm32g474
           - stm32g483
           - stm32g484
-          #- stm32g491 # Does not seem ready yet
-          #- stm32g4a1 # Does not seem ready yet
+          - stm32g491 # Does not seem ready yet
+          - stm32g4a1 # Does not seem ready yet
         features:
           - log-rtt,defmt
           # TODO: -log-rtt # log-rtt without defmt, more combos?
