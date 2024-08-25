@@ -7,10 +7,9 @@ extern crate cortex_m;
 extern crate cortex_m_rt as rt;
 extern crate stm32g4xx_hal as hal;
 
-use fixed::types::I1F15;
+use fixed::types::{I1F15, I1F31};
 use hal::cordic::{
-    data_type::{Q15, Q31},
-    func::SinCos,
+    func::{dynamic::Mode as _, scale::N0, Magnitude, SinCos, Sqrt},
     prec::P60,
     Ext as _,
 };
@@ -34,13 +33,24 @@ fn main() -> ! {
     let mut cordic = dp
         .CORDIC
         .constrain(&mut rcc)
-        .freeze::<Q15, Q31, SinCos, P60>(); // 16 bit arguments, 32 bit results, compute sine and cosine, 60 iterations
+        .freeze::<I1F15, I1F31, SinCos, P60>(); // 16 bit arguments, 32 bit results, compute sine and cosine, 60 iterations
+
+    // static operation (zero overhead)
 
     cordic.start(I1F15::from_num(-0.25 /* -45 degreees */));
 
     let (sin, cos) = cordic.result();
 
     println!("sin: {}, cos: {}", sin.to_num::<f32>(), cos.to_num::<f32>());
+
+    // dynamic operation
+
+    let mut cordic = cordic.into_dynamic();
+
+    let sqrt = cordic.run::<Sqrt<N0>>(I1F15::from_num(0.25));
+    println!("sqrt: {}", sqrt.to_num::<f32>());
+    let magnitude = cordic.run::<Magnitude>((I1F15::from_num(0.25), I1F15::from_num(0.5)));
+    println!("magnitude: {}", magnitude.to_num::<f32>());
 
     loop {}
 }
