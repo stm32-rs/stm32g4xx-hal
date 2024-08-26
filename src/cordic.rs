@@ -64,30 +64,57 @@ pub mod types {
 
     pub use fixed::types::{I1F15, I1F31};
 
-    /// Trait for newtypes to represent CORDIC argument or result data.
-    pub trait DataType: Fixed {
+    /// q1.15 fixed point number.
+    pub struct Q15;
+    /// q1.31 fixed point number.
+    pub struct Q31;
+
+    /// Extension trait for fixed point types.
+    pub trait Ext: Fixed {
+        /// Type-state representing this type.
+        type Repr: DataType<Inner = Self>;
+
         /// Convert to bits of the register width,
         fn to_register(self) -> u32;
         /// Convert from bits of the register width,
         fn from_register(bits: u32) -> Self;
     }
 
-    impl DataType for I1F31 {
-        fn to_register(self) -> u32 {
-            self.to_bits() as u32
-        }
-        fn from_register(bits: u32) -> Self {
-            Self::from_bits(bits as i32)
-        }
-    }
+    impl Ext for I1F15 {
+        type Repr = Q15;
 
-    impl DataType for I1F15 {
         fn to_register(self) -> u32 {
             self.to_bits() as u16 as u32
         }
         fn from_register(bits: u32) -> Self {
             Self::from_bits(bits as u16 as i16)
         }
+    }
+
+    impl Ext for I1F31 {
+        type Repr = Q31;
+
+        fn to_register(self) -> u32 {
+            self.to_bits() as u32
+        }
+
+        fn from_register(bits: u32) -> Self {
+            Self::from_bits(bits as i32)
+        }
+    }
+
+    /// Trait for newtypes to represent CORDIC argument or result data.
+    pub trait DataType {
+        /// Internal fixed point representation.
+        type Inner: Ext<Repr = Self>;
+    }
+
+    impl DataType for Q15 {
+        type Inner = I1F15;
+    }
+
+    impl DataType for Q31 {
+        type Inner = I1F31;
     }
 
     /// Traits and structures related to argument type-states.
@@ -119,8 +146,8 @@ pub mod types {
         }
 
         impls! {
-            (super::I1F31, Bits32),
-            (super::I1F15, Bits16),
+            (super::Q31, Bits32),
+            (super::Q15, Bits16),
         }
     }
 
@@ -153,8 +180,8 @@ pub mod types {
         }
 
         impls! {
-            (super::I1F31, Bits32),
-            (super::I1F15, Bits16),
+            (super::Q31, Bits32),
+            (super::Q15, Bits16),
         }
     }
 }
@@ -182,7 +209,7 @@ pub mod func {
         where
             T: types::DataType,
         {
-            type Signature: super::signature::Property<T>;
+            type Signature: super::signature::Property<T::Inner>;
 
             const COUNT: Count;
         }
@@ -191,7 +218,7 @@ pub mod func {
         where
             T: types::DataType,
         {
-            type Signature = T;
+            type Signature = T::Inner;
 
             const COUNT: Count = Count::One;
         }
@@ -200,7 +227,7 @@ pub mod func {
         where
             T: types::DataType,
         {
-            type Signature = (T, T);
+            type Signature = (T::Inner, T::Inner);
 
             const COUNT: Count = Count::Two;
         }
@@ -334,6 +361,8 @@ pub mod func {
     /// Traits and structures related to the function signature.
     pub mod signature {
         use super::{data_count, reg_count, types};
+        use types::arg::State as _;
+        use types::res::State as _;
 
         type WData = crate::stm32g4::Reg<crate::stm32::cordic::wdata::WDATA_SPEC>;
         type RData = crate::stm32g4::Reg<crate::stm32::cordic::rdata::RDATA_SPEC>;
@@ -341,7 +370,7 @@ pub mod func {
         /// The signature is a property of the function type-state.
         pub trait Property<T>
         where
-            T: types::DataType,
+            T: types::Ext,
         {
             /// Number of register operations required.
             type NReg;
@@ -349,25 +378,25 @@ pub mod func {
             /// Write arguments to the argument register.
             fn write(self, reg: &WData)
             where
-                T: types::arg::State;
+                T::Repr: types::arg::State;
 
             /// Read results from the result register.
             fn read(reg: &RData) -> Self
             where
-                T: types::res::State;
+                T::Repr: types::res::State;
         }
 
         impl<T> Property<T> for T
         where
-            T: types::DataType,
+            T: types::Ext,
         {
-            type NReg = reg_count::NReg<T, data_count::One>;
+            type NReg = reg_count::NReg<T::Repr, data_count::One>;
 
             fn write(self, reg: &WData)
             where
-                T: types::arg::State,
+                T::Repr: types::arg::State,
             {
-                let data = match const { T::RAW } {
+                let data = match const { T::Repr::RAW } {
                     types::arg::Raw::Bits16 => {
                         // $RM0440 17.4.2
                         // since we are only using the lower half of the register,
@@ -384,7 +413,7 @@ pub mod func {
 
             fn read(reg: &RData) -> Self
             where
-                T: types::res::State,
+                T::Repr: types::res::State,
             {
                 T::from_register(reg.read().res().bits())
             }
@@ -392,17 +421,17 @@ pub mod func {
 
         impl<T> Property<T> for (T, T)
         where
-            T: types::DataType,
+            T: types::Ext,
         {
-            type NReg = reg_count::NReg<T, data_count::Two>;
+            type NReg = reg_count::NReg<T::Repr, data_count::Two>;
 
             fn write(self, reg: &WData)
             where
-                T: types::arg::State,
+                T::Repr: types::arg::State,
             {
                 let (primary, secondary) = self;
 
-                match const { T::RAW } {
+                match const { T::Repr::RAW } {
                     types::arg::Raw::Bits16 => {
                         // $RM0440 17.4.2
                         reg.write(|w| {
@@ -419,9 +448,9 @@ pub mod func {
 
             fn read(reg: &RData) -> Self
             where
-                T: types::res::State,
+                T::Repr: types::res::State,
             {
-                match const { T::RAW } {
+                match const { T::Repr::RAW } {
                     types::res::Raw::Bits16 => {
                         let data = reg.read().res().bits();
 
@@ -443,23 +472,7 @@ pub mod func {
     pub(crate) type Raw = crate::stm32::cordic::csr::FUNC_A;
 
     /// Trait for function type-states.
-    pub trait State<Arg, Res>
-    where
-        Arg: types::arg::State,
-        Res: types::res::State,
-    {
-        /// The number of arguments required by this function.
-        type Arguments: signature::Property<Arg>;
-        /// The number of arguments produced by this function.
-        type Results: signature::Property<Res>;
-
-        /// The appropriate scale for this function.
-        type Scale: scale::State;
-        /// The required argument register writes.
-        type NArgs: reg_count::arg::State<Arg>;
-        /// The required result register reads.
-        type NRes: reg_count::res::State<Res>;
-
+    pub trait State {
         /// Raw representation of the function.
         const RAW: Raw;
 
@@ -471,20 +484,42 @@ pub mod func {
         }
     }
 
+    /// Define specific combinations
+    /// of states and properties for each function.
+    pub trait Feature<Arg, Res>: State
+    where
+        Arg: types::arg::State,
+        Res: types::res::State,
+    {
+        /// The number of arguments required.
+        type Arguments: signature::Property<Arg::Inner>;
+        /// The number of arguments produced.
+        type Results: signature::Property<Res::Inner>;
+
+        /// The operation to perform.
+        type Op: State;
+        /// The scale to be applied.
+        type Scale: scale::State;
+        /// The required argument register writes.
+        type NArgs: reg_count::arg::State<Arg>;
+        /// The required result register reads.
+        type NRes: reg_count::res::State<Res>;
+    }
+
     impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
     where
         Arg: types::arg::State,
         Res: types::res::State,
-        Func: State<Arg, Res>,
+        Func: Feature<Arg, Res>,
         Prec: prec::State,
-        Func::Arguments: signature::Property<Arg>,
-        Func::Results: signature::Property<Res>,
+        Func::Arguments: signature::Property<Arg::Inner>,
+        Func::Results: signature::Property<Res::Inner>,
     {
         /// Start the configured operation.
-        pub fn start(&mut self, arg: Func::Arguments) {
+        pub fn start(&mut self, args: Func::Arguments) {
             use signature::Property as _;
 
-            arg.write(&self.rb.wdata);
+            args.write(&self.rb.wdata);
         }
 
         /// Get the result of an operation.
@@ -545,7 +580,11 @@ pub mod func {
     macro_rules! impls {
         ( $( ($NAME:ident < $SCALE:ident >, $RAW:ident, $NARGS:ident, $NRES:ident, start( $($START_PARAM:ident),+ )) $(,)?)+ ) => {
             $(
-                impl<Arg, Res> State<Arg, Res> for $NAME
+                impl State for $NAME {
+                    const RAW: Raw = Raw::$RAW;
+                }
+
+                impl<Arg, Res> Feature<Arg, Res> for $NAME
                 where
                     Arg: types::arg::State,
                     Res: types::res::State,
@@ -553,11 +592,10 @@ pub mod func {
                     type Arguments = <data_count::$NARGS as data_count::Property<Arg>>::Signature;
                     type Results = <data_count::$NRES as data_count::Property<Res>>::Signature;
 
+                    type Op = Self;
                     type Scale = scale::$SCALE;
-                    type NArgs = <Self::Arguments as signature::Property<Arg>>::NReg;
-                    type NRes = <Self::Results as signature::Property<Res>>::NReg;
-
-                    const RAW: Raw = Raw::$RAW;
+                    type NArgs = <Self::Arguments as signature::Property<Arg::Inner>>::NReg;
+                    type NRes = <Self::Results as signature::Property<Res::Inner>>::NReg;
                 }
             )+
         };
@@ -568,7 +606,11 @@ pub mod func {
         ( $( ($NAME:ident < $( $SCALE:ident  $(,)? )+ >, $RAW:ident, $NARGS:ident, $NRES:ident, start $START_PARAM:tt ) $(,)?)+ ) => {
             $(
                 $(
-                    impl<Arg, Res> State<Arg, Res> for $NAME<scale::$SCALE>
+                    impl State for $NAME<scale::$SCALE> {
+                        const RAW: Raw = Raw::$RAW;
+                    }
+
+                    impl<Arg, Res> Feature<Arg, Res> for $NAME<scale::$SCALE>
                     where
                         Arg: types::arg::State,
                         Res: types::res::State,
@@ -576,11 +618,10 @@ pub mod func {
                         type Arguments = <data_count::$NARGS as data_count::Property<Arg>>::Signature;
                         type Results = <data_count::$NRES as data_count::Property<Res>>::Signature;
 
+                        type Op = Self;
                         type Scale = scale::$SCALE;
-                        type NArgs = <Self::Arguments as signature::Property<Arg>>::NReg;
-                        type NRes = <Self::Results as signature::Property<Res>>::NReg;
-
-                        const RAW: Raw = Raw::$RAW;
+                        type NArgs = <Self::Arguments as signature::Property<Arg::Inner>>::NReg;
+                        type NRes = <Self::Results as signature::Property<Res::Inner>>::NReg;
                     }
                 )+
             )+
@@ -611,7 +652,7 @@ pub mod func {
 
     /// Traits and structures for dynamic function operation.
     pub mod dynamic {
-        use super::{prec, signature, types, Cordic, State};
+        use super::{prec, signature, types, Cordic, Feature};
 
         /// Any function can be invoked with this type-state.
         pub struct Any;
@@ -628,7 +669,7 @@ pub mod func {
             /// For less overhead, use static operations.*
             fn run<Func>(&mut self, args: Func::Arguments) -> Func::Results
             where
-                Func: State<Arg, Res>;
+                Func: Feature<Arg, Res>;
         }
 
         impl<Arg, Res, Prec> Mode<Arg, Res> for Cordic<Arg, Res, Any, Prec>
@@ -639,7 +680,7 @@ pub mod func {
         {
             fn run<Func>(&mut self, args: Func::Arguments) -> Func::Results
             where
-                Func: State<Arg, Res>,
+                Func: Feature<Arg, Res>,
             {
                 use signature::Property as _;
 
@@ -756,7 +797,7 @@ where
     where
         NewArg: types::arg::State,
         NewRes: types::res::State,
-        NewFunc: func::State<NewArg, NewRes>,
+        NewFunc: func::Feature<NewArg, NewRes>,
         NewPrec: prec::State,
     {
         self.rb.csr.write(|w| {
@@ -791,7 +832,7 @@ where
     where
         NewArg: types::arg::State,
         NewRes: types::res::State,
-        NewFunc: func::State<NewArg, NewRes>,
+        NewFunc: func::Feature<NewArg, NewRes>,
         NewPrec: prec::State,
     {
         self.apply_config::<NewArg, NewRes, NewFunc, NewPrec>();
@@ -851,13 +892,14 @@ where
 }
 
 /// $RM0440 17.4.1
-pub type CordicReset = Cordic<types::I1F31, types::I1F31, func::Cos, prec::P20>;
+pub type CordicReset = Cordic<types::Q31, types::Q31, func::Cos, prec::P20>;
 
+// reset
 impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
 where
     Arg: types::arg::State,
     Res: types::res::State,
-    Func: func::State<Arg, Res>,
+    Func: func::Feature<Arg, Res>,
     Prec: prec::State,
 {
     /// Configure the resource back to the "reset"
@@ -873,7 +915,7 @@ impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
 where
     Arg: types::arg::State,
     Res: types::res::State,
-    Func: func::State<Arg, Res>,
+    Func: func::Feature<Arg, Res>,
     Prec: prec::State,
 {
     /// Enable the result ready interrupt.
@@ -894,7 +936,7 @@ impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
 where
     Arg: types::arg::State,
     Res: types::res::State,
-    Func: func::State<Arg, Res>,
+    Func: func::Feature<Arg, Res>,
     Prec: prec::State,
 {
     /// Release the CORDIC resource binding as a noop.
