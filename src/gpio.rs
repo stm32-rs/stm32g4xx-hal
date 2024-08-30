@@ -342,6 +342,8 @@ macro_rules! gpio {
                     _mode: PhantomData<MODE>,
                 }
 
+                impl<MODE> crate::Sealed for $PXi<MODE> {}
+
                 #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Input<PullDown>>> for $PXi<DefaultMode> {
                     fn into(self) -> $PXi<Input<PullDown>> {
