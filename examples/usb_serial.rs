@@ -10,13 +10,9 @@ use hal::pwr::PwrExt;
 use hal::usb::{Peripheral, UsbBus};
 use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
-use stm32g4xx_hal::gpio::Speed;
-use stm32g4xx_hal::rcc::{PllConfig, PllMDiv, PllNMul, PllRDiv, PllSrc};
 
 use usb_device::prelude::*;
 use usbd_serial::{SerialPort, USB_CLASS_CDC};
-
-use utils::logger::info;
 
 use panic_probe as _;
 
