@@ -475,7 +475,7 @@ macro_rules! gpio {
                     }
 
                     /// Configures the pin as external trigger
-                    pub fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> $PXi<Input<MODE>> {
+                    pub fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> $PXi<MODE> {
                         exti.listen(Event::from_code($i), edge);
                         $PXi { _mode: PhantomData }
                     }
