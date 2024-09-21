@@ -29,10 +29,11 @@ extern crate bare_metal;
 extern crate void;
 
 pub extern crate cortex_m;
-pub extern crate embedded_hal as hal;
 pub extern crate nb;
 pub extern crate stm32g4;
 
+pub use embedded_hal as hal;
+pub use embedded_hal_old as hal_02;
 pub use nb::block;
 
 mod sealed {
@@ -66,6 +67,8 @@ pub use stm32g4::stm32g491 as stm32;
 
 #[cfg(feature = "stm32g4a1")]
 pub use stm32g4::stm32g4a1 as stm32;
+
+pub use stm32 as pac;
 
 #[cfg(feature = "rt")]
 pub use crate::stm32::interrupt;

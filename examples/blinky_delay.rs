@@ -3,6 +3,7 @@
 #![no_main]
 #![no_std]
 
+use embedded_hal::delay::DelayNs;
 use hal::delay::DelayFromCountDownTimer;
 use hal::prelude::*;
 use hal::pwr::PwrExt;
@@ -47,6 +48,6 @@ fn main() -> ! {
         info!("Toggle");
         led.toggle().unwrap();
         info!("TIM2 delay");
-        delay_tim2.delay_ms(1000_u16);
+        delay_tim2.delay_ms(1000);
     }
 }

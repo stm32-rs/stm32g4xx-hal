@@ -1,5 +1,5 @@
 //! Analog to digital converter configuration.
-//! https://github.com/stm32-rs/stm32l4xx-hal/blob/master/src/adc.rs
+//! <https://github.com/stm32-rs/stm32l4xx-hal/blob/master/src/adc.rs>
 
 #![deny(missing_docs)]
 
@@ -20,10 +20,8 @@ use crate::{
 };
 use core::fmt;
 use core::marker::PhantomData;
-use embedded_hal::{
-    adc::{Channel, OneShot},
-    blocking::delay::DelayUs,
-};
+use embedded_hal::delay::DelayNs;
+use embedded_hal_old::adc::{Channel, OneShot};
 
 use self::config::ExternalTrigger12;
 
@@ -168,7 +166,7 @@ macro_rules! adc_op_follower {
 
 /// Contains types related to ADC configuration
 pub mod config {
-    use embedded_hal::adc::Channel;
+    use embedded_hal_old::adc::Channel;
 
     /// The place in the sequence a given channel should be captured
     #[derive(Debug, PartialEq, PartialOrd, Copy, Clone)]
@@ -312,7 +310,8 @@ pub mod config {
     pub enum ClockMode {
         /// (Asynchronous clock mode), adc_ker_ck. generated at product level (refer to Section 6: Reset and clock control (RCC)
         Asynchronous,
-        /// (Synchronous clock mode). adc_hclk/1 This configuration must be enabled only if the AHB clock prescaler is set to 1 (HPRE[3:0] = 0xxx in RCC_CFGR register) and if the system clock has a 50% duty cycle.
+        /// (Synchronous clock mode). adc_hclk/1
+        /// This configuration must be enabled only if the AHB clock prescaler is set to 1 (HPRE\[3:0\] = 0xxx in RCC_CFGR register) and if the system clock has a 50% duty cycle.
         Synchronous_Div_1,
         /// Synchronous clock mode. adc_hclk/2
         Synchronous_Div_2,
@@ -1168,9 +1167,9 @@ impl<ADC: TriggerType> Conversion<ADC> {
         !self.is_active()
     }
 
-    /// Converts from Conversion<C, E> to Option<C>.
+    /// Converts from `Conversion<C, E>` to `Option<C>`.
     ///
-    /// Converts self into an Option<C>, consuming self, and discarding the adc, if it is stopped.
+    /// Converts self into an `Option<C>`, consuming self, and discarding the adc, if it is stopped.
     #[inline(always)]
     pub fn active(self) -> Option<Adc<ADC, Active>> {
         match self {
@@ -1179,9 +1178,9 @@ impl<ADC: TriggerType> Conversion<ADC> {
         }
     }
 
-    /// Converts from Conversion<C, E> to Option<E>.
+    /// Converts from `Conversion<C, E>` to `Option<E>`.
     ///
-    /// Converts self into an Option<E>, consuming self, and discarding the adc, if it is still active.
+    /// Converts self into an `Option<E>`, consuming self, and discarding the adc, if it is still active.
     #[inline(always)]
     pub fn stopped(self) -> Option<Adc<ADC, Configured>> {
         match self {
@@ -1381,7 +1380,7 @@ pub trait AdcClaim<TYPE: TriggerType> {
         self,
         cs: ClockSource,
         rcc: &Rcc,
-        delay: &mut impl DelayUs<u8>,
+        delay: &mut impl DelayNs,
         reset: bool,
     ) -> Adc<TYPE, Disabled>;
 
@@ -1391,7 +1390,7 @@ pub trait AdcClaim<TYPE: TriggerType> {
         cs: ClockSource,
         rcc: &Rcc,
         config: config::AdcConfig<TYPE::ExternalTrigger>,
-        delay: &mut impl DelayUs<u8>,
+        delay: &mut impl DelayNs,
         reset: bool,
     ) -> Adc<TYPE, Configured>;
 }
@@ -1583,7 +1582,7 @@ macro_rules! adc {
 
                 /// Powers-up an powered-down Adc
                 #[inline(always)]
-                pub fn power_up(&mut self, delay: &mut impl DelayUs<u8>) {
+                pub fn power_up(&mut self, delay: &mut impl DelayNs) {
                     if self.is_deeppwd_enabled() {
                         self.disable_deeppwd_down();
                     }
@@ -1616,7 +1615,7 @@ macro_rules! adc {
 
                 /// Enables the Voltage Regulator
                 #[inline(always)]
-                pub fn enable_vreg(&mut self, delay: &mut impl DelayUs<u8>) {
+                pub fn enable_vreg(&mut self, delay: &mut impl DelayNs) {
                     self.adc_reg.cr.modify(|_, w| w.advregen().set_bit());
                     while !self.adc_reg.cr.read().advregen().bit_is_set() {}
 
@@ -2125,7 +2124,7 @@ macro_rules! adc {
                 ///
                 /// TODO: fix needing SYST
                 #[inline(always)]
-                fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayUs<u8>, reset: bool) -> Adc<stm32::$adc_type, Disabled> {
+                fn claim(self, cs: ClockSource, rcc: &Rcc, delay: &mut impl DelayNs, reset: bool) -> Adc<stm32::$adc_type, Disabled> {
                     unsafe {
                         let rcc_ptr = &(*stm32::RCC::ptr());
                         stm32::$adc_type::enable(rcc_ptr);
@@ -2149,7 +2148,7 @@ macro_rules! adc {
 
                 /// claims and configures the Adc
                 #[inline(always)]
-                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, config: config::AdcConfig<$trigger_type>, delay: &mut impl DelayUs<u8>, reset :bool) -> Adc<stm32::$adc_type, Configured> {
+                fn claim_and_configure(self, cs: ClockSource, rcc: &Rcc, config: config::AdcConfig<$trigger_type>, delay: &mut impl DelayNs, reset :bool) -> Adc<stm32::$adc_type, Configured> {
                     let mut adc = self.claim(cs, rcc, delay, reset);
                     adc.adc.config = config;
 
@@ -2173,7 +2172,7 @@ macro_rules! adc {
             impl Adc<stm32::$adc_type, PoweredDown> {
                 /// Powers-up an powered-down Adc
                 #[inline(always)]
-                pub fn power_up(mut self, delay: &mut impl DelayUs<u8>) -> Adc<stm32::$adc_type, Disabled> {
+                pub fn power_up(mut self, delay: &mut impl DelayNs) -> Adc<stm32::$adc_type, Disabled> {
                     self.adc.power_up(delay);
 
                     Adc {

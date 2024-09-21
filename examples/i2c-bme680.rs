@@ -5,7 +5,7 @@
 
 use bme680::*;
 use core::time::Duration;
-use embedded_hal::blocking::delay::DelayMs;
+use embedded_hal::delay::DelayNs;
 use hal::delay::DelayFromCountDownTimer;
 use hal::i2c::Config;
 use hal::prelude::*;
@@ -15,10 +15,10 @@ use hal::timer::Timer;
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use log::info;
 
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
