@@ -152,7 +152,7 @@ where
     /// with external filtering.
     fn pga_external_filter<
         B1: Borrow<NonInverting>,
-        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm0>,
+        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
     >(
         self,
         non_inverting: B1,
@@ -165,7 +165,7 @@ where
     /// external filtering.
     fn pga_external_bias<
         B1: Borrow<NonInverting>,
-        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm0>,
+        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
     >(
         self,
         non_inverting: B1,
@@ -178,8 +178,8 @@ where
     /// external filtering.
     fn pga_external_bias_and_filter<
         B1: Borrow<NonInverting>,
-        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm0>,
-        B3: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::vinm1>,
+        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
+        B3: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm1>,
     >(
         self,
         non_inverting: B1,
@@ -197,9 +197,9 @@ where
     Opamp: LookupPgaGain,
 {
     /// Type of the associated vinm0 input.
-    type vinm0;
+    type Vinm0;
     /// Type of the associated vinm1 input.
-    type vinm1;
+    type Vinm1;
 
     /// Write the opamp CSR register configuring the opamp PGA.
     ///
@@ -720,8 +720,8 @@ macro_rules! opamps {
         paste::paste!{
             impl ConfigurePgaReg<$opamp, $non_inverting> for $opamp
             {
-                type vinm0 = $vinm0;
-                type vinm1 = $vinm1;
+                type Vinm0 = $vinm0;
+                type Vinm1 = $vinm1;
 
                 /// Configures the opamp for programmable gain operation.
                 unsafe fn write_pga_reg(gain: Gain, mode: PgaMode, output_enable: bool) {
@@ -762,7 +762,7 @@ macro_rules! opamps {
                 #[allow(private_bounds)]
                 fn pga_external_filter<
                     B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: B1,
@@ -776,7 +776,7 @@ macro_rules! opamps {
                 #[allow(private_bounds)]
                 fn pga_external_bias<
                     B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: B1,
@@ -790,8 +790,8 @@ macro_rules! opamps {
                 #[allow(private_bounds)]
                 fn pga_external_bias_and_filter<
                     B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
-                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm1>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
                 >(
                     self,
                     _non_inverting: B1,
@@ -819,7 +819,7 @@ macro_rules! opamps {
                 #[allow(private_bounds)]
                 fn pga_external_filter<
                     B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: B1,
@@ -833,7 +833,7 @@ macro_rules! opamps {
                 #[allow(private_bounds)]
                 fn pga_external_bias<
                     B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: B1,
@@ -847,8 +847,8 @@ macro_rules! opamps {
                 #[allow(private_bounds)]
                 fn pga_external_bias_and_filter<
                     B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm0>,
-                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::vinm1>,
+                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
                 >(
                     self,
                     _non_inverting: B1,
