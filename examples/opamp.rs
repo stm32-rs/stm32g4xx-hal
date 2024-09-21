@@ -44,7 +44,7 @@ fn main() -> ! {
 
     // Configure opamp1 with pa1 as non-inverting input and set gain to x2
     let _opamp1 = opamp1.pga(&pa1, pa2, Gain::Gain2);
-    
+
     // Set up opamp2 in follower mode with output routed to internal ADC
     let opamp2 = opamp2.follower(&pa7, InternalOutput);
 

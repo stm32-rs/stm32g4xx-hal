@@ -32,13 +32,49 @@ pub struct IsNotFrozen;
 ///
 /// It is also implemented for reference to a frozen pin `&$PXi<MODE, IsFrozen>`, since they can not change mode due to being frozen.
 pub trait FrozenPin<T>: crate::Sealed {}
-impl<A1, A2, B1, B2> FrozenPin<(B1, B2)> for (A1, A2) where A1: FrozenPin<B1>, A2: FrozenPin<B2> {}
-impl<A1, A2, A3, B1, B2, B3> FrozenPin<(B1, B2, B3)> for (A1, A2, A3) where A1: FrozenPin<B1>, A2: FrozenPin<B2>, A3: FrozenPin<B3> {}
-impl<A1, A2, A3, A4, B1, B2, B3, B4> FrozenPin<(B1, B2, B3, B4)> for (A1, A2, A3, A4) where A1: FrozenPin<B1>, A2: FrozenPin<B2>, A3: FrozenPin<B3>, A4: FrozenPin<B4> {}
+impl<A1, A2, B1, B2> FrozenPin<(B1, B2)> for (A1, A2)
+where
+    A1: FrozenPin<B1>,
+    A2: FrozenPin<B2>,
+{
+}
+impl<A1, A2, A3, B1, B2, B3> FrozenPin<(B1, B2, B3)> for (A1, A2, A3)
+where
+    A1: FrozenPin<B1>,
+    A2: FrozenPin<B2>,
+    A3: FrozenPin<B3>,
+{
+}
+impl<A1, A2, A3, A4, B1, B2, B3, B4> FrozenPin<(B1, B2, B3, B4)> for (A1, A2, A3, A4)
+where
+    A1: FrozenPin<B1>,
+    A2: FrozenPin<B2>,
+    A3: FrozenPin<B3>,
+    A4: FrozenPin<B4>,
+{
+}
 
-impl<A1, A2> crate::Sealed for (A1, A2) where A1: crate::Sealed, A2: crate::Sealed {}
-impl<A1, A2, A3> crate::Sealed for (A1, A2, A3) where A1: crate::Sealed, A2: crate::Sealed, A3: crate::Sealed {}
-impl<A1, A2, A3, A4> crate::Sealed for (A1, A2, A3, A4) where A1: crate::Sealed, A2: crate::Sealed, A3: crate::Sealed, A4: crate::Sealed {}
+impl<A1, A2> crate::Sealed for (A1, A2)
+where
+    A1: crate::Sealed,
+    A2: crate::Sealed,
+{
+}
+impl<A1, A2, A3> crate::Sealed for (A1, A2, A3)
+where
+    A1: crate::Sealed,
+    A2: crate::Sealed,
+    A3: crate::Sealed,
+{
+}
+impl<A1, A2, A3, A4> crate::Sealed for (A1, A2, A3, A4)
+where
+    A1: crate::Sealed,
+    A2: crate::Sealed,
+    A3: crate::Sealed,
+    A4: crate::Sealed,
+{
+}
 
 /// Input mode (type state)
 pub struct Input<MODE> {

@@ -10,7 +10,6 @@ use core::marker::PhantomData;
 
 use crate::dac;
 use crate::exti::{Event as ExtiEvent, ExtiExt};
-use crate::gpio::{FrozenPin, IsFrozen};
 use crate::gpio::{
     gpioa::{PA0, PA1, PA11, PA12, PA2, PA3, PA4, PA5, PA6, PA7},
     gpiob::{PB0, PB1, PB14, PB15, PB2, PB6, PB7, PB8, PB9},
@@ -18,6 +17,7 @@ use crate::gpio::{
     gpiof::PF4,
     Alternate, AlternateOD, Analog, SignalEdge, AF2, AF3, AF8,
 };
+use crate::gpio::{FrozenPin, IsFrozen};
 
 #[cfg(any(
     feature = "stm32g473",
@@ -143,9 +143,9 @@ pub enum Hysteresis {
 /// Comparator positive input
 pub trait PositiveInput<C>: crate::Sealed {
     /// Setup comaprator to use this as its positive input
-    /// 
+    ///
     /// # Safety
-    /// 
+    ///
     /// Internal use only
     unsafe fn setup(&self, comp: &mut C);
 }
@@ -165,7 +165,7 @@ pub trait NegativeInput<C>: crate::Sealed {
     /// Setup comaprator to use this as its negative input
     ///
     /// # Safety
-    /// 
+    ///
     /// Internal use only
     unsafe fn setup(&self, comp: &mut C);
 }
@@ -436,7 +436,7 @@ macro_rules! impl_comparator {
             ) -> Comparator<$COMP, Disabled>
             where
                 PP: FrozenPin<P> + PositiveInput<$COMP>,
-                NP: FrozenPin<N> + NegativeInput<$COMP>
+                NP: FrozenPin<N> + NegativeInput<$COMP>,
             {
                 unsafe {
                     positive_input.borrow().setup(&mut self);
@@ -474,7 +474,7 @@ macro_rules! impl_comparator {
             ) -> Self
             where
                 PP: FrozenPin<P> + PositiveInput<$COMP>,
-                NP: FrozenPin<N> + NegativeInput<$COMP>
+                NP: FrozenPin<N> + NegativeInput<$COMP>,
             {
                 comp.comparator(positive_input, negative_input, config, clocks)
             }
