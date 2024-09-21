@@ -218,7 +218,7 @@ where
         Pga {
             opamp: PhantomData,
             non_inverting: PhantomData,
-            output: output,
+            output,
         }
     }
 }
