@@ -18,13 +18,27 @@ pub trait GpioExt {
 }
 
 /// Type state for a gpio pin frozen to its current mode
-/// 
+///
 /// The into_alternate/analog/{x}_input/output can not be called on a pin with this state.
 /// The pin is thus guaranteed to stay as this type as long as the program is running.
 pub struct IsFrozen;
 
 /// See [IsFrozen]
 pub struct IsNotFrozen;
+
+/// A pin type that is guaranteed to stay in the current mode after being passed to a peripheral
+///
+/// This is implemented for all owned pins since no one else can change their mode once ownership is passed on to the peripheral.
+///
+/// It is also implemented for reference to a frozen pin `&$PXi<MODE, IsFrozen>`, since they can not change mode due to being frozen.
+pub trait FrozenPin<T>: crate::Sealed {}
+impl<A1, A2, B1, B2> FrozenPin<(B1, B2)> for (A1, A2) where A1: FrozenPin<B1>, A2: FrozenPin<B2> {}
+impl<A1, A2, A3, B1, B2, B3> FrozenPin<(B1, B2, B3)> for (A1, A2, A3) where A1: FrozenPin<B1>, A2: FrozenPin<B2>, A3: FrozenPin<B3> {}
+impl<A1, A2, A3, A4, B1, B2, B3, B4> FrozenPin<(B1, B2, B3, B4)> for (A1, A2, A3, A4) where A1: FrozenPin<B1>, A2: FrozenPin<B2>, A3: FrozenPin<B3>, A4: FrozenPin<B4> {}
+
+impl<A1, A2> crate::Sealed for (A1, A2) where A1: crate::Sealed, A2: crate::Sealed {}
+impl<A1, A2, A3> crate::Sealed for (A1, A2, A3) where A1: crate::Sealed, A2: crate::Sealed, A3: crate::Sealed {}
+impl<A1, A2, A3, A4> crate::Sealed for (A1, A2, A3, A4) where A1: crate::Sealed, A2: crate::Sealed, A3: crate::Sealed, A4: crate::Sealed {}
 
 /// Input mode (type state)
 pub struct Input<MODE> {
@@ -352,6 +366,11 @@ macro_rules! gpio {
                     _frozen_state: PhantomData<F>,
                 }
 
+                impl<MODE> FrozenPin<$PXi<MODE, IsFrozen>> for $PXi<MODE> {}
+                impl<MODE> FrozenPin<$PXi<MODE, IsFrozen>> for &$PXi<MODE, IsFrozen> {}
+                impl<MODE, F> crate::Sealed for $PXi<MODE, F> {}
+                impl<MODE> crate::Sealed for &$PXi<MODE, IsFrozen> {}
+
                 #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Input<PullDown>>> for $PXi<DefaultMode> {
                     fn into(self) -> $PXi<Input<PullDown>> {
@@ -552,7 +571,7 @@ macro_rules! gpio {
                         }
                         $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
-                    
+
                     pub fn freeze(self) -> $PXi<MODE, IsFrozen> {
                         $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }

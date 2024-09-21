@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use crate::gpio::gpioa::{PA4, PA5, PA6};
-use crate::gpio::DefaultMode;
+use crate::gpio::{DefaultMode, FrozenPin, IsFrozen, IsNotFrozen};
 use crate::rcc::{self, *};
 use crate::stm32::{DAC1, DAC2, DAC3, DAC4, RCC};
 use hal::blocking::delay::DelayUs;
@@ -64,9 +64,20 @@ impl ED for Disabled {}
 
 macro_rules! impl_dac {
     ($DACxCHy:ident) => {
-        pub struct $DACxCHy<const MODE_BITS: u8, ED> {
+        pub struct $DACxCHy<const MODE_BITS: u8, ED, F = IsNotFrozen> {
             _enabled: PhantomData<ED>,
+            _frozen_state: PhantomData<F>,
         }
+
+        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, Enabled>{}
+        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, WaveGenerator>{}
+        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, Enabled, IsFrozen>{}
+        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, WaveGenerator, IsFrozen>{}
+
+        impl<const M: u8> crate::Sealed for $DACxCHy<M, Enabled>{}
+        impl<const M: u8> crate::Sealed for $DACxCHy<M, WaveGenerator>{}
+        impl<const M: u8> crate::Sealed for &$DACxCHy<M, Enabled, IsFrozen>{}
+        impl<const M: u8> crate::Sealed for &$DACxCHy<M, WaveGenerator, IsFrozen>{}
     };
 }
 
@@ -198,6 +209,7 @@ macro_rules! dac_helper {
 
                     $CX {
                         _enabled: PhantomData,
+                        _frozen_state: PhantomData,
                     }
                 }
 
@@ -214,11 +226,12 @@ macro_rules! dac_helper {
 
                     $CX {
                         _enabled: PhantomData,
+                        _frozen_state: PhantomData,
                     }
                 }
             }
 
-            impl<const MODE_BITS: u8, ED> $CX<MODE_BITS, ED> {
+            impl<const MODE_BITS: u8, ED> $CX<MODE_BITS, ED, IsNotFrozen> {
                 /// Calibrate the DAC output buffer by performing a "User
                 /// trimming" operation. It is useful when the VDDA/VREF+
                 /// voltage or temperature differ from the factory trimming
@@ -251,6 +264,7 @@ macro_rules! dac_helper {
 
                     $CX {
                         _enabled: PhantomData,
+                        _frozen_state: PhantomData,
                     }
                 }
 
@@ -263,13 +277,18 @@ macro_rules! dac_helper {
 
                     $CX {
                         _enabled: PhantomData,
+                        _frozen_state: PhantomData,
                     }
+                }
+
+                pub fn freeze(self) -> $CX<MODE_BITS, ED, IsFrozen> {
+                    $CX { _enabled: PhantomData, _frozen_state: PhantomData }
                 }
             }
 
             /// DacOut implementation available in any Enabled/Disabled
             /// state
-            impl<const MODE_BITS: u8, ED> DacOut<u16> for $CX<MODE_BITS, ED> {
+            impl<const MODE_BITS: u8, ED, F> DacOut<u16> for $CX<MODE_BITS, ED, F> {
                 fn set_value(&mut self, val: u16) {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.$dhrx.write(|w| unsafe { w.bits(val as u32) });
@@ -282,7 +301,7 @@ macro_rules! dac_helper {
             }
 
             /// Wave generator state implementation
-            impl<const MODE_BITS: u8> $CX<MODE_BITS, WaveGenerator> {
+            impl<const MODE_BITS: u8, F> $CX<MODE_BITS, WaveGenerator, F> {
                 pub fn trigger(&mut self) {
                     let dac = unsafe { &(*<$DAC>::ptr()) };
                     dac.dac_swtrgr.write(|w| { w.$swtrig().set_bit() });

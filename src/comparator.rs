@@ -5,16 +5,18 @@
 //! This code has been taken from the stm32g0xx-hal project and modified slightly to support
 //! STM32G4xx MCUs.
 
+use core::borrow::Borrow;
 use core::marker::PhantomData;
 
 use crate::dac;
 use crate::exti::{Event as ExtiEvent, ExtiExt};
+use crate::gpio::{FrozenPin, IsFrozen};
 use crate::gpio::{
     gpioa::{PA0, PA1, PA11, PA12, PA2, PA3, PA4, PA5, PA6, PA7},
     gpiob::{PB0, PB1, PB14, PB15, PB2, PB6, PB7, PB8, PB9},
     gpioc::PC2,
     gpiof::PF4,
-    Analog, Alternate, AlternateOD, SignalEdge, AF2, AF3, AF8,
+    Alternate, AlternateOD, Analog, SignalEdge, AF2, AF3, AF8,
 };
 
 #[cfg(any(
@@ -139,12 +141,17 @@ pub enum Hysteresis {
 }
 
 /// Comparator positive input
-pub trait PositiveInput<C> {
-    fn setup(&self, comp: &C);
+pub trait PositiveInput<C>: crate::Sealed {
+    /// Setup comaprator to use this as its positive input
+    /// 
+    /// # Safety
+    /// 
+    /// Internal use only
+    unsafe fn setup(&self, comp: &mut C);
 }
 
 /// Comparator negative input
-pub trait NegativeInput<C> {
+pub trait NegativeInput<C>: crate::Sealed {
     /// Does this input use the internal reference Vrefint
     ///
     /// This only true for RefintInput
@@ -155,19 +162,36 @@ pub trait NegativeInput<C> {
     /// This is only relevant for `RefintInput` other than `RefintInput::VRefint`
     fn use_resistor_divider(&self) -> bool;
 
-    fn setup(&self, comp: &C);
+    /// Setup comaprator to use this as its negative input
+    ///
+    /// # Safety
+    /// 
+    /// Internal use only
+    unsafe fn setup(&self, comp: &mut C);
 }
 
 macro_rules! positive_input_pin {
     ($COMP:ident, $pin_0:ident, $pin_1:ident) => {
-        impl PositiveInput<$COMP> for &$pin_0<Analog> {
-            fn setup(&self, comp: &$COMP) {
+        impl PositiveInput<$COMP> for &$pin_0<Analog, IsFrozen> {
+            unsafe fn setup(&self, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(false))
             }
         }
 
-        impl PositiveInput<$COMP> for &$pin_1<Analog> {
-            fn setup(&self, comp: &$COMP) {
+        impl PositiveInput<$COMP> for $pin_0<Analog> {
+            unsafe fn setup(&self, comp: &mut $COMP) {
+                comp.csr().modify(|_, w| w.inpsel().bit(false))
+            }
+        }
+
+        impl PositiveInput<$COMP> for &$pin_1<Analog, IsFrozen> {
+            unsafe fn setup(&self, comp: &mut $COMP) {
+                comp.csr().modify(|_, w| w.inpsel().bit(true))
+            }
+        }
+
+        impl PositiveInput<$COMP> for $pin_1<Analog> {
+            unsafe fn setup(&self, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(true))
             }
         }
@@ -212,7 +236,7 @@ macro_rules! negative_input_pin_helper {
                 false
             }
 
-            fn setup(&self, comp: &$COMP) {
+            unsafe fn setup(&self, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) })
             }
         }
@@ -257,6 +281,9 @@ pub enum RefintInput {
     VRefint = 0b011,
 }
 
+impl FrozenPin<RefintInput> for RefintInput {}
+impl crate::Sealed for RefintInput {}
+
 macro_rules! refint_input {
     ($($COMP:ident, )+) => {$(
         impl NegativeInput<$COMP> for RefintInput {
@@ -266,7 +293,7 @@ macro_rules! refint_input {
                 *self != RefintInput::VRefint
             }
 
-            fn setup(&self, comp: &$COMP) {
+            unsafe fn setup(&self, comp: &mut $COMP) {
                 comp.csr()
                     .modify(|_, w| unsafe { w.inmsel().bits(*self as u8) })
             }
@@ -285,15 +312,27 @@ refint_input!(COMP1, COMP2, COMP3, COMP4,);
 refint_input!(COMP5, COMP6, COMP7,);
 
 macro_rules! dac_input_helper {
-    ($COMP:ident: $channel:ident, $MODE:ident, $bits:expr) => {
-        impl<ED> NegativeInput<$COMP> for &dac::$channel<{ dac::$MODE }, ED> {
+    ($COMP:ident: $channel:ident, $MODE:ident, $ED:ty, $bits:expr) => {
+        impl NegativeInput<$COMP> for &dac::$channel<{ dac::$MODE }, $ED, IsFrozen> {
             const USE_VREFINT: bool = false;
 
             fn use_resistor_divider(&self) -> bool {
                 false
             }
 
-            fn setup(&self, comp: &$COMP) {
+            unsafe fn setup(&self, comp: &mut $COMP) {
+                comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) })
+            }
+        }
+
+        impl NegativeInput<$COMP> for dac::$channel<{ dac::$MODE }, $ED> {
+            const USE_VREFINT: bool = false;
+
+            fn use_resistor_divider(&self) -> bool {
+                false
+            }
+
+            unsafe fn setup(&self, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) })
             }
         }
@@ -302,8 +341,10 @@ macro_rules! dac_input_helper {
 
 macro_rules! dac_input {
     ($COMP:ident: $channel:ident, $bits:expr) => {
-        dac_input_helper!($COMP: $channel, M_MIX_SIG, $bits);
-        dac_input_helper!($COMP: $channel, M_INT_SIG, $bits);
+        dac_input_helper!($COMP: $channel, M_MIX_SIG, dac::Enabled, $bits);
+        dac_input_helper!($COMP: $channel, M_MIX_SIG, dac::WaveGenerator, $bits);
+        dac_input_helper!($COMP: $channel, M_INT_SIG, dac::Enabled, $bits);
+        dac_input_helper!($COMP: $channel, M_INT_SIG, dac::WaveGenerator, $bits);
     };
 }
 
@@ -371,27 +412,36 @@ pub struct Comparator<C, ED> {
 
 pub trait ComparatorExt<COMP> {
     /// Initializes a comparator
-    fn comparator<P: PositiveInput<COMP>, N: NegativeInput<COMP>>(
+    fn comparator<PP, NP, P, N>(
         self,
-        positive_input: P,
-        negative_input: N,
+        positive_input: PP,
+        negative_input: NP,
         config: Config,
         clocks: &Clocks,
-    ) -> Comparator<COMP, Disabled>;
+    ) -> Comparator<COMP, Disabled>
+    where
+        PP: FrozenPin<P> + PositiveInput<COMP>,
+        NP: FrozenPin<N> + NegativeInput<COMP>;
 }
 
 macro_rules! impl_comparator {
     ($COMP:ty, $comp:ident, $Event:expr) => {
         impl ComparatorExt<$COMP> for $COMP {
-            fn comparator<P: PositiveInput<$COMP>, N: NegativeInput<$COMP>>(
-                self,
-                positive_input: P,
-                negative_input: N,
+            fn comparator<PP, NP, P, N>(
+                mut self,
+                positive_input: PP,
+                negative_input: NP,
                 config: Config,
                 clocks: &Clocks,
-            ) -> Comparator<$COMP, Disabled> {
-                positive_input.setup(&self);
-                negative_input.setup(&self);
+            ) -> Comparator<$COMP, Disabled>
+            where
+                PP: FrozenPin<P> + PositiveInput<$COMP>,
+                NP: FrozenPin<N> + NegativeInput<$COMP>
+            {
+                unsafe {
+                    positive_input.borrow().setup(&mut self);
+                    negative_input.borrow().setup(&mut self);
+                }
                 // Delay for scaler voltage bridge initialization for certain negative inputs
                 let voltage_scaler_delay = clocks.sys_clk.raw() / (1_000_000 / 200); // 200us
                 cortex_m::asm::delay(voltage_scaler_delay);
@@ -399,9 +449,9 @@ macro_rules! impl_comparator {
                     w.hyst()
                         .bits(config.hysteresis as u8)
                         .scalen()
-                        .bit(N::USE_VREFINT)
+                        .bit(NP::USE_VREFINT)
                         .brgen()
-                        .bit(negative_input.use_resistor_divider())
+                        .bit(negative_input.borrow().use_resistor_divider())
                         .pol()
                         .bit(config.inverted)
                 });
@@ -415,13 +465,17 @@ macro_rules! impl_comparator {
 
         impl Comparator<$COMP, Disabled> {
             /// Initializes a comparator
-            pub fn $comp<P: PositiveInput<$COMP>, N: NegativeInput<$COMP>>(
+            pub fn $comp<PP, NP, P, N>(
                 comp: $COMP,
-                positive_input: P,
-                negative_input: N,
+                positive_input: PP,
+                negative_input: NP,
                 config: Config,
                 clocks: &Clocks,
-            ) -> Self {
+            ) -> Self
+            where
+                PP: FrozenPin<P> + PositiveInput<$COMP>,
+                NP: FrozenPin<N> + NegativeInput<$COMP>
+            {
                 comp.comparator(positive_input, negative_input, config, clocks)
             }
 

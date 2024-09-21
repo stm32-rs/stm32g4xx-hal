@@ -31,35 +31,25 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
 
+    let pa1 = gpioa.pa1.into_analog();
+    let pa2 = gpioa.pa2.into_analog();
+    let pa7 = gpioa.pa7.into_analog();
+
+    let pb0 = gpiob.pb0.into_analog();
+    let pb1 = gpiob.pb1.into_analog();
+    let pb2 = gpiob.pb2.into_analog();
+
     // setup opamps
     let (opamp1, opamp2, opamp3, ..) = dp.OPAMP.split(&mut rcc);
 
-    // Set up opamp1 and opamp2 in follower mode
-    let opamp1 = opamp1.follower(gpioa.pa1, gpioa.pa2);
-    let opamp2 = opamp2.follower(gpioa.pa7, InternalOutput);
-
-    // Set up opamp1 and opamp2 in open loop mode
-    let opamp3 = opamp3.open_loop(gpiob.pb0, gpiob.pb2, gpiob.pb1);
-
-    // disable opamps
-    let (opamp1, pa1, pa2) = opamp1.disable();
-    let (opamp2, pa7) = opamp2.disable();
-
-    let (_opamp3, _pb0, _pb2, _pb1) = opamp3.disable();
-
     // Configure opamp1 with pa1 as non-inverting input and set gain to x2
-    let _opamp1 = opamp1.pga(
-        pa1,
-        pa2, // Route output to pin pa2
-        Gain::Gain2,
-    );
+    let _opamp1 = opamp1.pga(&pa1, pa2, Gain::Gain2);
+    
+    // Set up opamp2 in follower mode with output routed to internal ADC
+    let opamp2 = opamp2.follower(&pa7, InternalOutput);
 
-    // Configure op with pa7 as non-inverting input and set gain to x4
-    let opamp2 = opamp2.pga(
-        pa7,
-        InternalOutput, // Do not route output to any external pin, use internal AD instead
-        Gain::Gain4,
-    );
+    // Set up opamp3 in open loop mode
+    let _opamp3 = opamp3.open_loop(&pb0, pb2, pb1);
 
     // Lock opamp2. After the opamp is locked its registers cannot be written
     // until the device is reset (even if using unsafe register accesses).
@@ -78,15 +68,13 @@ fn main() -> ! {
         );
 
         let millivolts = adc.sample_to_millivolts(sample);
-        info!("opamp2 thus 4x pa7: {}mV", millivolts);
+        info!("opamp2 thus pa7: {}mV", millivolts);
 
         delay.delay_ms(100);
     }
 
     #[allow(unreachable_code)]
     {
-        let (_opamp1, _pin) = _opamp1.disable();
-
         loop {
             delay.delay_ms(100);
         }

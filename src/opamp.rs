@@ -59,7 +59,12 @@
 
 // TODO: Add support for calibration
 
-use core::{borrow::Borrow, marker::PhantomData};
+use crate::gpio::gpioa::{PA1, PA2, PA3, PA5, PA6, PA7, PA8};
+use crate::gpio::gpiob::{PB0, PB1, PB10, PB11, PB12, PB13, PB14, PB15, PB2};
+use crate::gpio::gpioc::{PC3, PC5};
+use crate::gpio::gpiod::{PD11, PD12, PD14, PD8, PD9};
+use crate::gpio::{Analog, FrozenPin, IsFrozen};
+use core::marker::PhantomData;
 
 /// PGA Gain
 pub enum Gain {
@@ -84,21 +89,21 @@ pub struct Disabled<Opamp> {
 /// State type for opamp running in voltage follower mode.
 pub struct Follower<Opamp, Input, Output> {
     opamp: PhantomData<Opamp>,
-    input: Input,
-    output: Output,
+    input: PhantomData<Input>,
+    output: PhantomData<Output>,
 }
 /// State type for opamp running in open-loop mode.
 pub struct OpenLoop<Opamp, NonInverting, Inverting, Output> {
     opamp: PhantomData<Opamp>,
-    non_inverting: NonInverting,
-    inverting: Inverting,
-    output: Output,
+    non_inverting: PhantomData<NonInverting>,
+    inverting: PhantomData<Inverting>,
+    output: PhantomData<Output>,
 }
 /// State type for opamp running in programmable-gain mode.
 pub struct Pga<Opamp, NonInverting, Output> {
     opamp: PhantomData<Opamp>,
     non_inverting: PhantomData<NonInverting>,
-    output: Output,
+    output: PhantomData<Output>,
 }
 /// State type for an opamp that has been locked.
 pub struct Locked<Opamp, Output> {
@@ -141,22 +146,25 @@ where
     Opamp: ConfigurePgaReg<Opamp, NonInverting> + LookupPgaGain,
 {
     /// Configures the opamp for programmable gain operation.
-    fn pga<B: Borrow<NonInverting>>(
+    fn pga<IP, OP>(
         self,
-        non_inverting: B,
-        output: Output,
+        non_inverting: IP,
+        output: OP,
         gain: Gain,
-    ) -> Pga<Opamp, NonInverting, Output>;
+    ) -> Pga<Opamp, NonInverting, Output>
+    where
+        IP: FrozenPin<NonInverting>,
+        OP: FrozenPin<Output>;
 
     /// Trait for opamps that can be run in programmable gain mode,
     /// with external filtering.
     fn pga_external_filter<
-        B1: Borrow<NonInverting>,
-        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
+        P1: FrozenPin<NonInverting>,
+        P2: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
     >(
         self,
-        non_inverting: B1,
-        filter: B2,
+        non_inverting: P1,
+        filter: P2,
         output: Output,
         gain: Gain,
     ) -> Pga<Opamp, NonInverting, Output>;
@@ -164,8 +172,8 @@ where
     /// Configures the opamp for programmable gain operation, with
     /// external filtering.
     fn pga_external_bias<
-        B1: Borrow<NonInverting>,
-        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
+        B1: FrozenPin<NonInverting>,
+        B2: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
     >(
         self,
         non_inverting: B1,
@@ -177,9 +185,9 @@ where
     /// Configures the opamp for programmable gain operation, with
     /// external filtering.
     fn pga_external_bias_and_filter<
-        B1: Borrow<NonInverting>,
-        B2: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
-        B3: Borrow<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm1>,
+        B1: FrozenPin<NonInverting>,
+        B2: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
+        B3: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm1>,
     >(
         self,
         non_inverting: B1,
@@ -209,7 +217,6 @@ where
     /// Configure the
     ///
     fn configure_pga<Output>(
-        output: Output,
         gain: Gain,
         mode: PgaMode,
         output_enable: bool,
@@ -218,7 +225,7 @@ where
         Pga {
             opamp: PhantomData,
             non_inverting: PhantomData,
-            output,
+            output: PhantomData,
         }
     }
 }
@@ -251,27 +258,21 @@ macro_rules! opamps {
             $opamp:ident => $opampreg:ident
             :
             {
-                vinm0: $vinm0:ty,
-                vinm1: $vinm1:ty,
-
                 inverting
                 :
                 {
-                    $(
-                        $inverting:ty
-                        :
-                        $inverting_mask:tt
-                    ),*
-                    $(,)?
+                    vinm0: $vinm0:ty,
+                    vinm1: $vinm1:ty,
                 }
                 ,
                 non_inverting
                 :
                 {
                     $(
-                        $non_inverting:ty
-                        :
                         $non_inverting_mask:tt
+                        :
+                        $non_inverting:ty
+
                     ),*
                     $(,)?
                 }
@@ -366,41 +367,15 @@ macro_rules! opamps {
                     }
                 }
 
-                impl<Input> Follower<$opamp, Input, $output> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, Input, $output) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.input, self.output)
-                    }
-
-                    /// Disables the external output.
-                    /// This will connect the opamp output to the internal ADC.
-                    /// If the output was enabled, the output pin is returned.
-                    pub fn disable_output(self) -> (Follower<$opamp, Input, InternalOutput>, $output) {
-                        unsafe { $opamp::_disable_output(); }
-                        (Follower::<$opamp, Input, InternalOutput> {
-                            opamp: PhantomData,
-                            input: self.input,
-                            output: InternalOutput,
-                        }, self.output)
-                    }
-                }
-
                 impl<Input> Follower<$opamp, Input, InternalOutput> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, Input) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.input)
-                    }
-
                     /// Enables the external output pin.
-                    pub fn enable_output(self, output:$output) -> Follower<$opamp, Input, $output> {
+                    pub fn enable_output(self, _output: $output) -> Follower<$opamp, Input, $output> {
                         unsafe { $opamp::_enable_output(); }
 
                         Follower::<$opamp, Input, $output> {
                             opamp: PhantomData,
                             input: self.input,
-                            output,
+                            output: PhantomData,
                         }
                     }
                 }
@@ -415,43 +390,16 @@ macro_rules! opamps {
                     }
                 }
 
-                impl<NonInverting, Inverting> OpenLoop<$opamp, NonInverting, Inverting, $output> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, NonInverting, Inverting, $output) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.non_inverting, self.inverting, self.output)
-                    }
-
-                    /// Disables the external output.
-                    /// This will connect the opamp output to the internal ADC.
-                    /// If the output was enabled, the output pin is returned.
-                    pub fn disable_output(self) -> (OpenLoop<$opamp, NonInverting, Inverting, InternalOutput>, $output) {
-                        unsafe { $opamp::_disable_output(); }
-                        (OpenLoop::<$opamp, NonInverting, Inverting, InternalOutput> {
-                            opamp: PhantomData,
-                            inverting: self.inverting,
-                            non_inverting: self.non_inverting,
-                            output: InternalOutput,
-                        }, self.output)
-                    }
-                }
-
                 impl<NonInverting, Inverting> OpenLoop<$opamp, NonInverting, Inverting, InternalOutput> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, NonInverting, Inverting) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.non_inverting, self.inverting)
-                    }
-
                     /// Enables the external output pin.
-                    pub fn enable_output(self, output:$output) -> OpenLoop<$opamp, NonInverting, Inverting, $output> {
+                    pub fn enable_output(self, _output:$output) -> OpenLoop<$opamp, NonInverting, Inverting, $output> {
                         unsafe { $opamp::_enable_output(); }
 
                         OpenLoop::<$opamp, NonInverting, Inverting, $output> {
                             opamp: PhantomData,
-                            inverting: self.inverting,
-                            non_inverting: self.non_inverting,
-                            output,
+                            inverting: PhantomData,
+                            non_inverting: PhantomData,
+                            output: PhantomData,
                         }
                     }
                 }
@@ -466,25 +414,6 @@ macro_rules! opamps {
                     }
                 }
 
-                impl<NonInverting> Pga<$opamp, NonInverting, $output> {
-                    /// Disables the opamp and returns the resources it held.
-                    pub fn disable(self) -> (Disabled<$opamp>, $output) {
-                        unsafe { $opamp::_reset() };
-                        (Disabled { opamp: PhantomData }, self.output)
-                    }
-
-                    /// Disables the external output.
-                    /// This will connect the opamp output to the internal ADC.
-                    pub fn disable_output(self) -> (Pga<$opamp, NonInverting, InternalOutput>, $output) {
-                        unsafe { $opamp::_disable_output(); }
-                        (Pga::<$opamp, NonInverting, InternalOutput> {
-                            opamp: PhantomData,
-                            non_inverting: self.non_inverting,
-                            output: InternalOutput,
-                        }, self.output)
-                    }
-                }
-
                 impl<NonInverting> Pga<$opamp, NonInverting, InternalOutput> {
                     /// Disables the opamp and returns the resources it held.
                     pub fn disable(self) -> Disabled<$opamp> {
@@ -493,7 +422,7 @@ macro_rules! opamps {
                     }
 
                     /// Enables the external output pin.
-                    pub fn enable_output<IntoOutput>(self, output: IntoOutput) -> Pga<$opamp, NonInverting, $output>
+                    pub fn enable_output<IntoOutput>(self, _output: IntoOutput) -> Pga<$opamp, NonInverting, $output>
                     where
                         IntoOutput: Into<$output>,
                     {
@@ -502,13 +431,13 @@ macro_rules! opamps {
                         Pga::<$opamp, NonInverting, $output> {
                             opamp: PhantomData,
                             non_inverting: self.non_inverting,
-                            output: output.into(),
+                            output: PhantomData,
                         }
                     }
                 }
 
                 opamps!{ @follower $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* }
-                opamps!{ @open_loop_tt $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* : ($($inverting_mask, $inverting),*) }
+                opamps!{ @open_loop_tt $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* : (vinm0, $vinm0, vinm1, $vinm1) }
                 opamps!{ @pga_tt $opamp => $opampreg, $output, $($non_inverting_mask, $non_inverting),* : $vinm0, $vinm1 }
 
             )*
@@ -555,31 +484,30 @@ macro_rules! opamps {
     } => {
         paste::paste!{
             $(
-            impl <IntoInput, IntoOutput> IntoFollower <$opamp, IntoInput, IntoOutput, $input, $output> for Disabled<$opamp>
+            impl <Input, IntoOutput> IntoFollower <$opamp, Input, IntoOutput, $input, $output> for Disabled<$opamp>
                 where
-                    IntoInput: Into<$input>,
+                    Input: FrozenPin<$input>,
                     IntoOutput: Into<$output>,
             {
                 #[inline]
                 fn follower(
                     self,
-                    input: IntoInput,
+                    input: Input,
                     output: IntoOutput,
                 ) -> Follower<$opamp, $input, $output> {
                     self.follower(input, InternalOutput).enable_output(output.into())
                 }
             }
 
-            impl <IntoInput> IntoFollower <$opamp, IntoInput, InternalOutput, $input, InternalOutput> for Disabled<$opamp>
+            impl <Input> IntoFollower <$opamp, Input, InternalOutput, $input, InternalOutput> for Disabled<$opamp>
                 where
-                    IntoInput: Into<$input>,
+                    Input: FrozenPin<$input>,
             {
                 fn follower(
                     self,
-                    input: IntoInput,
+                    _input: Input,
                     _output: InternalOutput,
                 ) -> Follower<$opamp, $input, InternalOutput> {
-                    let input = input.into();
                     unsafe {
                         use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
@@ -596,7 +524,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    Follower {opamp: PhantomData, input, output: InternalOutput}
+                    Follower {opamp: PhantomData, input: PhantomData, output: PhantomData}
                 }
             }
 
@@ -633,37 +561,35 @@ macro_rules! opamps {
     } => {
         paste::paste!{
         $(
-            impl <IntoNonInverting, IntoInverting, IntoOutput> IntoOpenLoop
-                <$opamp, IntoNonInverting, IntoInverting, IntoOutput, $non_inverting, $inverting, $output> for Disabled<$opamp>
+            impl <NonInverting, Inverting, IntoOutput> IntoOpenLoop
+                <$opamp, NonInverting, Inverting, IntoOutput, $non_inverting, $inverting, $output> for Disabled<$opamp>
                 where
-                    IntoNonInverting: Into<$non_inverting>,
-                    IntoInverting: Into<$inverting>,
+                    NonInverting: FrozenPin<$non_inverting>,
+                    Inverting: FrozenPin<$inverting>,
                     IntoOutput: Into<$output>,
             {
                 #[inline]
                 fn open_loop(
                     self,
-                    non_inverting: IntoNonInverting,
-                    inverting: IntoInverting,
+                    non_inverting: NonInverting,
+                    inverting: Inverting,
                     output: IntoOutput,
                 ) -> OpenLoop<$opamp, $non_inverting, $inverting, $output> {
                     self.open_loop(non_inverting, inverting, InternalOutput).enable_output(output.into())
                 }
             }
-            impl <IntoNonInverting, IntoInverting> IntoOpenLoop
-                <$opamp, IntoNonInverting, IntoInverting, InternalOutput, $non_inverting, $inverting, InternalOutput> for Disabled<$opamp>
+            impl <NonInverting, Inverting> IntoOpenLoop
+                <$opamp, NonInverting, Inverting, InternalOutput, $non_inverting, $inverting, InternalOutput> for Disabled<$opamp>
                 where
-                    IntoNonInverting: Into<$non_inverting>,
-                    IntoInverting: Into<$inverting>,
+                    NonInverting: FrozenPin<$non_inverting>,
+                    Inverting: FrozenPin<$inverting>,
             {
                 fn open_loop(
                     self,
-                    non_inverting: IntoNonInverting,
-                    inverting: IntoInverting,
+                    _non_inverting: NonInverting,
+                    _inverting: Inverting,
                     _output: InternalOutput,
                 ) -> OpenLoop<$opamp, $non_inverting, $inverting, InternalOutput> {
-                    let non_inverting = non_inverting.into();
-                    let inverting = inverting.into();
                     unsafe {
                         use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
                         (*crate::stm32::OPAMP::ptr())
@@ -679,7 +605,7 @@ macro_rules! opamps {
                                     .enabled()
                             );
                     }
-                    OpenLoop {opamp: PhantomData, non_inverting, inverting, output: InternalOutput}
+                    OpenLoop {opamp: PhantomData, non_inverting: PhantomData, inverting: PhantomData, output: PhantomData }
                 }
             }
         )*
@@ -749,115 +675,121 @@ macro_rules! opamps {
 
             impl IntoPga<$opamp, $non_inverting, $output> for Disabled<$opamp>
             {
-                fn pga<B: Borrow<$non_inverting>>(
+                fn pga<IP, OP>(
                     self,
-                    _non_inverting: B,
-                    output: $output,
+                    _non_inverting: IP,
+                    _output: OP,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, $output>
+                where
+                    IP: FrozenPin<$non_inverting>,
+                    OP: FrozenPin<$output>,
                 {
-                    $opamp::configure_pga(output.into(), gain, PgaMode::Pga, true)
+                    $opamp::configure_pga(gain, PgaMode::Pga, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_filter<
-                    B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: FrozenPin<$non_inverting>,
+                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
-                    _non_inverting: B1,
-                    _filter: B2,
-                    output: $output,
+                    _non_inverting: P1,
+                    _filter: P2,
+                    _output: $output,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, $output> {
-                    $opamp::configure_pga(output.into(), gain, PgaMode::PgaExternalFilter, true)
+                    $opamp::configure_pga(gain, PgaMode::PgaExternalFilter, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_bias<
-                    B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: FrozenPin<$non_inverting>,
+                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
-                    _non_inverting: B1,
-                    _inverting: B2,
-                    output: $output,
+                    _non_inverting: P1,
+                    _inverting: P2,
+                    _output: $output,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, $output> {
-                    $opamp::configure_pga(output.into(), gain, PgaMode::PgaExternalBias, true)
+                    $opamp::configure_pga(gain, PgaMode::PgaExternalBias, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_bias_and_filter<
-                    B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
-                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
+                    P1: FrozenPin<$non_inverting>,
+                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P3: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
                 >(
                     self,
-                    _non_inverting: B1,
-                    _inverting: B2,
-                    _filter: B3,
-                    output: $output,
+                    _non_inverting: P1,
+                    _inverting: P2,
+                    _filter: P3,
+                    _output: $output,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, $output> {
-                    $opamp::configure_pga(output.into(), gain, PgaMode::PgaExternalBiasAndFilter, true)
+                    $opamp::configure_pga(gain, PgaMode::PgaExternalBiasAndFilter, true)
                 }
             }
 
             impl IntoPga<$opamp, $non_inverting, InternalOutput> for Disabled<$opamp>
             {
-                fn pga<B: Borrow<$non_inverting>>(
+                fn pga<IP, OP>(
                     self,
-                    _non_inverting: B,
-                    _output: InternalOutput,
+                    _non_inverting: IP,
+                    _output: OP,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput>
+                where
+                    IP: FrozenPin<$non_inverting>,
+                    OP: FrozenPin<InternalOutput>
                 {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::Pga, true)
+                    $opamp::configure_pga(gain, PgaMode::Pga, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_filter<
-                    B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: FrozenPin<$non_inverting>,
+                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
-                    _non_inverting: B1,
-                    _filter: B2,
+                    _non_inverting: P1,
+                    _filter: P2,
                     _output: InternalOutput,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput> {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalFilter, true)
+                    $opamp::configure_pga(gain, PgaMode::PgaExternalFilter, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_bias<
-                    B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: FrozenPin<$non_inverting>,
+                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
-                    _non_inverting: B1,
-                    _inverting: B2,
+                    _non_inverting: P1,
+                    _inverting: P2,
                     _output: InternalOutput,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput> {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBias, true)
+                    $opamp::configure_pga(gain, PgaMode::PgaExternalBias, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_bias_and_filter<
-                    B1: Borrow<$non_inverting>,
-                    B2: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
-                    B3: Borrow<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
+                    P1: FrozenPin<$non_inverting>,
+                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P3: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
                 >(
                     self,
-                    _non_inverting: B1,
-                    _inverting: B2,
-                    _filter: B3,
+                    _non_inverting: P1,
+                    _inverting: P2,
+                    _filter: P3,
                     _output: InternalOutput,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput> {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBiasAndFilter, true)
+                    $opamp::configure_pga(gain, PgaMode::PgaExternalBiasAndFilter, true)
                 }
             }
         }
@@ -867,47 +799,47 @@ macro_rules! opamps {
 #[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
 opamps! {
     Opamp1 => opamp1: {
-        vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
+        vinm0: PA3<Analog, IsFrozen>,
+        vinm1: PC5<Analog, IsFrozen>,
         inverting: {
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+            vinm0: PA3<Analog, IsFrozen>,
+            vinm1: PC5<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
+            vinp0: PA1<Analog, IsFrozen>,
+            vinp1: PA3<Analog, IsFrozen>,
+            vinp2: PA7<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
+        output: PA2<Analog, IsFrozen>,
     },
     Opamp2 => opamp2: {
-        vinm0: crate::gpio::gpioa::PA5<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
+        vinm0: PA5<Analog, IsFrozen>,
+        vinm1: PC5<Analog, IsFrozen>,
         inverting: {
-            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+            vinm0: PA5<Analog, IsFrozen>,
+            vinm1: PC5<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
-            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
+            vinp0: PA7<Analog, IsFrozen>,
+            vinp1: PB14<Analog, IsFrozen>,
+            vinp2: PB0<Analog, IsFrozen>,
+            vinp3: PD14<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
+        output: PA6<Analog, IsFrozen>,
     },
     Opamp3 => opamp3: {
-        vinm0: crate::gpio::gpiob::PB2<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpiob::PB10<crate::gpio::Analog>,
+        vinm0: PB2<Analog, IsFrozen>,
+        vinm1: PB10<Analog, IsFrozen>,
         inverting: {
-            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
+            vinm0: PB2<Analog, IsFrozen>,
+            vinm1: PB10<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
+            vinp0: PB0<Analog, IsFrozen>,
+            vinp1: PB13<Analog, IsFrozen>,
+            vinp2: PA1<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
+        output: PB1<Analog, IsFrozen>,
     },
 }
 
@@ -919,88 +851,76 @@ opamps! {
 ))]
 opamps! {
     Opamp1 => opamp1: {
-        vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
         inverting: {
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+            vinm0: PA3<Analog, IsFrozen>,
+            vinm1: PC5<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
+            vinp0: PA1<Analog, IsFrozen>,
+            vinp1: PA3<Analog, IsFrozen>,
+            vinp2: PA7<Analog, IsFrozen>
         },
-        output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
+        output: PA2<Analog, IsFrozen>,
     },
     Opamp2 => opamp2: {
-        vinm0: crate::gpio::gpioa::PA5<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
         inverting: {
-            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+            vinm0: PA5<Analog, IsFrozen>,
+            vinm1: PC5<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
-            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
+            vinp0: PA7<Analog, IsFrozen>,
+            vinp1: PB14<Analog, IsFrozen>,
+            vinp2: PB0<Analog, IsFrozen>,
+            vinp3: PD14<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
+        output: PA6<Analog, IsFrozen>,
     },
     Opamp3 => opamp3: {
-        vinm0: crate::gpio::gpiob::PB2<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpiob::PB10<crate::gpio::Analog>,
         inverting: {
-            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
+            vinm0: PB2<Analog, IsFrozen>,
+            vinm1: PB10<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
+            vinp0: PB0<Analog, IsFrozen>,
+            vinp1: PB13<Analog, IsFrozen>,
+            vinp2: PA1<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
+        output: PB1<Analog, IsFrozen>,
     },
     Opamp4 => opamp4: {
-        vinm0: crate::gpio::gpiob::PB10<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpiod::PD8<crate::gpio::Analog>,
         inverting: {
-            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpiod::PD8<crate::gpio::Analog>: vinm1,
+            vinm0: PB10<Analog, IsFrozen>,
+            vinm1: PD8<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiod::PD11<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpiob::PB11<crate::gpio::Analog>: vinp2,
+            vinp0: PB13<Analog, IsFrozen>,
+            vinp1: PD11<Analog, IsFrozen>,
+            vinp2: PB11<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpiob::PB12<crate::gpio::Analog>,
+        output: PB12<Analog, IsFrozen>,
     },
     Opamp5 => opamp5: {
-        vinm0: crate::gpio::gpiob::PB15<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
         inverting: {
-            crate::gpio::gpiob::PB15<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm1,
+            vinm0: PB15<Analog, IsFrozen>,
+            vinm1: PA3<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiod::PD12<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpioc::PC3<crate::gpio::Analog>: vinp2,
+            vinp0: PB14<Analog, IsFrozen>,
+            vinp1: PD12<Analog, IsFrozen>,
+            vinp2: PC3<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpioa::PA8<crate::gpio::Analog>,
+        output: PA8<Analog, IsFrozen>,
     },
     Opamp6 => opamp6: {
-        vinm0: crate::gpio::gpioa::PA1<crate::gpio::Analog>,
-        vinm1: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
         inverting: {
-            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
-            crate::gpio::gpiob::PB1<crate::gpio::Analog>: vinm1,
+            vinm0: PA1<Analog, IsFrozen>,
+            vinm1: PB1<Analog, IsFrozen>,
         },
         non_inverting: {
-            crate::gpio::gpiob::PB12<crate::gpio::Analog>: vinp0,
-            crate::gpio::gpiod::PD9<crate::gpio::Analog>: vinp1,
-            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp2,
+            vinp0: PB12<Analog, IsFrozen>,
+            vinp1: PD9<Analog, IsFrozen>,
+            vinp2: PB13<Analog, IsFrozen>,
         },
-        output: crate::gpio::gpiob::PB11<crate::gpio::Analog>,
+        output: PB11<Analog, IsFrozen>,
     },
 }

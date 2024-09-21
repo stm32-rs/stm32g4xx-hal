@@ -30,7 +30,7 @@ fn main() -> ! {
     // Set up DAC to output to pa4 and to internal signal Dac1IntSig1
     // which just so happens is compatible with comp1
     let dac1ch1 = dp.DAC1.constrain((gpioa.pa4, Dac1IntSig1), &mut rcc);
-    let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable();
+    let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable().freeze();
 
     let (comp1, _comp2, ..) = dp.COMP.split(&mut rcc);
     let pa1 = gpioa.pa1.into_analog();
