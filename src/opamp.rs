@@ -59,10 +59,26 @@
 
 // TODO: Add support for calibration
 
-use crate::gpio::gpioa::{PA1, PA2, PA3, PA5, PA6, PA7, PA8};
-use crate::gpio::gpiob::{PB0, PB1, PB10, PB11, PB12, PB13, PB14, PB15, PB2};
-use crate::gpio::gpioc::{PC3, PC5};
-use crate::gpio::gpiod::{PD11, PD12, PD14, PD8, PD9};
+use crate::gpio::{
+    gpioa::{PA1, PA2, PA3, PA5, PA6, PA7},
+    gpiob::{PB0, PB1, PB10, PB13, PB14, PB2},
+    gpioc::PC5,
+    gpiod::PD14,
+};
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+))]
+use crate::gpio::{
+    gpioa::PA8,
+    gpiob::{PB11, PB12, PB15},
+    gpioc::PC3,
+    gpiod::{PD11, PD12, PD8, PD9},
+};
+
 use crate::gpio::{Analog, FrozenPin, IsFrozen};
 use core::marker::PhantomData;
 
@@ -799,8 +815,6 @@ macro_rules! opamps {
 #[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
 opamps! {
     Opamp1 => opamp1: {
-        vinm0: PA3<Analog, IsFrozen>,
-        vinm1: PC5<Analog, IsFrozen>,
         inverting: {
             vinm0: PA3<Analog, IsFrozen>,
             vinm1: PC5<Analog, IsFrozen>,
@@ -813,8 +827,6 @@ opamps! {
         output: PA2<Analog, IsFrozen>,
     },
     Opamp2 => opamp2: {
-        vinm0: PA5<Analog, IsFrozen>,
-        vinm1: PC5<Analog, IsFrozen>,
         inverting: {
             vinm0: PA5<Analog, IsFrozen>,
             vinm1: PC5<Analog, IsFrozen>,
@@ -828,8 +840,6 @@ opamps! {
         output: PA6<Analog, IsFrozen>,
     },
     Opamp3 => opamp3: {
-        vinm0: PB2<Analog, IsFrozen>,
-        vinm1: PB10<Analog, IsFrozen>,
         inverting: {
             vinm0: PB2<Analog, IsFrozen>,
             vinm1: PB10<Analog, IsFrozen>,
