@@ -74,6 +74,8 @@ pub mod adc;
 pub mod bb;
 pub mod can;
 pub mod comparator;
+#[cfg(feature = "cordic")]
+pub mod cordic;
 // pub mod crc;
 pub mod dac;
 pub mod delay;
