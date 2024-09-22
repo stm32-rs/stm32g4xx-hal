@@ -31,26 +31,26 @@ pub struct IsNotFrozen;
 /// This is implemented for all owned pins since no one else can change their mode once ownership is passed on to the peripheral.
 ///
 /// It is also implemented for reference to a frozen pin `&$PXi<MODE, IsFrozen>`, since they can not change mode due to being frozen.
-pub trait FrozenPin<T>: crate::Sealed {}
-impl<A1, A2, B1, B2> FrozenPin<(B1, B2)> for (A1, A2)
+pub trait Frozen<T>: crate::Sealed {}
+impl<A1, A2, B1, B2> Frozen<(B1, B2)> for (A1, A2)
 where
-    A1: FrozenPin<B1>,
-    A2: FrozenPin<B2>,
+    A1: Frozen<B1>,
+    A2: Frozen<B2>,
 {
 }
-impl<A1, A2, A3, B1, B2, B3> FrozenPin<(B1, B2, B3)> for (A1, A2, A3)
+impl<A1, A2, A3, B1, B2, B3> Frozen<(B1, B2, B3)> for (A1, A2, A3)
 where
-    A1: FrozenPin<B1>,
-    A2: FrozenPin<B2>,
-    A3: FrozenPin<B3>,
+    A1: Frozen<B1>,
+    A2: Frozen<B2>,
+    A3: Frozen<B3>,
 {
 }
-impl<A1, A2, A3, A4, B1, B2, B3, B4> FrozenPin<(B1, B2, B3, B4)> for (A1, A2, A3, A4)
+impl<A1, A2, A3, A4, B1, B2, B3, B4> Frozen<(B1, B2, B3, B4)> for (A1, A2, A3, A4)
 where
-    A1: FrozenPin<B1>,
-    A2: FrozenPin<B2>,
-    A3: FrozenPin<B3>,
-    A4: FrozenPin<B4>,
+    A1: Frozen<B1>,
+    A2: Frozen<B2>,
+    A3: Frozen<B3>,
+    A4: Frozen<B4>,
 {
 }
 
@@ -402,8 +402,8 @@ macro_rules! gpio {
                     _frozen_state: PhantomData<F>,
                 }
 
-                impl<MODE> FrozenPin<$PXi<MODE, IsFrozen>> for $PXi<MODE> {}
-                impl<MODE> FrozenPin<$PXi<MODE, IsFrozen>> for &$PXi<MODE, IsFrozen> {}
+                impl<MODE> Frozen<$PXi<MODE, IsFrozen>> for $PXi<MODE> {}
+                impl<MODE> Frozen<$PXi<MODE, IsFrozen>> for &$PXi<MODE, IsFrozen> {}
                 impl<MODE, F> crate::Sealed for $PXi<MODE, F> {}
                 impl<MODE> crate::Sealed for &$PXi<MODE, IsFrozen> {}
 

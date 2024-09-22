@@ -79,7 +79,7 @@ use crate::gpio::{
     gpiod::{PD11, PD12, PD8, PD9},
 };
 
-use crate::gpio::{Analog, FrozenPin, IsFrozen};
+use crate::gpio::{Analog, Frozen, IsFrozen};
 use core::marker::PhantomData;
 
 /// PGA Gain
@@ -169,14 +169,14 @@ where
         gain: Gain,
     ) -> Pga<Opamp, NonInverting, Output>
     where
-        IP: FrozenPin<NonInverting>,
-        OP: FrozenPin<Output>;
+        IP: Frozen<NonInverting>,
+        OP: Frozen<Output>;
 
     /// Trait for opamps that can be run in programmable gain mode,
     /// with external filtering.
     fn pga_external_filter<
-        P1: FrozenPin<NonInverting>,
-        P2: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
+        P1: Frozen<NonInverting>,
+        P2: Frozen<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
     >(
         self,
         non_inverting: P1,
@@ -188,8 +188,8 @@ where
     /// Configures the opamp for programmable gain operation, with
     /// external filtering.
     fn pga_external_bias<
-        B1: FrozenPin<NonInverting>,
-        B2: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
+        B1: Frozen<NonInverting>,
+        B2: Frozen<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
     >(
         self,
         non_inverting: B1,
@@ -201,9 +201,9 @@ where
     /// Configures the opamp for programmable gain operation, with
     /// external filtering.
     fn pga_external_bias_and_filter<
-        B1: FrozenPin<NonInverting>,
-        B2: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
-        B3: FrozenPin<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm1>,
+        B1: Frozen<NonInverting>,
+        B2: Frozen<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm0>,
+        B3: Frozen<<Opamp as ConfigurePgaReg<Opamp, NonInverting>>::Vinm1>,
     >(
         self,
         non_inverting: B1,
@@ -502,7 +502,7 @@ macro_rules! opamps {
             $(
             impl <Input, IntoOutput> IntoFollower <$opamp, Input, IntoOutput, $input, $output> for Disabled<$opamp>
                 where
-                    Input: FrozenPin<$input>,
+                    Input: Frozen<$input>,
                     IntoOutput: Into<$output>,
             {
                 #[inline]
@@ -517,7 +517,7 @@ macro_rules! opamps {
 
             impl <Input> IntoFollower <$opamp, Input, InternalOutput, $input, InternalOutput> for Disabled<$opamp>
                 where
-                    Input: FrozenPin<$input>,
+                    Input: Frozen<$input>,
             {
                 fn follower(
                     self,
@@ -580,8 +580,8 @@ macro_rules! opamps {
             impl <NonInverting, Inverting, IntoOutput> IntoOpenLoop
                 <$opamp, NonInverting, Inverting, IntoOutput, $non_inverting, $inverting, $output> for Disabled<$opamp>
                 where
-                    NonInverting: FrozenPin<$non_inverting>,
-                    Inverting: FrozenPin<$inverting>,
+                    NonInverting: Frozen<$non_inverting>,
+                    Inverting: Frozen<$inverting>,
                     IntoOutput: Into<$output>,
             {
                 #[inline]
@@ -597,8 +597,8 @@ macro_rules! opamps {
             impl <NonInverting, Inverting> IntoOpenLoop
                 <$opamp, NonInverting, Inverting, InternalOutput, $non_inverting, $inverting, InternalOutput> for Disabled<$opamp>
                 where
-                    NonInverting: FrozenPin<$non_inverting>,
-                    Inverting: FrozenPin<$inverting>,
+                    NonInverting: Frozen<$non_inverting>,
+                    Inverting: Frozen<$inverting>,
             {
                 fn open_loop(
                     self,
@@ -698,16 +698,16 @@ macro_rules! opamps {
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, $output>
                 where
-                    IP: FrozenPin<$non_inverting>,
-                    OP: FrozenPin<$output>,
+                    IP: Frozen<$non_inverting>,
+                    OP: Frozen<$output>,
                 {
                     $opamp::configure_pga(gain, PgaMode::Pga, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_filter<
-                    P1: FrozenPin<$non_inverting>,
-                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: Frozen<$non_inverting>,
+                    P2: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: P1,
@@ -720,8 +720,8 @@ macro_rules! opamps {
 
                 #[allow(private_bounds)]
                 fn pga_external_bias<
-                    P1: FrozenPin<$non_inverting>,
-                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: Frozen<$non_inverting>,
+                    P2: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: P1,
@@ -734,9 +734,9 @@ macro_rules! opamps {
 
                 #[allow(private_bounds)]
                 fn pga_external_bias_and_filter<
-                    P1: FrozenPin<$non_inverting>,
-                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
-                    P3: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
+                    P1: Frozen<$non_inverting>,
+                    P2: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P3: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
                 >(
                     self,
                     _non_inverting: P1,
@@ -758,16 +758,16 @@ macro_rules! opamps {
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput>
                 where
-                    IP: FrozenPin<$non_inverting>,
-                    OP: FrozenPin<InternalOutput>
+                    IP: Frozen<$non_inverting>,
+                    OP: Frozen<InternalOutput>
                 {
                     $opamp::configure_pga(gain, PgaMode::Pga, true)
                 }
 
                 #[allow(private_bounds)]
                 fn pga_external_filter<
-                    P1: FrozenPin<$non_inverting>,
-                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: Frozen<$non_inverting>,
+                    P2: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: P1,
@@ -780,8 +780,8 @@ macro_rules! opamps {
 
                 #[allow(private_bounds)]
                 fn pga_external_bias<
-                    P1: FrozenPin<$non_inverting>,
-                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P1: Frozen<$non_inverting>,
+                    P2: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
                 >(
                     self,
                     _non_inverting: P1,
@@ -794,9 +794,9 @@ macro_rules! opamps {
 
                 #[allow(private_bounds)]
                 fn pga_external_bias_and_filter<
-                    P1: FrozenPin<$non_inverting>,
-                    P2: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
-                    P3: FrozenPin<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
+                    P1: Frozen<$non_inverting>,
+                    P2: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm0>,
+                    P3: Frozen<<$opamp as ConfigurePgaReg<$opamp, $non_inverting>>::Vinm1>,
                 >(
                     self,
                     _non_inverting: P1,

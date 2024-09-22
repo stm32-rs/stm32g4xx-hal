@@ -17,7 +17,7 @@ use crate::gpio::{
     gpiof::PF4,
     Alternate, AlternateOD, Analog, SignalEdge, AF2, AF3, AF8,
 };
-use crate::gpio::{FrozenPin, IsFrozen};
+use crate::gpio::{Frozen, IsFrozen};
 
 #[cfg(any(
     feature = "stm32g473",
@@ -281,7 +281,7 @@ pub enum RefintInput {
     VRefint = 0b011,
 }
 
-impl FrozenPin<RefintInput> for RefintInput {}
+impl Frozen<RefintInput> for RefintInput {}
 impl crate::Sealed for RefintInput {}
 
 macro_rules! refint_input {
@@ -420,8 +420,8 @@ pub trait ComparatorExt<COMP> {
         clocks: &Clocks,
     ) -> Comparator<COMP, Disabled>
     where
-        PP: FrozenPin<P> + PositiveInput<COMP>,
-        NP: FrozenPin<N> + NegativeInput<COMP>;
+        PP: Frozen<P> + PositiveInput<COMP>,
+        NP: Frozen<N> + NegativeInput<COMP>;
 }
 
 macro_rules! impl_comparator {
@@ -435,8 +435,8 @@ macro_rules! impl_comparator {
                 clocks: &Clocks,
             ) -> Comparator<$COMP, Disabled>
             where
-                PP: FrozenPin<P> + PositiveInput<$COMP>,
-                NP: FrozenPin<N> + NegativeInput<$COMP>,
+                PP: Frozen<P> + PositiveInput<$COMP>,
+                NP: Frozen<N> + NegativeInput<$COMP>,
             {
                 unsafe {
                     positive_input.borrow().setup(&mut self);
@@ -473,8 +473,8 @@ macro_rules! impl_comparator {
                 clocks: &Clocks,
             ) -> Self
             where
-                PP: FrozenPin<P> + PositiveInput<$COMP>,
-                NP: FrozenPin<N> + NegativeInput<$COMP>,
+                PP: Frozen<P> + PositiveInput<$COMP>,
+                NP: Frozen<N> + NegativeInput<$COMP>,
             {
                 comp.comparator(positive_input, negative_input, config, clocks)
             }

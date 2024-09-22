@@ -172,7 +172,7 @@
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
-use crate::gpio::FrozenPin;
+use crate::gpio::Frozen;
 use crate::gpio::IsFrozen;
 use crate::hal;
 use crate::stm32::LPTIMER1;
@@ -1116,7 +1116,7 @@ pub trait PwmExt: Sized {
     /// The requested frequency will be rounded to the nearest achievable frequency; the actual frequency may be higher or lower than requested.
     fn pwm<P, PINS, T, U, V>(self, _pins: P, frequency: T, rcc: &mut Rcc) -> PINS::Channel
     where
-        P: FrozenPin<PINS>,
+        P: Frozen<PINS>,
         PINS: Pins<Self, U, V>,
         T: Into<Hertz>;
 }
@@ -1128,7 +1128,7 @@ pub trait PwmAdvExt<WIDTH>: Sized {
         rcc: &mut Rcc,
     ) -> PwmBuilder<Self, PINS, CHANNEL, FaultDisabled, COMP, WIDTH>
     where
-        P: FrozenPin<PINS>,
+        P: Frozen<PINS>,
         PINS: Pins<Self, CHANNEL, COMP>;
 }
 
@@ -1138,7 +1138,7 @@ macro_rules! pwm_ext_hal {
         impl PwmExt for $TIMX {
             fn pwm<P, PINS, T, U, V>(self, pins: P, frequency: T, rcc: &mut Rcc) -> PINS::Channel
             where
-                P: FrozenPin<PINS>,
+                P: Frozen<PINS>,
                 PINS: Pins<Self, U, V>,
                 T: Into<Hertz>,
             {
@@ -1163,7 +1163,7 @@ macro_rules! tim_hal {
                 rcc: &mut Rcc,
             ) -> PINS::Channel
             where
-                P: FrozenPin<PINS>,
+                P: Frozen<PINS>,
                 PINS: Pins<$TIMX, T, U>,
             {
                 unsafe {
@@ -1206,7 +1206,7 @@ macro_rules! tim_hal {
                     rcc: &mut Rcc,
                 ) -> PwmBuilder<Self, PINS, CHANNEL, FaultDisabled, COMP, $typ>
                 where
-                    P: FrozenPin<PINS>,
+                    P: Frozen<PINS>,
                     PINS: Pins<Self, CHANNEL, COMP>
                 {
                     unsafe {
@@ -1783,7 +1783,7 @@ macro_rules! lptim_hal {
                 rcc: &mut Rcc,
             ) -> PINS::Channel
             where
-                P: FrozenPin<PINS>,
+                P: Frozen<PINS>,
                 PINS: Pins<$TIMX, T, U>,
             {
                 unsafe {

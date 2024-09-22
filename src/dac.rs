@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use crate::gpio::gpioa::{PA4, PA5, PA6};
-use crate::gpio::{DefaultMode, FrozenPin, IsFrozen, IsNotFrozen};
+use crate::gpio::{DefaultMode, Frozen, IsFrozen, IsNotFrozen};
 use crate::rcc::{self, *};
 use crate::stm32::{DAC1, DAC2, DAC3, DAC4, RCC};
 use hal::blocking::delay::DelayUs;
@@ -69,10 +69,10 @@ macro_rules! impl_dac {
             _frozen_state: PhantomData<F>,
         }
 
-        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, Enabled>{}
-        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, WaveGenerator>{}
-        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, Enabled, IsFrozen>{}
-        impl<const M: u8> FrozenPin<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, WaveGenerator, IsFrozen>{}
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, Enabled>{}
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, WaveGenerator>{}
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, Enabled, IsFrozen>{}
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, WaveGenerator, IsFrozen>{}
 
         impl<const M: u8> crate::Sealed for $DACxCHy<M, Enabled>{}
         impl<const M: u8> crate::Sealed for $DACxCHy<M, WaveGenerator>{}
