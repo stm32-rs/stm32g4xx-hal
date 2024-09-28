@@ -69,15 +69,21 @@ macro_rules! impl_dac {
             _frozen_state: PhantomData<F>,
         }
 
-        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, Enabled>{}
-        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, WaveGenerator>{}
-        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, Enabled, IsFrozen>{}
-        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for &$DACxCHy<M, WaveGenerator, IsFrozen>{}
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, Enabled> {}
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>> for $DACxCHy<M, WaveGenerator> {}
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>>
+            for &$DACxCHy<M, Enabled, IsFrozen>
+        {
+        }
+        impl<const M: u8> Frozen<$DACxCHy<M, Enabled, IsFrozen>>
+            for &$DACxCHy<M, WaveGenerator, IsFrozen>
+        {
+        }
 
-        impl<const M: u8> crate::Sealed for $DACxCHy<M, Enabled>{}
-        impl<const M: u8> crate::Sealed for $DACxCHy<M, WaveGenerator>{}
-        impl<const M: u8> crate::Sealed for &$DACxCHy<M, Enabled, IsFrozen>{}
-        impl<const M: u8> crate::Sealed for &$DACxCHy<M, WaveGenerator, IsFrozen>{}
+        impl<const M: u8> crate::Sealed for $DACxCHy<M, Enabled> {}
+        impl<const M: u8> crate::Sealed for $DACxCHy<M, WaveGenerator> {}
+        impl<const M: u8> crate::Sealed for &$DACxCHy<M, Enabled, IsFrozen> {}
+        impl<const M: u8> crate::Sealed for &$DACxCHy<M, WaveGenerator, IsFrozen> {}
     };
 }
 
