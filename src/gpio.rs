@@ -17,6 +17,65 @@ pub trait GpioExt {
     fn split(self, rcc: &mut Rcc) -> Self::Parts;
 }
 
+/// Type state for a gpio pin frozen to its current mode
+///
+/// The into_alternate/analog/{x}_input/output can not be called on a pin with this state.
+/// The pin is thus guaranteed to stay as this type as long as the program is running.
+pub struct IsFrozen;
+
+/// See [IsFrozen]
+pub struct IsNotFrozen;
+
+/// A pin type that is guaranteed to stay in the current mode after being passed to a peripheral
+///
+/// This is implemented for all owned pins since no one else can change their mode once ownership is passed on to the peripheral.
+///
+/// It is also implemented for reference to a frozen pin `&$PXi<MODE, IsFrozen>`, since they can not change mode due to being frozen.
+pub trait Frozen<T>: crate::Sealed {}
+impl<A1, A2, B1, B2> Frozen<(B1, B2)> for (A1, A2)
+where
+    A1: Frozen<B1>,
+    A2: Frozen<B2>,
+{
+}
+impl<A1, A2, A3, B1, B2, B3> Frozen<(B1, B2, B3)> for (A1, A2, A3)
+where
+    A1: Frozen<B1>,
+    A2: Frozen<B2>,
+    A3: Frozen<B3>,
+{
+}
+impl<A1, A2, A3, A4, B1, B2, B3, B4> Frozen<(B1, B2, B3, B4)> for (A1, A2, A3, A4)
+where
+    A1: Frozen<B1>,
+    A2: Frozen<B2>,
+    A3: Frozen<B3>,
+    A4: Frozen<B4>,
+{
+}
+
+impl<A1, A2> crate::Sealed for (A1, A2)
+where
+    A1: crate::Sealed,
+    A2: crate::Sealed,
+{
+}
+impl<A1, A2, A3> crate::Sealed for (A1, A2, A3)
+where
+    A1: crate::Sealed,
+    A2: crate::Sealed,
+    A3: crate::Sealed,
+{
+}
+impl<A1, A2, A3, A4> crate::Sealed for (A1, A2, A3, A4)
+where
+    A1: crate::Sealed,
+    A2: crate::Sealed,
+    A3: crate::Sealed,
+    A4: crate::Sealed,
+{
+}
+
 /// Input mode (type state)
 pub struct Input<MODE> {
     _mode: PhantomData<MODE>,
@@ -260,7 +319,7 @@ macro_rules! gpio {
                     rcc.rb.ahb2enr.modify(|_, w| w.$iopxenr().set_bit());
                     Parts {
                         $(
-                            $pxi: $PXi { _mode: PhantomData },
+                            $pxi: $PXi { _mode: PhantomData, _frozen_state: PhantomData },
                         )+
                     }
                 }
@@ -338,9 +397,15 @@ macro_rules! gpio {
             exti_erased!($PXx<Input<MODE>>, $Pxn);
 
             $(
-                pub struct $PXi<MODE> {
+                pub struct $PXi<MODE, F = IsNotFrozen> {
                     _mode: PhantomData<MODE>,
+                    _frozen_state: PhantomData<F>,
                 }
+
+                impl<MODE> Frozen<$PXi<MODE, IsFrozen>> for $PXi<MODE> {}
+                impl<MODE> Frozen<$PXi<MODE, IsFrozen>> for &$PXi<MODE, IsFrozen> {}
+                impl<MODE, F> crate::Sealed for $PXi<MODE, F> {}
+                impl<MODE> crate::Sealed for &$PXi<MODE, IsFrozen> {}
 
                 #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Input<PullDown>>> for $PXi<DefaultMode> {
@@ -358,7 +423,7 @@ macro_rules! gpio {
 
                 #[allow(clippy::from_over_into)]
                 impl Into<$PXi<Analog>> for $PXi<DefaultMode> {
-                    fn into(self) -> $PXi<Analog> {
+                    fn into(self) -> $PXi<Analog, IsNotFrozen> {
                         self.into_analog()
                     }
                 }
@@ -377,7 +442,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> $PXi<MODE> {
+                impl<MODE> $PXi<MODE, IsNotFrozen> {
                     /// Configures the pin to operate as a floating input pin
                     pub fn into_floating_input(self) -> $PXi<Input<Floating>> {
                         let offset = 2 * $i;
@@ -390,7 +455,7 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b11 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as a pulled down input pin
@@ -405,7 +470,7 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b11 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as a pulled up input pin
@@ -420,11 +485,11 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b11 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as an analog pin
-                    pub fn into_analog(self) -> $PXi<Analog> {
+                    pub fn into_analog<F>(self) -> $PXi<Analog, F> {
                         let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -435,7 +500,7 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b11 << offset))
                             });
                         }
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as an open drain output pin
@@ -453,7 +518,7 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin to operate as an push pull output pin
@@ -471,13 +536,13 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
                             })
                         };
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Configures the pin as external trigger
                     pub fn listen(self, edge: SignalEdge, exti: &mut EXTI) -> $PXi<MODE> {
                         exti.listen(Event::from_code($i), edge);
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
                     /// Set pin speed
@@ -491,7 +556,7 @@ macro_rules! gpio {
                         self
                     }
 
-                    pub fn into_alternate<const A: u8>(self) -> $PXi<Alternate<A>> {
+                    pub fn into_alternate<const A: u8, F>(self) -> $PXi<Alternate<A>, F> {
                         let mode = A as u32;
                         let offset = 2 * $i;
                         let offset2 = 4 * $i;
@@ -514,10 +579,10 @@ macro_rules! gpio {
                                 w.bits(r.bits() & !(0b1 << $i))
                             });
                         }
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
 
-                    pub fn into_alternate_open_drain<const A: u8>(self) -> $PXi<AlternateOD<A>> {
+                    pub fn into_alternate_open_drain<const A: u8, F>(self) -> $PXi<AlternateOD<A>, F> {
                         let mode = A as u32;
                         let offset = 2 * $i;
                         let offset2 = 4 * $i;
@@ -540,11 +605,15 @@ macro_rules! gpio {
                                 w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
                             });
                         }
-                        $PXi { _mode: PhantomData }
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
+                    }
+
+                    pub fn freeze(self) -> $PXi<MODE, IsFrozen> {
+                        $PXi { _mode: PhantomData, _frozen_state: PhantomData }
                     }
                 }
 
-                impl<MODE> $PXi<Output<MODE>> {
+                impl<MODE> $PXi<Output<MODE>, IsNotFrozen> {
                     /// Erases the pin number from the type
                     ///
                     /// This is useful when you want to collect the pins into an array where you
@@ -554,7 +623,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> OutputPin for $PXi<Output<MODE>> {
+                impl<MODE, F> OutputPin for $PXi<Output<MODE>, F> {
                     type Error = ();
 
                     fn set_high(&mut self) -> Result<(), ()> {
@@ -570,7 +639,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> StatefulOutputPin for $PXi<Output<MODE>> {
+                impl<MODE, F> StatefulOutputPin for $PXi<Output<MODE>, F> {
                     fn is_set_high(&self) -> Result<bool, ()> {
                         let is_set_high = !self.is_set_low()?;
                         Ok(is_set_high)
@@ -583,10 +652,10 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> toggleable::Default for $PXi<Output<MODE>> {
+                impl<MODE, F> toggleable::Default for $PXi<Output<MODE>, F> {
                 }
 
-                impl<MODE> InputPin for $PXi<Output<MODE>> {
+                impl<MODE, F> InputPin for $PXi<Output<MODE>, F> {
                     type Error = ();
 
                     fn is_high(&self) -> Result<bool, ()> {
@@ -601,7 +670,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> $PXi<Input<MODE>> {
+                impl<MODE> $PXi<Input<MODE>, IsNotFrozen> {
                     /// Erases the pin number from the type
                     ///
                     /// This is useful when you want to collect the pins into an array where you
@@ -611,7 +680,7 @@ macro_rules! gpio {
                     }
                 }
 
-                impl<MODE> InputPin for $PXi<Input<MODE>> {
+                impl<MODE, F> InputPin for $PXi<Input<MODE>, F> {
                     type Error = ();
 
                     fn is_high(&self) -> Result<bool, ()> {
