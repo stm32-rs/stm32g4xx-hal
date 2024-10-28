@@ -109,18 +109,18 @@ impl Rcc {
             _ => (sys_freq, 0b0000),
         };
         let (apb1_freq, apb1_psc_bits) = match rcc_cfg.apb1_psc {
-            Prescaler::Div2 => (sys_freq / 2, 0b100),
-            Prescaler::Div4 => (sys_freq / 4, 0b101),
-            Prescaler::Div8 => (sys_freq / 8, 0b110),
-            Prescaler::Div16 => (sys_freq / 16, 0b111),
-            _ => (sys_freq, 0b000),
+            Prescaler::Div2 => (ahb_freq / 2, 0b100),
+            Prescaler::Div4 => (ahb_freq / 4, 0b101),
+            Prescaler::Div8 => (ahb_freq / 8, 0b110),
+            Prescaler::Div16 => (ahb_freq / 16, 0b111),
+            _ => (ahb_freq, 0b000),
         };
         let (apb2_freq, apb2_psc_bits) = match rcc_cfg.apb2_psc {
-            Prescaler::Div2 => (sys_freq / 2, 0b100),
-            Prescaler::Div4 => (sys_freq / 4, 0b101),
-            Prescaler::Div8 => (sys_freq / 8, 0b110),
-            Prescaler::Div16 => (sys_freq / 16, 0b111),
-            _ => (sys_freq, 0b000),
+            Prescaler::Div2 => (ahb_freq / 2, 0b100),
+            Prescaler::Div4 => (ahb_freq / 4, 0b101),
+            Prescaler::Div8 => (ahb_freq / 8, 0b110),
+            Prescaler::Div16 => (ahb_freq / 16, 0b111),
+            _ => (ahb_freq, 0b000),
         };
 
         let present_vos_mode = pwr::current_vos();

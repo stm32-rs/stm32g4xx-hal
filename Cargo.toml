@@ -21,6 +21,7 @@ static_assertions = "1.1"
 fugit = "0.3.5"
 stm32-usbd = { version = "0.7.0", optional = true }
 critical-section = "1.1.2"
+fixed = { version = "1.28.0", optional = true }
 
 [dependencies.cortex-m]
 version = "0.7.7"
@@ -94,6 +95,7 @@ log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
 defmt-logging = ["defmt"]
+cordic = ["dep:fixed"]
 
 [profile.dev]
 codegen-units = 1
@@ -114,3 +116,7 @@ required-features = ["stm32g474"]
 [[example]]
 name = "usb_serial"
 required-features = ["usb"]
+
+[[example]]
+name = "cordic"
+required-features = ["cordic"]
