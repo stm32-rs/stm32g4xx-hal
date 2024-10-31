@@ -100,3 +100,5 @@ pub mod time;
 pub mod timer;
 // pub mod watchdog;
 pub mod independent_watchdog;
+#[cfg(feature = "usb")]
+pub mod usb;

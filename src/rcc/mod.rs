@@ -440,6 +440,11 @@ impl Rcc {
         while self.rb.csr.read().lsirdy().bit_is_clear() {}
     }
 
+    pub fn enable_hsi48(&self) {
+        self.rb.crrcr.modify(|_, w| w.hsi48on().set_bit());
+        while self.rb.crrcr.read().hsi48rdy().bit_is_clear() {}
+    }
+
     pub fn get_reset_reason(&self) -> ResetReason {
         let csr = self.rb.csr.read();
 
