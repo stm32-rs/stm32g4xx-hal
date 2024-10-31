@@ -245,6 +245,18 @@ trait LookupPgaGain {
     fn pga_gain(mode: PgaMode, gain: Gain) -> Self::PgaGainReg;
 }
 
+/// Internal output of DAC 3 channel 1.
+pub struct Dac3Out1;
+
+/// Internal output of DAC 3 channel 2.
+pub struct Dac3Out2;
+
+/// Internal output of DAC 4 channel 1.
+pub struct Dac4Out1;
+
+/// Internal output of DAC 4 channel 2.
+pub struct Dac4Out2;
+
 macro_rules! opamps {
     {
         $(
@@ -877,6 +889,7 @@ opamps! {
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
             crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
             crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
+            crate::opamp::Dac3Out1: dac3_ch1,
         },
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
@@ -906,6 +919,7 @@ opamps! {
             crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
             crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
+            crate::opamp::Dac3Out2: dac3_ch2,
         },
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
     },
@@ -929,6 +943,7 @@ opamps! {
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
             crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
             crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
+            crate::opamp::Dac3Out1: dac3_ch1,
         },
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
@@ -958,6 +973,7 @@ opamps! {
             crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
             crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
+            crate::opamp::Dac3Out2: dac3_ch2,
         },
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
     },
@@ -972,6 +988,7 @@ opamps! {
             crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp0,
             crate::gpio::gpiod::PD11<crate::gpio::Analog>: vinp1,
             crate::gpio::gpiob::PB11<crate::gpio::Analog>: vinp2,
+            crate::opamp::Dac4Out1: dac4_ch1,
         },
         output: crate::gpio::gpiob::PB12<crate::gpio::Analog>,
     },
@@ -986,6 +1003,7 @@ opamps! {
             crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp0,
             crate::gpio::gpiod::PD12<crate::gpio::Analog>: vinp1,
             crate::gpio::gpioc::PC3<crate::gpio::Analog>: vinp2,
+            crate::opamp::Dac4Out2: dac4_ch2,
         },
         output: crate::gpio::gpioa::PA8<crate::gpio::Analog>,
     },
@@ -1000,6 +1018,7 @@ opamps! {
             crate::gpio::gpiob::PB12<crate::gpio::Analog>: vinp0,
             crate::gpio::gpiod::PD9<crate::gpio::Analog>: vinp1,
             crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp2,
+            crate::opamp::Dac3Out1: dac3_ch1,
         },
         output: crate::gpio::gpiob::PB11<crate::gpio::Analog>,
     },
