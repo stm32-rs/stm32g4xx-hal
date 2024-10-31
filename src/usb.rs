@@ -56,7 +56,7 @@ unsafe impl<Dm: DmPin + Send, Dp: DpPin + Send> UsbPeripheral for Peripheral<Dm,
     const EP_MEMORY_ACCESS_2X16: bool = true;
 
     fn enable() {
-        critical_section::with(|_| unsafe {
+        cortex_m::interrupt::free(|_| unsafe {
             let rcc_ptr = &(*RCC::ptr());
             USB::enable(rcc_ptr);
             USB::reset(rcc_ptr);
