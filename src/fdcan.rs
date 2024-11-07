@@ -1159,10 +1159,11 @@ where
     #[inline]
     pub fn error_counters(&self) -> ErrorCounters {
         let can = self.registers();
-        let cel: u8 = can.ecr().read().cel().bits();
-        let rp: bool = can.ecr().read().rp().bit();
-        let rec: u8 = can.ecr().read().rec().bits();
-        let tec: u8 = can.ecr().read().tec().bits();
+        let ecr = can.ecr().read();
+        let cel: u8 = ecr.cel().bits();
+        let rp: bool = ecr.rp().bit();
+        let rec: u8 = ecr.rec().bits();
+        let tec: u8 = ecr.tec().bits();
 
         ErrorCounters {
             can_errors: cel,
