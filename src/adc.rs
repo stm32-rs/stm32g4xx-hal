@@ -2863,21 +2863,6 @@ adc_opamp!(
     opamp::Opamp6 => (ADC4, 17),
 );
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4a1",
-))]
-adc_op_follower!(
-    opamp::opamp3::Follower<A> => (ADC3, 13),
-    opamp::opamp4::Follower<A> => (ADC5, 5),
-    opamp::opamp5::Follower<A> => (ADC5, 3),
-    opamp::opamp6::Follower<A> => (ADC4, 17),
-);
-
 #[cfg(any(feature = "stm32g491", feature = "stm32g4a1",))]
 adc_opamp!(
     opamp::Opamp6 => (ADC3, 17),
