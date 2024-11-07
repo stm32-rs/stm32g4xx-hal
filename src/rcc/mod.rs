@@ -362,7 +362,7 @@ impl Rcc {
         unsafe {
             // Adjust flash wait states
             let flash = &(*FLASH::ptr());
-            flash.acr().modify(|_, w| w.latency().bits(latency))
+            flash.acr().modify(|_, w| w.latency().bits(latency));
         }
     }
 

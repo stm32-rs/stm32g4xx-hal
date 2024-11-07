@@ -1259,7 +1259,7 @@ macro_rules! tim_hal {
                             2 => tim.cr1().modify(|_, w| unsafe { w.ckd().bits(1) }),
                             4 => tim.cr1().modify(|_, w| unsafe { w.ckd().bits(2) }),
                             _ => panic!("Should be unreachable, invalid deadtime prescaler"),
-                        }
+                        };
 
                         let bkp = match self.fault_polarity {
                             Polarity::ActiveLow => false,
