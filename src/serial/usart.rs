@@ -3,7 +3,9 @@ use core::fmt;
 use core::marker::PhantomData;
 
 use crate::dma::traits::Stream;
-use crate::dma::{mux::DmaMuxResources, traits::TargetAddress, PeripheralToMemory, MemoryToPeripheral};
+use crate::dma::{
+    mux::DmaMuxResources, traits::TargetAddress, MemoryToPeripheral, PeripheralToMemory,
+};
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*};
 use crate::gpio::{Alternate, AlternateOD, AF12, AF5, AF7, AF8};
 use crate::prelude::*;
