@@ -95,7 +95,9 @@ impl HrTimOngoingCalibration {
             common
                 .dllcr()
                 .modify(|_r, w| w.calrte().bits(0b00).cal().set_bit().calen().clear_bit());
-            common.fltinr2().write(|w| w.fltsd().bits(flt_divider as u8));
+            common
+                .fltinr2()
+                .write(|w| w.fltsd().bits(flt_divider as u8));
             common.eecr3().write(|w| w.eevsd().bits(eev_divider as u8));
 
             common.adcps1().write(|w| {
