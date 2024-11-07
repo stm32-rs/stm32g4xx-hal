@@ -914,8 +914,9 @@ opamps! {
 
 #[cfg(any(feature = "stm32g471", feature = "stm32g491", feature = "stm32g4a1"))]
 opamps! {
-    opamp1: {
-        vinm0: PA3,
+    Opamp1 => opamp1: {
+        vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
             crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
@@ -927,8 +928,9 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
     },
-    opamp2: {
-        vinm0: PA5,
+    Opamp2 => opamp2: {
+        vinm0: crate::gpio::gpioa::PA5<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
             crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
@@ -941,8 +943,9 @@ opamps! {
         },
         output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
     },
-    opamp3: {
-        vinm0: PB2,
+    Opamp3 => opamp3: {
+        vinm0: crate::gpio::gpiob::PB2<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpiob::PB10<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
             crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
@@ -954,8 +957,9 @@ opamps! {
         },
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
     },
-    opamp6: {
-        vinm0: PA1,
+    Opamp6 => opamp6: {
+        vinm0: crate::gpio::gpioa::PA1<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
         inverting: {
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
             crate::gpio::gpiob::PB1<crate::gpio::Analog>: vinm1,
