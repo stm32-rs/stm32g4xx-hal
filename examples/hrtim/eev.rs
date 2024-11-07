@@ -16,9 +16,6 @@ use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
-    use hal::gpio::gpioa::PA8;
-    use hal::gpio::Alternate;
-    use hal::gpio::AF13;
     use hal::hrtim::compare_register::HrCompareRegister;
     use hal::hrtim::external_event;
     use hal::hrtim::external_event::ToExternalEventSource;
@@ -41,7 +38,7 @@ fn main() -> ! {
 
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
-            mux: rcc::PLLSrc::HSI,
+            mux: rcc::PllSrc::HSI,
             n: rcc::PllNMul::MUL_75,
             m: rcc::PllMDiv::DIV_4,
             r: Some(rcc::PllRDiv::DIV_2),
@@ -70,7 +67,7 @@ fn main() -> ! {
     // With max the max period set, this would be 1.2GHz/2^16 ~= 18kHz...
     let prescaler = Pscl4;
 
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
+    let pin_a = gpioa.pa8;
 
     //        .               .  *            .
     //        .  33%          .  *            .               .               .
@@ -100,7 +97,7 @@ fn main() -> ! {
     cr1.set_duty(timer.get_period() / 3);
 
     out1.enable();
-    timer.start(&mut hr_control);
+    timer.start(&mut hr_control.control);
 
     info!("Started");
 

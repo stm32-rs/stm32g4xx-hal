@@ -17,7 +17,6 @@ use utils::logger::info;
 fn main() -> ! {
     use hal::gpio::gpioa::PA8;
     use hal::gpio::gpioa::PA9;
-    use hal::gpio::Alternate;
     use hal::gpio::AF13;
     use hal::hrtim::{control::HrControltExt, HrPwmExt};
     use hal::prelude::*;
@@ -46,8 +45,8 @@ fn main() -> ! {
     );
 
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
-    let pin_b: PA9<Alternate<AF13>> = gpioa.pa9.into_alternate();
+    let pin_a = gpioa.pa8;
+    let pin_b = gpioa.pa9;
 
     //        .               .               .
     //        .  33%          .               .

@@ -25,7 +25,7 @@ fn main() -> ! {
         },
         delay::SYSTDelayExt,
         dma::{self, config::DmaConfig, stream::DMAExt, TransferExt},
-        gpio::{gpioa::PA8, gpioa::PA9, Alternate, GpioExt, AF13},
+        gpio::GpioExt,
         hrtim::compare_register::HrCompareRegister,
         hrtim::control::HrControltExt,
         hrtim::output::HrOutput,
@@ -50,7 +50,7 @@ fn main() -> ! {
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
-            mux: rcc::PLLSrc::HSI,
+            mux: rcc::PllSrc::HSI,
             n: rcc::PllNMul::MUL_15,
             m: rcc::PllMDiv::DIV_1,
             r: Some(rcc::PllRDiv::DIV_2),
@@ -72,8 +72,8 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pa0 = gpioa.pa0.into_analog();
 
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
-    let pin_b: PA9<Alternate<AF13>> = gpioa.pa9.into_alternate();
+    let pin_a = gpioa.pa8;
+    let pin_b = gpioa.pa9;
 
     // ...with a prescaler of 4 this gives us a HrTimer with a tick rate of 960MHz
     // With max the max period set, this would be 960MHz/2^16 ~= 15kHz...
@@ -140,7 +140,7 @@ fn main() -> ! {
     out1.enable();
     out2.enable();
 
-    timer.start(&mut hr_control);
+    timer.start(&mut hr_control.control);
 
     loop {
         let mut b = [0_u16; 4];

@@ -16,10 +16,6 @@ use utils::logger::info;
 #[entry]
 fn main() -> ! {
     use fugit::ExtU32;
-    use hal::gpio::gpioa::PA8;
-    use hal::gpio::gpioa::PA9;
-    use hal::gpio::Alternate;
-    use hal::gpio::AF13;
     use hal::hrtim::compare_register::HrCompareRegister;
     use hal::hrtim::control::HrControltExt;
     use hal::hrtim::output::HrOutput;
@@ -42,7 +38,7 @@ fn main() -> ! {
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
-            mux: rcc::PLLSrc::HSI,
+            mux: rcc::PllSrc::HSI,
             n: rcc::PllNMul::MUL_15,
             m: rcc::PllMDiv::DIV_1,
             r: Some(rcc::PllRDiv::DIV_2),
@@ -59,8 +55,8 @@ fn main() -> ! {
     let prescaler = Pscl4;
 
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
-    let pin_b: PA9<Alternate<AF13>> = gpioa.pa9.into_alternate();
+    let pin_a = gpioa.pa8;
+    let pin_b = gpioa.pa9;
 
     //        .               .               .               .
     //        .  30%          .               .               .

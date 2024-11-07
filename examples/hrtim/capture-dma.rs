@@ -19,7 +19,7 @@ fn main() -> ! {
 
     use hal::{
         dma::{config::DmaConfig, stream::DMAExt, TransferExt},
-        gpio::{gpioa::PA8, Alternate, GpioExt, AF13},
+        gpio::{GpioExt, AF13},
         hrtim::{
             capture, compare_register::HrCompareRegister, control::HrControltExt, external_event,
             external_event::ToExternalEventSource, output::HrOutput, timer::HrSlaveTimerCpt,
@@ -56,7 +56,7 @@ fn main() -> ! {
     let gpiob = dp.GPIOB.split(&mut rcc);
 
     // PA8 (D7 on Nucleo G474RE)
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
+    let pin_a = gpioa.pa8;
 
     // PB5 (D4 on Nucleo G474RE)
     let input = gpiob.pb5.into_pull_down_input();
@@ -98,7 +98,7 @@ fn main() -> ! {
     cr1.set_duty(period / 2);
 
     let (mut timer, mut capture, _capture_ch2) = timer.split_capture();
-    timer.start(&mut hr_control);
+    timer.start(&mut hr_control.control);
     out1.enable();
 
     capture.enable_interrupt(true, &mut hr_control);
