@@ -2844,6 +2844,15 @@ adc_opamp!(
 ))]
 adc_opamp!(
     opamp::Opamp3 => (ADC3, 13),
+);
+
+#[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+))]
+adc_opamp!(
     opamp::Opamp4 => (ADC5, 5),
     opamp::Opamp5 => (ADC5, 3),
     opamp::Opamp6 => (ADC4, 17),
