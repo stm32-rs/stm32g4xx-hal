@@ -333,13 +333,13 @@ macro_rules! opamps {
                     #[inline(always)]
                     unsafe fn _disable_output() {
                         (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>]().modify(|_, w|
-                            w.opaintoen().adcchannel())
+                            w.opaintoen().adcchannel());
                     }
 
                     #[inline(always)]
                     unsafe fn _enable_output() {
                         (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>]().modify(|_, w|
-                            w.opaintoen().output_pin())
+                            w.opaintoen().output_pin());
                     }
 
                     #[inline(always)]
@@ -352,7 +352,7 @@ macro_rules! opamps {
                         // the user doesn't want anything changing if they care to set
                         // the lock bit.
                         (*crate::stm32::OPAMP::ptr()).[<$opampreg _tcmr>]().modify(|_, w|
-                            w.lock().set_bit())
+                            w.lock().set_bit());
                     }
                 }
 
