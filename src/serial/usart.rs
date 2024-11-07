@@ -529,8 +529,8 @@ macro_rules! uart_lp {
                     Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().set_bit()),
                     Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().set_bit()),
                     Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().set_bit()),
-                    _ => {}
-                }
+                    _ => unimplemented!(),
+                };
             }
 
             /// Stop listening for an interrupt event
@@ -539,8 +539,8 @@ macro_rules! uart_lp {
                     Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().clear_bit()),
                     Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().clear_bit()),
                     Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().clear_bit()),
-                    _ => {}
-                }
+                    _ => unimplemented!(),
+                };
             }
 
             /// Check if interrupt event is pending
@@ -683,8 +683,8 @@ macro_rules! uart_full {
                     Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().set_bit()),
                     Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().set_bit()),
                     Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().set_bit()),
-                    _ => {}
-                }
+                    _ => unimplemented!(),
+                };
             }
 
             /// Stop listening for an interrupt event
@@ -693,8 +693,8 @@ macro_rules! uart_full {
                     Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().clear_bit()),
                     Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().clear_bit()),
                     Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().clear_bit()),
-                    _ => {}
-                }
+                    _ => unimplemented!(),
+                };
             }
 
             /// Check if interrupt event is pending

@@ -1947,7 +1947,7 @@ macro_rules! adc {
                         config::Sequence::Fourteen => self.adc_reg.sqr3().modify(|_, w| unsafe {w.sq14().bits(channel) }),
                         config::Sequence::Fifteen  => self.adc_reg.sqr4().modify(|_, w| unsafe {w.sq15().bits(channel) }),
                         config::Sequence::Sixteen  => self.adc_reg.sqr4().modify(|_, w| unsafe {w.sq16().bits(channel) }),
-                    }
+                    };
 
                     //Set the sample time for the channel
                     let st = u8::from(sample_time);
@@ -1973,7 +1973,7 @@ macro_rules! adc {
                             17 => self.adc_reg.smpr2().modify(|_, w| w.smp17().bits(st) ),
                             18 => self.adc_reg.smpr2().modify(|_, w| w.smp18().bits(st) ),
                             _ => unimplemented!(),
-                        }
+                        };
                     }
                 }
                 /// Synchronously convert a single sample
