@@ -19,10 +19,7 @@ fn main() -> ! {
     use hal::comparator;
     use hal::comparator::{ComparatorExt, ComparatorSplit, Hysteresis};
     use hal::dac::{self, DacExt, DacOut};
-    use hal::gpio::gpioa::PA8;
-    use hal::gpio::Alternate;
     use hal::gpio::SignalEdge;
-    use hal::gpio::AF13;
     use hal::hrtim::compare_register::HrCompareRegister;
     use hal::hrtim::external_event::{self, ToExternalEventSource};
     use hal::hrtim::timer::HrTimer;
@@ -45,7 +42,7 @@ fn main() -> ! {
 
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
-            mux: rcc::PLLSrc::HSI,
+            mux: rcc::PllSrc::HSI,
             n: rcc::PllNMul::MUL_75,
             m: rcc::PllMDiv::DIV_4,
             r: Some(rcc::PllRDiv::DIV_2),
@@ -61,7 +58,7 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
 
     let input = gpioa.pa1.into_analog();
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
+    let pin_a = gpioa.pa8;
 
     let dac1ch1 = dp.DAC1.constrain(dac::Dac1IntSig1, &mut rcc);
     let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable();
@@ -128,7 +125,7 @@ fn main() -> ! {
     cr1.set_duty(timer.get_period() / 3);
 
     out1.enable();
-    timer.start(&mut hr_control);
+    timer.start(&mut hr_control.control);
 
     info!("Started");
 

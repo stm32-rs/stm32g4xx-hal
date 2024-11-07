@@ -18,7 +18,7 @@ fn main() -> ! {
     use stm32g4xx_hal as hal;
 
     use hal::{
-        gpio::{gpioa::PA8, Alternate, GpioExt, AF13},
+        gpio::GpioExt,
         hrtim::{
             capture::HrCapture, compare_register::HrCompareRegister, control::HrControltExt,
             external_event, external_event::ToExternalEventSource, output::HrOutput,
@@ -40,7 +40,7 @@ fn main() -> ! {
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
-            mux: rcc::PLLSrc::HSI,
+            mux: rcc::PllSrc::HSI,
             n: rcc::PllNMul::MUL_15,
             m: rcc::PllMDiv::DIV_1,
             r: Some(rcc::PllRDiv::DIV_2),
@@ -55,7 +55,7 @@ fn main() -> ! {
     let gpiob = dp.GPIOB.split(&mut rcc);
 
     // PA8 (D7 on Nucleo G474RE)
-    let pin_a: PA8<Alternate<AF13>> = gpioa.pa8.into_alternate();
+    let pin_a = gpioa.pa8;
 
     // PB5 (D4 on Nucleo G474RE)
     let input = gpiob.pb5.into_pull_down_input();
@@ -94,7 +94,7 @@ fn main() -> ! {
     out1.enable_set_event(&timer); // Set high at new period
 
     cr1.set_duty(period / 2);
-    timer.start(&mut hr_control);
+    timer.start(&mut hr_control.control);
     out1.enable();
 
     let capture = timer.capture_ch1();
@@ -104,19 +104,16 @@ fn main() -> ! {
     let mut old_duty = 0;
     loop {
         for duty in (u32::from(period) / 10)..(9 * u32::from(period) / 10) {
-            if !capture.is_pending() {
-                continue;
+            if let Some(value) = capture.get_signed(period) {
+                info!(
+                    "Capture: {:?}, duty: {}, diff: {}",
+                    value,
+                    old_duty,
+                    value - old_duty as i32
+                );
+                cr1.set_duty(duty as u16);
+                old_duty = duty;
             }
-            let value = capture.get_signed();
-            cr1.set_duty(duty as u16);
-            capture.clear_interrupt();
-            info!(
-                "Capture: {:?}, duty: {}, diff: {}",
-                value,
-                old_duty,
-                value - old_duty as i32
-            );
-            old_duty = duty;
         }
     }
 }
