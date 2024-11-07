@@ -8,10 +8,6 @@
 mod utils;
 
 use cortex_m_rt::entry;
-
-use defmt_rtt as _; // global logger
-use panic_probe as _;
-
 use utils::logger::info;
 
 #[entry]

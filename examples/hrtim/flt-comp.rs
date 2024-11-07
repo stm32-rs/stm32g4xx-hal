@@ -8,10 +8,6 @@
 mod utils;
 
 use cortex_m_rt::entry;
-
-use defmt_rtt as _; // global logger
-use panic_probe as _;
-
 use utils::logger::info;
 
 #[entry]
@@ -135,7 +131,7 @@ fn main() -> ! {
         for _ in 0..5 {
             //delay.delay(500_u32.millis());
             info!(
-                "State: {}, comp: {}, is_fault_active: {}, pc1: {}",
+                "State: {:?}, comp: {}, is_fault_active: {}, pc1: {}",
                 out1.get_state(),
                 comp3.output(),
                 hr_control.fault_5.is_fault_active(),
