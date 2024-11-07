@@ -362,19 +362,19 @@ macro_rules! hrtim_finalize_body {
                 $tim.$timXcr().modify(|_r, w| w
                     .tx_rstu().set_bit()
                     .preen().set_bit()
-                )
+                );
             },
             Some(PreloadSource::OnMasterTimerUpdate) => {
                 $tim.$timXcr().modify(|_r, w| w
                     .mstu().set_bit()
                     .preen().set_bit()
-                )
+                );
             }
             Some(PreloadSource::OnRepetitionUpdate) => {
                 $tim.$timXcr().modify(|_r, w| w
                     .tx_repu().set_bit()
                     .preen().set_bit()
-                )
+                );
             }
             None => ()
         }
@@ -386,7 +386,7 @@ macro_rules! hrtim_finalize_body {
                 $tim.$timXcr().modify(|_r, w| w
                     .mrepu().set_bit()
                     .preen().set_bit()
-                )
+                );
             }
             None => ()
         }
