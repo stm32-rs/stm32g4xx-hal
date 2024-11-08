@@ -1,6 +1,6 @@
 on:
   pull_request:
-  
+
 name: Continuous integration
 
 # Make sure CI fails on all warnings, including Clippy lints
@@ -29,6 +29,7 @@ jobs:
           # TODO: -log-rtt # log-rtt without defmt, more combos?
           - log-itm
           - log-semihost
+          - cordic
 
     steps:
       - uses: actions/checkout@v2
