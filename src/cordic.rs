@@ -15,7 +15,7 @@
 //!     let mut cordic = dp
 //!         .CORDIC
 //!         .constrain(&mut rcc)
-//!         .freeze::<I1F15, I1F31, SinCos, P60>(); // 16 bit arguments, 32 bit results, compute sine and cosine, 60 iterations
+//!         .freeze::<I1F15, I1F31, P60, SinCos>(); // 16 bit arguments, 32 bit results, 60 iterations, compute sine and cosine
 //!
 //!     // static operation (zero overhead)
 //!
@@ -38,41 +38,65 @@
 //! }
 //! ```
 
-use crate::{rcc::Rcc, stm32::CORDIC};
+use crate::{
+    rcc::Rcc,
+    {stm32::cordic::csr, stm32::CORDIC},
+};
 use core::marker::PhantomData;
 
-/// Extension trait for constraining the CORDIC peripheral.
+/// Extension trait for constraining the Cordic peripheral.
 pub trait Ext {
-    /// Constrain the CORDIC peripheral.
+    /// Constrain the Cordic peripheral.
     fn constrain(self, rcc: &mut Rcc) -> CordicReset;
 }
 
 impl Ext for CORDIC {
     #[inline]
     fn constrain(self, rcc: &mut Rcc) -> CordicReset {
-        rcc.rb.ahb1enr.modify(|_, w| w.cordicen().set_bit());
+        rcc.rb.ahb1enr().modify(|_, w| w.cordicen().set_bit());
 
-        // SAFETY: the resource is assumed to be
-        // in the "reset" configuration.
-        unsafe { Cordic::wrap(self) }
+        // SAFETY: we assume the resource is already
+        // in a reset state
+        // BONUS: this line enforces that the
+        // abstraction is of zero-size
+        unsafe { core::mem::transmute(()) }
     }
 }
 
 /// Traits and structures related to data types.
 pub mod types {
+    use super::csr;
     use fixed::traits::Fixed;
 
     pub use fixed::types::{I1F15, I1F31};
+
+    pub(crate) mod sealed {
+        use super::Ext;
+
+        /// Trait for tags to represent Cordic argument or result data.
+        pub trait Tag {
+            /// Internal fixed point representation.
+            type Repr: Ext<Tag = Self>;
+        }
+    }
 
     /// q1.15 fixed point number.
     pub struct Q15;
     /// q1.31 fixed point number.
     pub struct Q31;
 
+    impl sealed::Tag for Q15 {
+        type Repr = I1F15;
+    }
+
+    impl sealed::Tag for Q31 {
+        type Repr = I1F31;
+    }
+
     /// Extension trait for fixed point types.
     pub trait Ext: Fixed {
-        /// Type-state representing this type.
-        type Repr: DataType<Inner = Self>;
+        /// Tag representing this type.
+        type Tag: sealed::Tag<Repr = Self>;
 
         /// Convert to bits of the register width,
         fn to_register(self) -> u32;
@@ -81,58 +105,48 @@ pub mod types {
     }
 
     impl Ext for I1F15 {
-        type Repr = Q15;
+        type Tag = Q15;
 
+        #[inline]
         fn to_register(self) -> u32 {
             self.to_bits() as u16 as u32
         }
+
+        #[inline]
         fn from_register(bits: u32) -> Self {
             Self::from_bits(bits as u16 as i16)
         }
     }
 
     impl Ext for I1F31 {
-        type Repr = Q31;
+        type Tag = Q31;
 
+        #[inline]
         fn to_register(self) -> u32 {
             self.to_bits() as u32
         }
 
+        #[inline]
         fn from_register(bits: u32) -> Self {
             Self::from_bits(bits as i32)
         }
     }
 
-    /// Trait for newtypes to represent CORDIC argument or result data.
-    pub trait DataType {
-        /// Internal fixed point representation.
-        type Inner: Ext<Repr = Self>;
-    }
-
-    impl DataType for Q15 {
-        type Inner = I1F15;
-    }
-
-    impl DataType for Q31 {
-        type Inner = I1F31;
-    }
-
     /// Traits and structures related to argument type-states.
-    pub mod arg {
-        pub(crate) type Raw = crate::stm32::cordic::csr::ARGSIZE_A;
+    pub(crate) mod arg {
+        use super::{csr, sealed::Tag};
+
+        pub type Raw = csr::ARGSIZE;
 
         /// Trait for argument type-states.
-        pub(crate) trait State: super::DataType {
+        pub trait State: Tag {
             /// Raw representation of the configuration
             /// in the form of a bitfield variant.
             const RAW: Raw;
 
             /// Configure the resource to be represented
             /// by this type-state.
-            #[inline]
-            fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::ARGSIZE_W<OFFSET>) {
-                w.variant(Self::RAW);
-            }
+            fn set(w: csr::ARGSIZE_W<csr::CSRrs>) -> Self;
         }
 
         macro_rules! impls {
@@ -140,6 +154,13 @@ pub mod types {
                 $(
                     impl State for $NAME {
                         const RAW: Raw = Raw::$RAW;
+
+                        #[inline]
+                        fn set(w: csr::ARGSIZE_W<csr::CSRrs>) -> Self {
+                            w.variant(Self::RAW);
+
+                            Self
+                        }
                     }
                 )+
             };
@@ -152,21 +173,20 @@ pub mod types {
     }
 
     /// Traits and structures related to result type-states.
-    pub mod res {
-        pub(crate) type Raw = crate::stm32::cordic::csr::RESSIZE_A;
+    pub(crate) mod res {
+        use super::{csr, sealed::Tag};
+
+        pub type Raw = csr::RESSIZE;
 
         /// Trait for argument type-states.
-        pub(crate) trait State: super::DataType {
+        pub trait State: Tag {
             /// Raw representation of the configuration
             /// in the form of a bitfield variant.
             const RAW: Raw;
 
             /// Configure the resource to be represented
             /// by this type-state.
-            #[inline]
-            fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::RESSIZE_W<OFFSET>) {
-                w.variant(Self::RAW);
-            }
+            fn set(w: csr::RESSIZE_W<csr::CSRrs>) -> Self;
         }
 
         macro_rules! impls {
@@ -174,6 +194,13 @@ pub mod types {
                 $(
                     impl State for $NAME {
                         const RAW: Raw = Raw::$RAW;
+
+                        #[inline]
+                        fn set(w: csr::RESSIZE_W<csr::CSRrs>) -> Self {
+                            w.variant(Self::RAW);
+
+                            Self
+                        }
                     }
                 )+
             };
@@ -186,221 +213,344 @@ pub mod types {
     }
 }
 
-/// Traits and structures related to function type-states.
-pub mod func {
-    use super::*;
+/// Traits and structures related to data counts (argument or result).
+pub(crate) mod reg_count {
+    use super::{csr, op::data_count, types, PhantomData};
 
-    /// For internal use. A means of indirectly specifying a signature property
-    /// based solely on the number of elements.
-    mod data_count {
-        use super::types;
-
-        pub enum Count {
-            One,
-            Two,
-        }
-
-        /// One (primary) function argument/result.
-        pub struct One;
-        /// Two (primary and secondary) function arguments/results.
-        pub struct Two;
-
-        pub trait Property<T>
-        where
-            T: types::DataType,
-        {
-            type Signature: super::signature::Property<T::Inner>;
-
-            const COUNT: Count;
-        }
-
-        impl<T> Property<T> for One
-        where
-            T: types::DataType,
-        {
-            type Signature = T::Inner;
-
-            const COUNT: Count = Count::One;
-        }
-
-        impl<T> Property<T> for Two
-        where
-            T: types::DataType,
-        {
-            type Signature = (T::Inner, T::Inner);
-
-            const COUNT: Count = Count::Two;
-        }
+    pub struct NReg<T, Count>
+    where
+        T: types::sealed::Tag,
+        Count: data_count::Property<T>,
+    {
+        _t: PhantomData<T>,
+        _count: PhantomData<Count>,
     }
 
-    /// Traits and structures related to data counts (argument or result).
-    pub(crate) mod reg_count {
-        use super::{super::types, data_count, PhantomData};
+    pub mod arg {
+        use super::{csr, data_count, types, NReg, PhantomData};
 
-        pub struct NReg<T, Count>
-        where
-            T: types::DataType,
-            Count: data_count::Property<T>,
-        {
-            _t: PhantomData<T>,
-            _count: PhantomData<Count>,
-        }
+        type Raw = csr::NARGS;
 
-        pub mod arg {
-            use super::{data_count, types, NReg};
-
-            type Raw = crate::stm32::cordic::csr::NARGS_A;
-
-            pub(crate) trait State<T> {
-                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NARGS_W<OFFSET>);
-            }
-
-            impl<Arg, Count> State<Arg> for NReg<Arg, Count>
-            where
-                Arg: types::arg::State,
-                Count: data_count::Property<Arg>,
-            {
-                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NARGS_W<OFFSET>) {
-                    w.variant(
-                        const {
-                            match (Arg::RAW, Count::COUNT) {
-                                (types::arg::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
-                                (_, _) => Raw::Num1,
-                            }
-                        },
-                    );
-                }
-            }
-        }
-
-        pub mod res {
-            use super::{data_count, types, NReg};
-
-            type Raw = crate::stm32::cordic::csr::NRES_A;
-
-            pub(crate) trait State<T> {
-                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NRES_W<OFFSET>);
-            }
-
-            impl<Res, Count> State<Res> for NReg<Res, Count>
-            where
-                Res: types::res::State,
-                Count: data_count::Property<Res>,
-            {
-                fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::NRES_W<OFFSET>) {
-                    w.variant(
-                        const {
-                            match (Res::RAW, Count::COUNT) {
-                                (types::res::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
-                                (_, _) => Raw::Num1,
-                            }
-                        },
-                    );
-                }
-            }
-        }
-    }
-
-    /// Traits and structures related to function scale type-states.
-    pub mod scale {
-        pub(crate) type Raw = u8;
-
-        /// Trait for function scale type-states.
         pub(crate) trait State {
-            /// Raw representation of the configuration
-            /// in the form of a bitfield variant.
-            const RAW: Raw;
+            fn set(w: csr::NARGS_W<csr::CSRrs>) -> Self;
+        }
 
-            /// Configure the resource to be represented
-            /// by this type-state.
+        impl<Arg, Count> State for NReg<Arg, Count>
+        where
+            Arg: types::arg::State,
+            Count: data_count::Property<Arg>,
+        {
             #[inline]
-            fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::SCALE_W<OFFSET>) {
-                w.bits(<Self as State>::RAW);
+            fn set(w: csr::NARGS_W<csr::CSRrs>) -> Self {
+                w.variant(
+                    const {
+                        match (Arg::RAW, Count::COUNT) {
+                            (types::arg::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
+                            (_, _) => Raw::Num1,
+                        }
+                    },
+                );
+
+                Self {
+                    _t: PhantomData,
+                    _count: PhantomData,
+                }
             }
-        }
-
-        /// Scale of 0.
-        pub struct N0;
-        /// Scale of 1.
-        pub struct N1;
-        /// Scale of 2.
-        pub struct N2;
-        /// Scale of 3.
-        pub struct N3;
-        /// Scale of 4.
-        pub struct N4;
-        /// Scale of 5.
-        pub struct N5;
-        /// Scale of 6.
-        pub struct N6;
-        /// Scale of 7.
-        pub struct N7;
-
-        macro_rules! impls {
-            ( $( ($NAME:ident, $BITS:expr) $(,)? )+ ) => {
-                $(
-                    impl State for $NAME {
-                        const RAW: u8 = $BITS;
-                    }
-                )+
-            };
-        }
-
-        impls! {
-            (N0, 0),
-            (N1, 1),
-            (N2, 2),
-            (N3, 3),
-            (N4, 4),
-            (N5, 5),
-            (N6, 6),
-            (N7, 7),
         }
     }
 
-    /// Traits and structures related to the function signature.
-    pub mod signature {
-        use super::{data_count, reg_count, types};
+    pub mod res {
+        use super::{csr, data_count, types, NReg, PhantomData};
+
+        type Raw = csr::NRES;
+
+        pub(crate) trait State {
+            fn set(w: csr::NRES_W<csr::CSRrs>) -> Self;
+        }
+
+        impl<Res, Count> State for NReg<Res, Count>
+        where
+            Res: types::res::State,
+            Count: data_count::Property<Res>,
+        {
+            #[inline]
+            fn set(w: csr::NRES_W<csr::CSRrs>) -> Self {
+                w.variant(
+                    const {
+                        match (Res::RAW, Count::COUNT) {
+                            (types::res::Raw::Bits32, data_count::Count::Two) => Raw::Num2,
+                            (_, _) => Raw::Num1,
+                        }
+                    },
+                );
+
+                Self {
+                    _t: PhantomData,
+                    _count: PhantomData,
+                }
+            }
+        }
+    }
+}
+
+/// Traits and structures related to function scale type-states.
+pub mod scale {
+    use super::csr;
+
+    pub(crate) type Raw = u8;
+
+    /// Trait for function scale type-states.
+    pub(crate) trait State {
+        /// Raw representation of the configuration
+        /// in the form of a bitfield variant.
+        const RAW: Raw;
+
+        /// Configure the resource to be represented
+        /// by this type-state.
+        fn set(w: csr::SCALE_W<csr::CSRrs>) -> Self;
+    }
+
+    /// Scale of 0.
+    pub struct N0;
+    /// Scale of 1.
+    pub struct N1;
+    /// Scale of 2.
+    pub struct N2;
+    /// Scale of 3.
+    pub struct N3;
+    /// Scale of 4.
+    pub struct N4;
+    /// Scale of 5.
+    pub struct N5;
+    /// Scale of 6.
+    pub struct N6;
+    /// Scale of 7.
+    pub struct N7;
+
+    macro_rules! impls {
+        ( $( ($NAME:ident, $BITS:expr) $(,)? )+ ) => {
+            $(
+                impl State for $NAME {
+                    const RAW: u8 = $BITS;
+
+                    #[inline]
+                    fn set(w: csr::SCALE_W<csr::CSRrs>) -> Self {
+                        // SAFETY: all bits are valid
+                        unsafe { w.bits(<Self as State>::RAW) };
+
+                        Self
+                    }
+                }
+            )+
+        };
+    }
+
+    impls! {
+        (N0, 0),
+        (N1, 1),
+        (N2, 2),
+        (N3, 3),
+        (N4, 4),
+        (N5, 5),
+        (N6, 6),
+        (N7, 7),
+    }
+}
+
+/// Traits and structures related to precision type-states.
+pub mod prec {
+    use super::csr;
+
+    /// Trait for precision type-states.
+    pub(crate) trait State {
+        /// Bit representation of the precision.
+        const BITS: u8;
+
+        /// Configure the resource to be represented
+        /// by this type-state.
+        fn set(w: csr::PRECISION_W<csr::CSRrs>) -> Self;
+    }
+
+    /// 4 iterations.
+    pub struct P4;
+    /// 8 iterations.
+    pub struct P8;
+    /// 12 iterations.
+    pub struct P12;
+    /// 16 iterations.
+    pub struct P16;
+    /// 20 iterations.
+    pub struct P20;
+    /// 24 iterations.
+    pub struct P24;
+    /// 28 iterations.
+    pub struct P28;
+    /// 32 iterations.
+    pub struct P32;
+    /// 36 iterations.
+    pub struct P36;
+    /// 40 iterations.
+    pub struct P40;
+    /// 44 iterations.
+    pub struct P44;
+    /// 48 iterations.
+    pub struct P48;
+    /// 52 iterations.
+    pub struct P52;
+    /// 56 iterations.
+    pub struct P56;
+    /// 60 iterations.
+    pub struct P60;
+
+    macro_rules! impls {
+        ( $( ($NAME:ident, $BITS:expr) $(,)? )+ ) => {
+            $(
+                impl State for $NAME {
+                    const BITS: u8 = $BITS;
+
+                    #[inline]
+                    fn set(w: csr::PRECISION_W<csr::CSRrs>) -> Self {
+                        // SAFETY: reliant on valid type-state
+                        // implementations.
+                        unsafe { w.bits(<Self as State>::BITS) };
+
+                        Self
+                    }
+                }
+            )+
+        };
+    }
+
+    impls! {
+        (P4, 1),
+        (P8, 2),
+        (P12, 3),
+        (P16, 4),
+        (P20, 5),
+        (P24, 6),
+        (P28, 7),
+        (P32, 8),
+        (P36, 9),
+        (P40, 10),
+        (P44, 11),
+        (P48, 12),
+        (P52, 13),
+        (P56, 14),
+        (P60, 15),
+    }
+}
+
+/// Traits and structures related to function type-states.
+pub(crate) mod func {
+    use super::csr;
+
+    pub type Raw = csr::FUNC;
+
+    /// Trait for function type-states.
+    pub trait State {
+        /// Raw representation of the function.
+        const RAW: Raw;
+
+        /// Configure the resource to be represented
+        /// by this type-state.
+        fn set(w: csr::FUNC_W<csr::CSRrs>) -> Self;
+    }
+
+    pub struct Cos;
+    pub struct Sin;
+    pub struct ATan2;
+    pub struct Magnitude;
+    pub struct ATan;
+    pub struct CosH;
+    pub struct SinH;
+    pub struct ATanH;
+    pub struct Ln;
+    pub struct Sqrt;
+
+    macro_rules! impls {
+        ( $( ($NAME:ident, $RAW:ident) $(,)? )+ ) => {
+            $(
+                impl State for $NAME {
+                    const RAW: Raw = Raw::$RAW;
+
+                    #[inline]
+                    fn set(w: csr::FUNC_W<csr::CSRrs>) -> Self {
+                        w.variant(Self::RAW);
+
+                        Self
+                    }
+                }
+            )+
+        };
+    }
+
+    impls! {
+        (Cos, Cosine),
+        (Sin, Sine),
+        (ATan2, Phase),
+        (Magnitude, Modulus),
+        (ATan, Arctangent),
+        (CosH, HyperbolicCosine),
+        (SinH, HyperbolicSine),
+        (ATanH, Arctanh),
+        (Ln, NaturalLogarithm),
+        (Sqrt, SquareRoot),
+    }
+}
+
+/// Traits and structures related to operating the Cordic.
+pub mod op {
+    use core::marker::PhantomData;
+
+    use super::{func, prec, reg_count, scale, types, Cordic};
+
+    /// Traits and structures related to the operation signature.
+    pub(crate) mod signature {
+        use super::types;
         use types::arg::State as _;
         use types::res::State as _;
 
-        type WData = crate::stm32g4::Reg<crate::stm32::cordic::wdata::WDATA_SPEC>;
-        type RData = crate::stm32g4::Reg<crate::stm32::cordic::rdata::RDATA_SPEC>;
+        type WData = crate::stm32::cordic::WDATA;
+        type RData = crate::stm32::cordic::RDATA;
 
-        /// The signature is a property of the function type-state.
+        /// The signature is a property of the operation type-state.
         pub trait Property<T>
         where
             T: types::Ext,
         {
-            /// Number of register operations required.
-            type NReg;
-
             /// Write arguments to the argument register.
-            fn write(self, reg: &WData)
+            ///
+            /// # Safety:
+            /// Cordic must be configured to expect the
+            /// correct number of register writes.
+            unsafe fn write(self, reg: &WData)
             where
-                T::Repr: types::arg::State;
+                T::Tag: types::arg::State;
 
             /// Read results from the result register.
-            fn read(reg: &RData) -> Self
+            ///
+            /// # Safety:
+            /// Cordic must be configured to expect the
+            /// correct number of register reades.
+            unsafe fn read(reg: &RData) -> Self
             where
-                T::Repr: types::res::State;
+                T::Tag: types::res::State;
         }
 
         impl<T> Property<T> for T
         where
             T: types::Ext,
         {
-            type NReg = reg_count::NReg<T::Repr, data_count::One>;
-
-            fn write(self, reg: &WData)
+            #[inline]
+            unsafe fn write(self, reg: &WData)
             where
-                T::Repr: types::arg::State,
+                T::Tag: types::arg::State,
             {
-                let data = match const { T::Repr::RAW } {
+                let data = match const { T::Tag::RAW } {
                     types::arg::Raw::Bits16 => {
                         // $RM0440 17.4.2
                         // since we are only using the lower half of the register,
-                        // the CORDIC **will** read the upper half if the function
+                        // the Cordic **will** read the upper half if the function
                         // accepts two arguments, so we fill it with +1 as per the
                         // stated default.
                         self.to_register() | (0x7fff << 16)
@@ -408,12 +558,14 @@ pub mod func {
                     types::arg::Raw::Bits32 => self.to_register(),
                 };
 
-                reg.write(|w| w.arg().bits(data));
+                // SAFETY: all bits are valid
+                reg.write(|w| unsafe { w.arg().bits(data) });
             }
 
-            fn read(reg: &RData) -> Self
+            #[inline]
+            unsafe fn read(reg: &RData) -> Self
             where
-                T::Repr: types::res::State,
+                T::Tag: types::res::State,
             {
                 T::from_register(reg.read().res().bits())
             }
@@ -423,34 +575,37 @@ pub mod func {
         where
             T: types::Ext,
         {
-            type NReg = reg_count::NReg<T::Repr, data_count::Two>;
-
-            fn write(self, reg: &WData)
+            #[inline]
+            unsafe fn write(self, reg: &WData)
             where
-                T::Repr: types::arg::State,
+                T::Tag: types::arg::State,
             {
                 let (primary, secondary) = self;
 
-                match const { T::Repr::RAW } {
+                match const { T::Tag::RAW } {
                     types::arg::Raw::Bits16 => {
                         // $RM0440 17.4.2
-                        reg.write(|w| {
+                        // SAFETY: all bits are valid
+                        reg.write(|w| unsafe {
                             w.arg()
                                 .bits(primary.to_register() | (secondary.to_register() << 16))
                         });
                     }
                     types::arg::Raw::Bits32 => {
-                        reg.write(|w| w.arg().bits(primary.to_register()));
-                        reg.write(|w| w.arg().bits(secondary.to_register()));
+                        // SAFETY: all bits are valid
+                        reg.write(|w| unsafe { w.arg().bits(primary.to_register()) });
+                        // SAFETY: all bits are valid
+                        reg.write(|w| unsafe { w.arg().bits(secondary.to_register()) });
                     }
                 };
             }
 
-            fn read(reg: &RData) -> Self
+            #[inline]
+            unsafe fn read(reg: &RData) -> Self
             where
-                T::Repr: types::res::State,
+                T::Tag: types::res::State,
             {
-                match const { T::Repr::RAW } {
+                match const { T::Tag::RAW } {
                     types::res::Raw::Bits16 => {
                         let data = reg.read().res().bits();
 
@@ -469,68 +624,130 @@ pub mod func {
         }
     }
 
-    pub(crate) type Raw = crate::stm32::cordic::csr::FUNC_A;
+    /// For internal use. A means of indirectly specifying a signature property
+    /// based solely on the number of elements.
+    pub(crate) mod data_count {
+        use super::types;
 
-    /// Trait for function type-states.
-    pub trait State {
-        /// Raw representation of the function.
-        const RAW: Raw;
+        pub enum Count {
+            One,
+            Two,
+        }
 
-        /// Configure the resource to be represented
-        /// by this type-state.
+        pub struct One;
+        pub struct Two;
+
+        pub trait Property<T>
+        where
+            T: types::sealed::Tag,
+        {
+            type Signature: super::signature::Property<T::Repr>;
+
+            const COUNT: Count;
+        }
+
+        impl<T> Property<T> for One
+        where
+            T: types::sealed::Tag,
+        {
+            type Signature = T::Repr;
+
+            const COUNT: Count = Count::One;
+        }
+
+        impl<T> Property<T> for Two
+        where
+            T: types::sealed::Tag,
+        {
+            type Signature = (T::Repr, T::Repr);
+
+            const COUNT: Count = Count::Two;
+        }
+    }
+
+    pub(crate) mod sealed {
+        use super::types;
+
+        /// An operation is a feature of the Cordic.
+        ///
+        /// Operations are permutations of:
+        /// - nargs
+        /// - nres
+        /// - scale
+        /// - func
+        pub trait Feature {
+            /// The required argument register writes.
+            type NArgs<Arg>
+            where
+                Arg: types::arg::State + types::sealed::Tag;
+            /// The required result register reads.
+            type NRes<Res>
+            where
+                Res: types::res::State + types::sealed::Tag;
+            /// The scale to be applied.
+            type Scale;
+            /// The function to evaluate.
+            type Func;
+
+            /// The number of arguments required.
+            type ArgCount;
+            /// The number of results produced.
+            type ResCount;
+        }
+    }
+
+    /// An operation of the Cordic.
+    ///
+    /// Enables writing and reading values
+    /// to and from the Cordic.
+    #[allow(unused)]
+    struct Operation<'a, Arg, Res, Op>
+    where
+        Arg: types::arg::State,
+        Res: types::res::State,
+        Op: sealed::Feature,
+    {
+        nargs: &'a Op::NArgs<Arg>,
+        nres: &'a Op::NRes<Res>,
+        scale: &'a Op::Scale,
+        func: &'a Op::Func,
+    }
+
+    impl<'a, Arg, Res, Op> Operation<'a, Arg, Res, Op>
+    where
+        Arg: types::arg::State,
+        Res: types::res::State,
+        Op: sealed::Feature,
+    {
+        /// Write arguments to the argument register.
         #[inline]
-        fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::FUNC_W<OFFSET>) {
-            w.variant(Self::RAW);
-        }
-    }
-
-    /// Define specific combinations
-    /// of states and properties for each function.
-    pub trait Feature<Arg, Res>: State
-    where
-        Arg: types::arg::State,
-        Res: types::res::State,
-    {
-        /// The number of arguments required.
-        type Arguments: signature::Property<Arg::Inner>;
-        /// The number of arguments produced.
-        type Results: signature::Property<Res::Inner>;
-
-        /// The operation to perform.
-        type Op: State;
-        /// The scale to be applied.
-        type Scale: scale::State;
-        /// The required argument register writes.
-        type NArgs: reg_count::arg::State<Arg>;
-        /// The required result register reads.
-        type NRes: reg_count::res::State<Res>;
-    }
-
-    impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
-    where
-        Arg: types::arg::State,
-        Res: types::res::State,
-        Func: Feature<Arg, Res>,
-        Prec: prec::State,
-        Func::Arguments: signature::Property<Arg::Inner>,
-        Func::Results: signature::Property<Res::Inner>,
-    {
-        /// Start the configured operation.
-        pub fn start(&mut self, args: Func::Arguments) {
-            use signature::Property as _;
-
-            args.write(&self.rb.wdata);
+        fn write<Args>(&mut self, args: Args, reg: &crate::stm32::cordic::WDATA)
+        where
+            Arg: types::sealed::Tag,
+            Args: signature::Property<Arg::Repr>,
+            Op::ArgCount: data_count::Property<Arg, Signature = Args>,
+        {
+            // SAFETY: Cordic is necessarily configured properly if
+            // an instance of `Operation` exists.
+            unsafe {
+                signature::Property::<Arg::Repr>::write(args, reg);
+            }
         }
 
-        /// Get the result of an operation.
-        pub fn result(&mut self) -> Func::Results {
-            use signature::Property as _;
-
-            Func::Results::read(&self.rb.rdata)
+        /// Read results from the result register.
+        #[inline]
+        fn read(
+            &mut self,
+            reg: &crate::stm32::cordic::RDATA,
+        ) -> <Op::ResCount as data_count::Property<Res>>::Signature
+        where
+            Op::ResCount: data_count::Property<Res>,
+        {
+            // SAFETY: Cordic is necessarily configured properly if
+            // an instance of `Operation` exists.
+            unsafe { signature::Property::<Res::Repr>::read(reg) }
         }
     }
-
-    // function types with argument count encoded
 
     /// Cosine of an angle theta divided by pi.
     pub struct Cos;
@@ -578,50 +795,42 @@ pub mod func {
     }
 
     macro_rules! impls {
-        ( $( ($NAME:ident < $SCALE:ident >, $RAW:ident, $NARGS:ident, $NRES:ident, start( $($START_PARAM:ident),+ )) $(,)?)+ ) => {
+        ( $( ($TAG:ident<$SCALE:ident>, $NARGS:ident, $NRES:ident, $FUNC:ident) $(,)?)+ ) => {
             $(
-                impl State for $NAME {
-                    const RAW: Raw = Raw::$RAW;
-                }
-
-                impl<Arg, Res> Feature<Arg, Res> for $NAME
-                where
-                    Arg: types::arg::State,
-                    Res: types::res::State,
+                impl sealed::Feature for $TAG
                 {
-                    type Arguments = <data_count::$NARGS as data_count::Property<Arg>>::Signature;
-                    type Results = <data_count::$NRES as data_count::Property<Res>>::Signature;
-
-                    type Op = Self;
+                    type NArgs<Arg> = reg_count::NReg<Arg, Self::ArgCount>
+                    where
+                        Arg: types::arg::State + types::sealed::Tag;
+                    type NRes<Res> = reg_count::NReg<Res, Self::ResCount>
+                    where
+                        Res: types::res::State + types::sealed::Tag;
                     type Scale = scale::$SCALE;
-                    type NArgs = <Self::Arguments as signature::Property<Arg::Inner>>::NReg;
-                    type NRes = <Self::Results as signature::Property<Res::Inner>>::NReg;
+                    type Func = func::$FUNC;
+
+                    type ArgCount = data_count::$NARGS;
+                    type ResCount = data_count::$NRES;
                 }
             )+
         };
     }
 
     macro_rules! impls_multi_scale {
-        // root / config (almost identical to single scale)
-        ( $( ($NAME:ident < $( $SCALE:ident  $(,)? )+ >, $RAW:ident, $NARGS:ident, $NRES:ident, start $START_PARAM:tt ) $(,)?)+ ) => {
+        ( $( ($TAG:ident<$($SCALE:ident $(,)?)+>, $NARGS:ident, $NRES:ident, $FUNC:ident) $(,)?)+ ) => {
             $(
                 $(
-                    impl State for $NAME<scale::$SCALE> {
-                        const RAW: Raw = Raw::$RAW;
-                    }
-
-                    impl<Arg, Res> Feature<Arg, Res> for $NAME<scale::$SCALE>
-                    where
-                        Arg: types::arg::State,
-                        Res: types::res::State,
-                    {
-                        type Arguments = <data_count::$NARGS as data_count::Property<Arg>>::Signature;
-                        type Results = <data_count::$NRES as data_count::Property<Res>>::Signature;
-
-                        type Op = Self;
+                    impl sealed::Feature for $TAG<scale::$SCALE> {
+                        type NArgs<Arg> = reg_count::NReg<Arg, Self::ArgCount>
+                        where
+                            Arg: types::arg::State + types::sealed::Tag;
+                        type NRes<Res> = reg_count::NReg<Res, Self::ResCount>
+                        where
+                            Res: types::res::State + types::sealed::Tag;
                         type Scale = scale::$SCALE;
-                        type NArgs = <Self::Arguments as signature::Property<Arg::Inner>>::NReg;
-                        type NRes = <Self::Results as signature::Property<Res::Inner>>::NReg;
+                        type Func = func::$FUNC;
+
+                        type ArgCount = data_count::$NARGS;
+                        type ResCount = data_count::$NRES;
                     }
                 )+
             )+
@@ -629,33 +838,94 @@ pub mod func {
     }
 
     impls! {
-        (Cos<N0>, Cosine, One, One, start(angle)),
-        (Sin<N0>, Sine, One, One, start(angle)),
-        (SinCos<N0>, Sine, One, Two, start(angle)),
-        (CosM<N0>, Cosine, Two, One, start(angle, modulus)),
-        (SinM<N0>, Sine, Two, One, start(angle, modulus)),
-        (SinCosM<N0>, Sine, Two, Two, start(angle, modulus)),
-        (ATan2<N0>, Phase, Two, One, start(x, y)),
-        (Magnitude<N0>, Modulus, Two, One, start(x, y)),
-        (ATan2Magnitude<N0>, Phase, Two, Two, start(x, y)),
-        (CosH<N1>, HyperbolicCosine, One, One, start(x)),
-        (SinH<N1>, HyperbolicSine, One, One, start(x)),
-        (SinHCosH<N1>, HyperbolicSine, One, Two, start(x)),
-        (ATanH<N1>, Arctanh, One, One, start(x)),
+        (Cos<N0>, One, One, Cos),
+        (Sin<N0>, One, One, Sin),
+        (SinCos<N0>, One, Two, Sin),
+        (CosM<N0>, Two, One, Cos),
+        (SinM<N0>, Two, One, Sin),
+        (SinCosM<N0>, Two, Two, Sin),
+        (ATan2<N0>, Two, One, ATan2),
+        (Magnitude<N0>, Two, One, Magnitude),
+        (ATan2Magnitude<N0>, Two, Two, ATan2),
+        (CosH<N1>, One, One, CosH),
+        (SinH<N1>, One, One, SinH),
+        (SinHCosH<N1>, One, Two, SinH),
+        (ATanH<N1>, One, One, ATan),
     }
 
     impls_multi_scale! {
-        (ATan<N0, N1, N2, N3, N4, N5, N6, N7>, Arctangent, One, One, start(x)),
-        (Ln<N1, N2, N3, N4>, NaturalLogarithm, One, One, start(x)),
-        (Sqrt<N0, N1, N2>, SquareRoot, One, One, start(x)),
+        (ATan<N0, N1, N2, N3, N4, N5, N6, N7>, One, One, ATan),
+        (Ln<N1, N2, N3, N4>, One, One, Ln),
+        (Sqrt<N0, N1, N2>, One, One, Sqrt),
+    }
+
+    impl<Arg, Res, Prec, Op> Cordic<Arg, Res, Prec, Op>
+    where
+        Arg: types::arg::State,
+        Res: types::res::State,
+        Prec: prec::State,
+        Op: sealed::Feature,
+    {
+        /// Start the configured operation.
+        #[inline]
+        pub fn start(&mut self, args: <Op::ArgCount as data_count::Property<Arg>>::Signature)
+        where
+            Op::ArgCount: data_count::Property<Arg>,
+        {
+            let config = &self.config;
+            let mut op = Operation::<Arg, Res, Op> {
+                nargs: &config.nargs,
+                nres: &config.nres,
+                scale: &config.scale,
+                func: &config.func,
+            };
+
+            op.write(args, self.rb.wdata());
+        }
+
+        /// Get the result of an operation.
+        #[inline]
+        pub fn result(&mut self) -> <Op::ResCount as data_count::Property<Res>>::Signature
+        where
+            Op::ResCount: data_count::Property<Res>,
+        {
+            let config = &self.config;
+            let mut op = Operation::<Arg, Res, Op> {
+                nargs: &config.nargs,
+                nres: &config.nres,
+                scale: &config.scale,
+                func: &config.func,
+            };
+
+            op.read(self.rb.rdata())
+        }
     }
 
     /// Traits and structures for dynamic function operation.
     pub mod dynamic {
-        use super::{prec, signature, types, Cordic, Feature};
+        use super::{
+            super::{prec, reg_count, Cordic},
+            data_count, func, scale,
+            sealed::Feature,
+            types, Operation,
+        };
 
-        /// Any function can be invoked with this type-state.
+        /// Any operation can be invoked with this type-state.
         pub struct Any;
+
+        impl Feature for Any {
+            type NArgs<Arg> = ()
+            where
+                Arg: types::arg::State + types::sealed::Tag;
+            type NRes<Res> = ()
+            where
+                Res: types::res::State + types::sealed::Tag;
+            type Scale = ();
+            type Func = ();
+
+            type ArgCount = ();
+            type ResCount = ();
+        }
 
         /// A Cordic in dynamic mode.
         pub trait Mode<Arg, Res>
@@ -663,160 +933,102 @@ pub mod func {
             Arg: types::arg::State,
             Res: types::res::State,
         {
-            /// Run a function with provided arguments and get the result.
+            /// Run an operation with provided arguments and get the result.
             ///
             /// *Note: This employs the polling strategy.
             /// For less overhead, use static operations.*
-            fn run<Func>(&mut self, args: Func::Arguments) -> Func::Results
+            fn run<Op>(
+                &mut self,
+                args: <Op::ArgCount as data_count::Property<Arg>>::Signature,
+            ) -> <Op::ResCount as data_count::Property<Res>>::Signature
             where
-                Func: Feature<Arg, Res>;
+                Op: Feature,
+                Op::NArgs<Arg>: reg_count::arg::State,
+                Op::NRes<Res>: reg_count::res::State,
+                Op::Scale: scale::State,
+                Op::Func: func::State,
+                Op::ArgCount: data_count::Property<Arg>,
+                Op::ResCount: data_count::Property<Res>;
         }
 
-        impl<Arg, Res, Prec> Mode<Arg, Res> for Cordic<Arg, Res, Any, Prec>
+        impl<Arg, Res, Prec> Mode<Arg, Res> for Cordic<Arg, Res, Prec, Any>
         where
             Arg: types::arg::State,
             Res: types::res::State,
             Prec: prec::State,
         {
-            fn run<Func>(&mut self, args: Func::Arguments) -> Func::Results
+            #[inline]
+            fn run<Op>(
+                &mut self,
+                args: <Op::ArgCount as data_count::Property<Arg>>::Signature,
+            ) -> <Op::ResCount as data_count::Property<Res>>::Signature
             where
-                Func: Feature<Arg, Res>,
+                Op: Feature,
+                Op::NArgs<Arg>: reg_count::arg::State,
+                Op::NRes<Res>: reg_count::res::State,
+                Op::Scale: scale::State,
+                Op::Func: func::State,
+                Op::ArgCount: data_count::Property<Arg>,
+                Op::ResCount: data_count::Property<Res>,
             {
-                use signature::Property as _;
+                use func::State as _;
+                use reg_count::{arg::State as _, res::State as _};
+                use scale::State as _;
 
-                self.apply_config::<Arg, Res, Func, Prec>();
+                let (nargs, nres, scale, func) = self.rb.csr().from_modify(|_, w| {
+                    (
+                        Op::NArgs::set(w.nargs()),
+                        Op::NRes::set(w.nres()),
+                        Op::Scale::set(w.scale()),
+                        Op::Func::set(w.func()),
+                    )
+                });
 
-                args.write(&self.rb.wdata);
-                self.when_ready(|cordic| Func::Results::read(&cordic.rb.rdata))
+                let mut op = Operation::<Arg, Res, Op> {
+                    nargs: &nargs,
+                    nres: &nres,
+                    scale: &scale,
+                    func: &func,
+                };
+
+                op.write(args, self.rb.wdata());
+                self.when_ready(|cordic| op.read(cordic.rb.rdata()))
             }
         }
     }
 }
 
-/// Traits and structures related to precision type-states.
-pub mod prec {
-    /// Trait for precision type-states.
-    pub(crate) trait State {
-        /// Bit representation of the precision.
-        const BITS: u8;
-
-        /// Configure the resource to be represented
-        /// by this type-state.
-        fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::PRECISION_W<OFFSET>);
-    }
-
-    /// 4 iterations.
-    pub struct P4;
-    /// 8 iterations.
-    pub struct P8;
-    /// 12 iterations.
-    pub struct P12;
-    /// 16 iterations.
-    pub struct P16;
-    /// 20 iterations.
-    pub struct P20;
-    /// 24 iterations.
-    pub struct P24;
-    /// 28 iterations.
-    pub struct P28;
-    /// 32 iterations.
-    pub struct P32;
-    /// 36 iterations.
-    pub struct P36;
-    /// 40 iterations.
-    pub struct P40;
-    /// 44 iterations.
-    pub struct P44;
-    /// 48 iterations.
-    pub struct P48;
-    /// 52 iterations.
-    pub struct P52;
-    /// 56 iterations.
-    pub struct P56;
-    /// 60 iterations.
-    pub struct P60;
-
-    macro_rules! impls {
-        ( $( ($NAME:ident, $BITS:expr) $(,)? )+ ) => {
-            $(
-                impl State for $NAME {
-                    const BITS: u8 = $BITS;
-
-                    #[inline]
-                    fn set<const OFFSET: u8>(w: crate::stm32::cordic::csr::PRECISION_W<OFFSET>) {
-                        // SAFETY: reliant on valid type-state
-                        // implementations.
-                        unsafe { w.bits(<Self as State>::BITS) };
-                    }
-                }
-            )+
-        };
-    }
-
-    impls! {
-        (P4, 1),
-        (P8, 2),
-        (P12, 3),
-        (P16, 4),
-        (P20, 5),
-        (P24, 6),
-        (P28, 7),
-        (P32, 8),
-        (P36, 9),
-        (P40, 10),
-        (P44, 11),
-        (P48, 12),
-        (P52, 13),
-        (P56, 14),
-        (P60, 15),
-    }
+/// Configuration for the Cordic.
+struct Config<Arg, Res, NArgs, NRes, Scale, Prec, Func> {
+    arg: Arg,
+    res: Res,
+    nargs: NArgs,
+    nres: NRes,
+    scale: Scale,
+    prec: Prec,
+    func: Func,
 }
 
 /// Cordic co-processor interface.
-pub struct Cordic<Arg, Res, Func, Prec>
+pub struct Cordic<Arg, Res, Prec, Op>
 where
     Arg: types::arg::State,
     Res: types::res::State,
     Prec: prec::State,
+    Op: op::sealed::Feature,
 {
     rb: CORDIC,
-    _arg_size: PhantomData<Arg>,
-    _res_size: PhantomData<Res>,
-    _func: PhantomData<Func>,
-    _prec: PhantomData<Prec>,
+    config: Config<Arg, Res, Op::NArgs<Arg>, Op::NRes<Res>, Op::Scale, Prec, Op::Func>,
 }
 
 // root impl
-impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
+impl<Arg, Res, Prec, Op> Cordic<Arg, Res, Prec, Op>
 where
     Arg: types::arg::State,
     Res: types::res::State,
     Prec: prec::State,
+    Op: op::sealed::Feature,
 {
-    fn apply_config<NewArg, NewRes, NewFunc, NewPrec>(&mut self)
-    where
-        NewArg: types::arg::State,
-        NewRes: types::res::State,
-        NewFunc: func::Feature<NewArg, NewRes>,
-        NewPrec: prec::State,
-    {
-        self.rb.csr.write(|w| {
-            use func::reg_count::arg::State as _;
-            use func::reg_count::res::State as _;
-            use func::scale::State as _;
-
-            NewArg::set(w.argsize());
-            NewRes::set(w.ressize());
-            NewPrec::set(w.precision());
-            NewFunc::set(w.func());
-            NewFunc::NArgs::set(w.nargs());
-            NewFunc::NRes::set(w.nres());
-            NewFunc::Scale::set(w.scale());
-
-            w
-        });
-    }
-
     /// Configure the resource as dictated by the resulting
     /// type-states. The produced binding represents
     /// a frozen configuration, since it is represented
@@ -826,26 +1038,43 @@ where
     ///
     /// *Note: The configuration is inferred from context because
     /// it is represented by generic type-states.*
-    pub fn freeze<NewArg, NewRes, NewFunc, NewPrec>(
-        mut self,
-    ) -> Cordic<NewArg, NewRes, NewFunc, NewPrec>
+    #[inline]
+    pub fn freeze<NewArg, NewRes, NewPrec, NewOp>(self) -> Cordic<NewArg, NewRes, NewPrec, NewOp>
     where
         NewArg: types::arg::State,
         NewRes: types::res::State,
-        NewFunc: func::Feature<NewArg, NewRes>,
         NewPrec: prec::State,
+        NewOp: op::sealed::Feature,
+        NewOp::NArgs<NewArg>: reg_count::arg::State,
+        NewOp::NRes<NewRes>: reg_count::res::State,
+        NewOp::Scale: scale::State,
+        NewOp::Func: func::State,
     {
-        self.apply_config::<NewArg, NewRes, NewFunc, NewPrec>();
+        use func::State as _;
+        use reg_count::arg::State as _;
+        use reg_count::res::State as _;
+        use scale::State as _;
 
-        // SAFETY: the resource has been configured
-        // to represent the new type-states.
-        unsafe { Cordic::wrap(self.rb) }
+        let config = self.rb.csr().from_modify(|_, w| Config {
+            arg: NewArg::set(w.argsize()),
+            res: NewRes::set(w.ressize()),
+            nargs: NewOp::NArgs::set(w.nargs()),
+            nres: NewOp::NRes::set(w.nres()),
+            scale: NewOp::Scale::set(w.scale()),
+            prec: NewPrec::set(w.precision()),
+            func: NewOp::Func::set(w.func()),
+        });
+
+        Cordic {
+            rb: self.rb,
+            config,
+        }
     }
 
     /// Determine whether a result is pending or not.
     #[inline]
     pub fn is_ready(&self) -> bool {
-        self.rb.csr.read().rrdy().bit_is_set()
+        self.rb.csr().read().rrdy().bit_is_set()
     }
 
     /// Dispatch an operation once a result is
@@ -868,93 +1097,83 @@ where
     /// Convert into a Cordic interface that supports
     /// runtime function selection.
     #[inline]
-    pub fn into_dynamic(self) -> Cordic<Arg, Res, func::dynamic::Any, Prec> {
-        unsafe { Cordic::wrap(self.rb) }
-    }
-
-    /// Wrap the resource as a noop.
-    ///
-    /// # Safety
-    ///
-    /// If the resource configuration and
-    /// type-states are incongruent, the invariance
-    /// is broken and actions may exhibit
-    /// undefined behavior.
-    pub const unsafe fn wrap(rb: CORDIC) -> Self {
-        Self {
-            rb,
-            _arg_size: PhantomData,
-            _res_size: PhantomData,
-            _func: PhantomData,
-            _prec: PhantomData,
+    pub fn into_dynamic(self) -> Cordic<Arg, Res, Prec, op::dynamic::Any> {
+        Cordic {
+            rb: self.rb,
+            config: Config {
+                arg: self.config.arg,
+                res: self.config.res,
+                nargs: (),
+                nres: (),
+                scale: (),
+                prec: self.config.prec,
+                func: (),
+            },
         }
     }
 }
 
 /// $RM0440 17.4.1
-pub type CordicReset = Cordic<types::Q31, types::Q31, func::Cos, prec::P20>;
+pub type CordicReset = Cordic<types::Q31, types::Q31, prec::P20, op::Cos>;
 
-// reset
-impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
+impl<Arg, Res, Prec, Op> Cordic<Arg, Res, Prec, Op>
 where
     Arg: types::arg::State,
     Res: types::res::State,
-    Func: func::Feature<Arg, Res>,
     Prec: prec::State,
+    Op: op::sealed::Feature,
 {
-    /// Configure the resource back to the "reset"
-    /// state.
     #[inline]
-    fn reset(self) -> CordicReset {
+    fn into_reset(self) -> CordicReset {
         self.freeze()
     }
 }
 
 // listen
-impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
+impl<Arg, Res, Prec, Op> Cordic<Arg, Res, Prec, Op>
 where
     Arg: types::arg::State,
     Res: types::res::State,
-    Func: func::Feature<Arg, Res>,
     Prec: prec::State,
+    Op: op::sealed::Feature,
 {
     /// Enable the result ready interrupt.
     #[inline]
     pub fn listen(&mut self) {
-        self.rb.csr.modify(|_, w| w.ien().set_bit());
+        self.rb.csr().modify(|_, w| w.ien().set_bit());
     }
 
     /// Disable the result ready interrupt.
     #[inline]
     pub fn unlisten(&mut self) {
-        self.rb.csr.modify(|_, w| w.ien().clear_bit());
+        self.rb.csr().modify(|_, w| w.ien().clear_bit());
     }
 }
 
 // release
-impl<Arg, Res, Func, Prec> Cordic<Arg, Res, Func, Prec>
+impl<Arg, Res, Prec, Op> Cordic<Arg, Res, Prec, Op>
 where
     Arg: types::arg::State,
     Res: types::res::State,
-    Func: func::Feature<Arg, Res>,
     Prec: prec::State,
+    Op: op::sealed::Feature,
 {
-    /// Release the CORDIC resource binding as a noop.
+    /// Release the Cordic resource binding as a noop.
     ///
     /// # Safety
     ///
-    /// The CORDIC peripheral is not reset.
+    /// The Cordic peripheral is not reset.
     #[inline]
     pub unsafe fn release(self) -> CORDIC {
         self.rb
     }
 
-    /// Release the CORDIC resource binding after reset.
+    /// Release the Cordic resource binding after reset.
     #[inline]
     pub fn release_and_reset(self, rcc: &mut Rcc) -> CORDIC {
-        let reset = self.reset();
+        let reset = self.into_reset();
 
-        rcc.rb.ahb1enr.modify(|_, w| w.cordicen().clear_bit());
+        rcc.rb.ahb1enr().modify(|_, w| w.cordicen().clear_bit());
 
         // SAFETY: the resource has been reset
         unsafe { reset.release() }
