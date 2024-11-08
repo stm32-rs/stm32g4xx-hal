@@ -7,11 +7,11 @@ extern crate cortex_m;
 extern crate cortex_m_rt as rt;
 extern crate stm32g4xx_hal as hal;
 
-use fixed::types::I1F15;
 use hal::cordic::{
-    func::{dynamic::Mode as _, scale::N0, Magnitude, SinCos, Sqrt},
+    op::{dynamic::Mode as _, Magnitude, SinCos, Sqrt},
     prec::P60,
-    types::{Q15, Q31},
+    scale::N0,
+    types::{I1F15, Q15, Q31},
     Ext as _,
 };
 use hal::prelude::*;
@@ -34,7 +34,7 @@ fn main() -> ! {
     let mut cordic = dp
         .CORDIC
         .constrain(&mut rcc)
-        .freeze::<Q15, Q31, SinCos, P60>(); // 16 bit arguments, 32 bit results, compute sine and cosine, 60 iterations
+        .freeze::<Q15, Q31, P60, SinCos>(); // 16 bit arguments, 32 bit results, compute sine and cosine, 60 iterations
 
     // static operation (zero overhead)
 
