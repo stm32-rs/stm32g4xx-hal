@@ -53,5 +53,6 @@ fn main() -> ! {
     let magnitude = cordic.run::<Magnitude>((I1F15::from_num(0.25), I1F15::from_num(0.5)));
     println!("magnitude: {}", magnitude.to_num::<f32>());
 
+    #[allow(clippy::empty_loop)]
     loop {}
 }
