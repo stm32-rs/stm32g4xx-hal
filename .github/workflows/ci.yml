@@ -29,7 +29,7 @@ jobs:
           # TODO: -log-rtt # log-rtt without defmt, more combos?
           - log-itm
           - log-semihost
-          - cordic
+          - cordic,log-rtt,defmt
 
     steps:
       - uses: actions/checkout@v2
