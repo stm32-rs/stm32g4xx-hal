@@ -1018,6 +1018,7 @@ where
     Op: op::sealed::Feature,
 {
     rb: CORDIC,
+    #[allow(clippy::type_complexity)]
     config: Config<Arg, Res, Op::NArgs<Arg>, Op::NRes<Res>, Op::Scale, Prec, Op::Func>,
 }
 
