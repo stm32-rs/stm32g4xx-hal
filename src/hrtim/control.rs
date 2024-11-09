@@ -211,9 +211,9 @@ impl HrTimCalibrated {
     }
 }
 
-impl<'a> Into<&'a mut HrPwmCtrl> for &'a mut HrPwmControl {
-    fn into(self) -> &'a mut HrPwmCtrl {
-        &mut self.control
+impl<'a> From<&'a mut HrPwmControl> for &'a mut HrPwmCtrl {
+    fn from(val: &'a mut HrPwmControl) -> Self {
+        &mut val.control
     }
 }
 

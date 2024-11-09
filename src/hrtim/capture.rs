@@ -25,7 +25,8 @@ pub enum CountingDirection {
 /// Implemented for
 /// * TIM's update event
 /// * EEVT1-10
-/// TODO: This sould be implemeted
+///
+/// TODO:
 /// * All neighbor timers CMP1, CPM2, OUT1_RST and OUT1_SET events
 pub trait CaptureEvent<TIM, PSCL> {
     const BITS: u32;

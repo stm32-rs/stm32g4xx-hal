@@ -3,6 +3,8 @@ pub trait EventSource<DST, PSCL> {
     const BITS: u32;
 }
 
+/// Event that can be used reset the timer counter
+///
 /// Done:
 /// * [x] Eev1-10
 /// * [x] Master period
@@ -10,7 +12,6 @@ pub trait EventSource<DST, PSCL> {
 /// * [x] Cmp2, Cmp4
 /// * [x] Timer Update
 /// * [ ] Neighbor timers compare events
-/// Event that can be used reset the timer counter
 pub trait TimerResetEventSource<DST, PSCL> {
     const BITS: u32;
 }

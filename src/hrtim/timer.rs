@@ -91,6 +91,12 @@ pub trait HrSlaveTimer: HrTimer {
     );
 }
 
+pub struct TimerSplitCapture<T, PSCL, CH1, CH2> {
+    pub timer: HrTim<T, PSCL, (), ()>,
+    pub ch1: HrCapt<T, PSCL, CH1, capture::NoDma>,
+    pub ch2: HrCapt<T, PSCL, CH2, capture::NoDma>,
+}
+
 /// Trait for unsplit slave timer which still contains its capture modules
 pub trait HrSlaveTimerCpt: HrSlaveTimer {
     type CaptureCh1: HrCapture;
@@ -100,11 +106,7 @@ pub trait HrSlaveTimerCpt: HrSlaveTimer {
     fn capture_ch2(&mut self) -> &mut <Self as HrSlaveTimerCpt>::CaptureCh2;
     fn split_capture(
         self,
-    ) -> (
-        HrTim<Self::Timer, Self::Prescaler, (), ()>,
-        HrCapt<Self::Timer, Self::Prescaler, capture::Ch1, capture::NoDma>,
-        HrCapt<Self::Timer, Self::Prescaler, capture::Ch2, capture::NoDma>,
-    );
+    ) -> TimerSplitCapture<Self::Timer, Self::Prescaler, capture::Ch1, capture::Ch2>;
 }
 
 macro_rules! hrtim_timer {
@@ -267,7 +269,7 @@ macro_rules! hrtim_timer {
                     &mut self.capture_ch2
                 }
 
-                fn split_capture(self) -> (HrTim<$TIMX, PSCL, (), ()>, HrCapt<$TIMX, PSCL, capture::Ch1, capture::NoDma>, HrCapt<$TIMX, PSCL, capture::Ch2, capture::NoDma>) {
+                fn split_capture(self) -> TimerSplitCapture<$TIMX, PSCL, capture::Ch1, capture::Ch2> {
                     let HrTim{
                         _timer,
                         _prescaler,
@@ -275,16 +277,16 @@ macro_rules! hrtim_timer {
                         capture_ch2,
                     } = self;
 
-                    (
-                        HrTim{
+                    TimerSplitCapture {
+                        timer: HrTim{
                             _timer,
                             _prescaler,
                             capture_ch1: (),
                             capture_ch2: (),
                         },
-                        capture_ch1,
-                        capture_ch2,
-                    )
+                        ch1: capture_ch1,
+                        ch2: capture_ch2,
+                    }
                 }
             }
 
@@ -295,8 +297,6 @@ macro_rules! hrtim_timer {
             }
 
             /// Timer Update event
-            ///
-            /// TODO: What dows this mean?
             impl<PSCL, CPT1, CPT2> super::capture::CaptureEvent<$TIMX, PSCL> for HrTim<$TIMX, PSCL, CPT1, CPT2> {
                 const BITS: u32 = 1 << 1;
             }

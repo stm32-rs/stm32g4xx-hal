@@ -14,6 +14,10 @@ use crate::{
     stm32::HRTIM_COMMON,
 };
 
+mod sealed {
+    pub trait Sealed<T> {}
+}
+
 macro_rules! hrtim_out {
     ($($TIMX:ident: $out_type:ident: $tXYoen:ident, $tXYodis:ident, $tXYods:ident, $setXYr:ident, $rstXYr:ident,)+) => {$(
         impl<PSCL> HrOutput<$TIMX, PSCL> for $out_type<$TIMX, PSCL> {
@@ -136,13 +140,20 @@ impl State {
     }
 }
 
-pub unsafe trait ToHrOut<TIM> {
+pub trait ToHrOut<TIM>: sealed::Sealed<TIM> {
     type Out<PSCL>;
 
     fn connect_to_hrtim(self);
 }
 
-unsafe impl<TIM, PA, PB> ToHrOut<TIM> for (PA, PB)
+impl<TIM, PA, PB> sealed::Sealed<TIM> for (PA, PB)
+where
+    PA: ToHrOut<TIM>,
+    PB: ToHrOut<TIM>,
+{
+}
+
+impl<TIM, PA, PB> ToHrOut<TIM> for (PA, PB)
 where
     PA: ToHrOut<TIM>,
     PB: ToHrOut<TIM>,
@@ -161,16 +172,10 @@ pub struct HrOut2<TIM, PSCL>(PhantomData<(TIM, PSCL)>);
 macro_rules! pins {
     ($($TIMX:ty: CH1: $CH1:ident<$CH1_AF:ident>, CH2: $CH2:ident<$CH2_AF:ident>)+) => {
         $(
-            /*impl<PSCL> Pins<$TIMX, CH1<PSCL>, ComplementaryImpossible> for $CH1 {
-                type Channel = Pwm<$TIMX, CH1<PSCL>, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
-            }
+            impl sealed::Sealed<$TIMX> for $CH1<gpio::Input<gpio::Floating>> {}
+            impl sealed::Sealed<$TIMX> for $CH2<gpio::Input<gpio::Floating>> {}
 
-            impl<PSCL> Pins<$TIMX, CH2<PSCL>, ComplementaryImpossible> for $CH2 {
-                type Channel = Pwm<$TIMX, CH2<PSCL>, ComplementaryImpossible, ActiveHigh, ActiveHigh>;
-            }
-
-            */
-            unsafe impl ToHrOut<$TIMX> for $CH1<gpio::Input<gpio::Floating>> {
+            impl ToHrOut<$TIMX> for $CH1<gpio::Input<gpio::Floating>> {
                 type Out<PSCL> = HrOut1<$TIMX, PSCL>;
 
                 fn connect_to_hrtim(self) {
@@ -178,21 +183,13 @@ macro_rules! pins {
                 }
             }
 
-            unsafe impl ToHrOut<$TIMX> for $CH2<gpio::Input<gpio::Floating>> {
+            impl ToHrOut<$TIMX> for $CH2<gpio::Input<gpio::Floating>> {
                 type Out<PSCL> = HrOut2<$TIMX, PSCL>;
 
                 fn connect_to_hrtim(self) {
                     let _: $CH2<Alternate<$CH2_AF>> = self.into_alternate();
                 }
             }
-
-            /*unsafe impl<PSCL> ToHrOut for HrOut1<$TIMX, PSCL> {
-                type Out<P> = HrOut1<$TIMX, P>;
-            }
-
-            unsafe impl<PSCL> ToHrOut for HrOut2<$TIMX, PSCL> {
-                type Out<P> = HrOut2<$TIMX, P>;
-            }*/
         )+
     }
 }
@@ -212,7 +209,8 @@ impl<T> Pins<T, (), ComplementaryImpossible> for () {
     type Channel = ();
 }
 
-unsafe impl<T> ToHrOut<T> for () {
+impl<T> sealed::Sealed<T> for () {}
+impl<T> ToHrOut<T> for () {
     type Out<PSCL> = ();
 
     fn connect_to_hrtim(self) {}

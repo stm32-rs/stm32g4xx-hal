@@ -121,6 +121,7 @@ pub enum InterleavedMode {
     ///
     /// Automatically force
     /// * Cr1 to PERIOD / 2 (not visable through `get_duty`).
+    ///
     /// Automatically updates when changing period
     ///
     /// NOTE: Affects Cr1
@@ -131,6 +132,7 @@ pub enum InterleavedMode {
     /// Automatically force
     /// * Cr1 to 1 * PERIOD / 3 and
     /// * Cr2 to 2 * PERIOD / 3
+    ///
     /// (not visable through `get_duty`). Automatically updates when changing period.
     ///
     /// NOTE: Must not be used simultaneously with other modes
@@ -143,6 +145,7 @@ pub enum InterleavedMode {
     /// * Cr1 to 1 * PERIOD / 4,
     /// * Cr2 to 2 * PERIOD / 4 and
     /// * Cr3 to 3 * PERIOD / 4
+    ///
     /// (not visable through `get_duty`). Automatically updates when changing period.
     ///
     /// NOTE: Must not be used simultaneously with other modes
