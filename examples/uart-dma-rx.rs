@@ -5,7 +5,7 @@
 
 extern crate cortex_m_rt as rt;
 
-use hal::dma::{config::DmaConfig, stream::DMAExt, TransferExt};
+use hal::dma::{channel::DMAExt, config::DmaConfig, TransferExt};
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::serial::*;
@@ -30,7 +30,7 @@ fn main() -> ! {
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = rcc.freeze(rcc::Config::hsi(), pwr);
 
-    let streams = dp.DMA1.split(&rcc);
+    let channels = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()
         .transfer_complete_interrupt(false)
         .circular_buffer(true)
@@ -65,7 +65,7 @@ fn main() -> ! {
 
     let (_tx, rx) = usart.split();
 
-    let mut transfer = streams.0.into_circ_peripheral_to_memory_transfer(
+    let mut transfer = channels.0.into_circ_peripheral_to_memory_transfer(
         rx.enable_dma(),
         &mut rx_buffer[..],
         config,

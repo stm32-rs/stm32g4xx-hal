@@ -1,7 +1,7 @@
 //! Direct Memory Access.
 //!
 //! [Transfer::init](struct.Transfer.html#method.init) is only implemented for
-//! valid combinations of peripheral-stream-channel-direction, providing compile
+//! valid combinations of peripheral-channel-direction, providing compile
 //! time checking.
 //!
 //! This module implements Memory To Memory, Peripheral To Memory and Memory to
@@ -17,13 +17,13 @@
 
 use core::fmt::Debug;
 
+pub mod channel; // DMA MUX // DMA1 and DMA2
 pub mod config;
 pub(crate) mod mux;
-pub mod stream; // DMA MUX // DMA1 and DMA2
 pub mod traits;
 pub mod transfer;
 
-use traits::{sealed::Bits, Direction, Stream, TargetAddress};
+use traits::{sealed::Bits, Channel, Direction, TargetAddress};
 pub use transfer::{Transfer, TransferExt};
 
 /// Errors.

@@ -22,8 +22,8 @@ use crate::hal::{
 
 use cortex_m_rt::entry;
 use stm32g4xx_hal as hal;
+use stm32g4xx_hal::dma::channel::DMAExt;
 use stm32g4xx_hal::dma::config::DmaConfig;
-use stm32g4xx_hal::dma::stream::DMAExt;
 use stm32g4xx_hal::dma::TransferExt;
 
 #[macro_use]
@@ -50,7 +50,7 @@ fn main() -> ! {
     let spi = dp
         .SPI1
         .spi((sclk, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
-    let streams = dp.DMA1.split(&rcc);
+    let channels = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()
         .transfer_complete_interrupt(false)
         .circular_buffer(true)
@@ -62,10 +62,11 @@ fn main() -> ! {
         *item = index as u8;
     }
     let dma_buf = cortex_m::singleton!(: [u8; BUFFER_SIZE] = buf).unwrap();
-    let mut transfer_dma =
-        streams
-            .0
-            .into_memory_to_peripheral_transfer(spi.enable_tx_dma(), &mut dma_buf[..], config);
+    let mut transfer_dma = channels.0.into_memory_to_peripheral_transfer(
+        spi.enable_tx_dma(),
+        &mut dma_buf[..],
+        config,
+    );
     transfer_dma.start(|_spi| {});
     loop {
         delay_tim2.delay_ms(1000_u16);

@@ -9,7 +9,7 @@ use crate::hal::{
         AdcClaim, ClockSource, Temperature,
     },
     delay::SYSTDelayExt,
-    dma::{config::DmaConfig, stream::DMAExt, TransferExt},
+    dma::{channel::DMAExt, config::DmaConfig, TransferExt},
     gpio::GpioExt,
     pwr::PwrExt,
     rcc::{Config, RccExt},
@@ -37,7 +37,7 @@ fn main() -> ! {
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = rcc.freeze(Config::hsi(), pwr);
 
-    let mut streams = dp.DMA1.split(&rcc);
+    let mut channels = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()
         .transfer_complete_interrupt(false)
         .circular_buffer(false)
@@ -61,7 +61,7 @@ fn main() -> ! {
 
     info!("Setup DMA");
     let first_buffer = cortex_m::singleton!(: [u16; 2] = [0; 2]).unwrap();
-    let mut transfer = streams.0.into_peripheral_to_memory_transfer(
+    let mut transfer = channels.0.into_peripheral_to_memory_transfer(
         adc.enable_dma(AdcDma::Single),
         &mut first_buffer[..],
         config,
@@ -77,7 +77,7 @@ fn main() -> ! {
     let (s0, adc, first_buffer) = transfer.free();
     let adc = adc.disable();
 
-    streams.0 = s0;
+    channels.0 = s0;
 
     let millivolts = adc.sample_to_millivolts(first_buffer[0]);
     info!("pa3: {}mV", millivolts);

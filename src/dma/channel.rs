@@ -70,66 +70,24 @@ pub struct DmaInterrupts {
     half_transfer: bool,
 }
 
-/// Stream 0 on DMA
-pub struct Stream0<DMA> {
-    _dma: PhantomData<DMA>,
-}
-/// Stream 1 on DMA
-pub struct Stream1<DMA> {
-    _dma: PhantomData<DMA>,
-}
-/// Stream 2 on DMA
-pub struct Stream2<DMA> {
-    _dma: PhantomData<DMA>,
-}
-/// Stream 3 on DMA
-pub struct Stream3<DMA> {
-    _dma: PhantomData<DMA>,
-}
-/// Stream 4 on DMA
-pub struct Stream4<DMA> {
-    _dma: PhantomData<DMA>,
-}
-/// Stream 5 on DMA
-pub struct Stream5<DMA> {
-    _dma: PhantomData<DMA>,
-}
-/// Stream 6 on DMA
-pub struct Stream6<DMA> {
-    _dma: PhantomData<DMA>,
-}
-/// Stream 7 on DMA
-pub struct Stream7<DMA> {
-    _dma: PhantomData<DMA>,
-}
-
-impl<DMA> Sealed for Stream0<DMA> {}
-impl<DMA> Sealed for Stream1<DMA> {}
-impl<DMA> Sealed for Stream2<DMA> {}
-impl<DMA> Sealed for Stream3<DMA> {}
-impl<DMA> Sealed for Stream4<DMA> {}
-impl<DMA> Sealed for Stream5<DMA> {}
-impl<DMA> Sealed for Stream6<DMA> {}
-impl<DMA> Sealed for Stream7<DMA> {}
-
-/// Alias for a tuple with all DMA streams.
-pub struct StreamsTuple<T>(
-    pub Stream0<T>,
-    pub Stream1<T>,
-    pub Stream2<T>,
-    pub Stream3<T>,
-    pub Stream4<T>,
-    pub Stream5<T>,
-    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))] pub Stream6<T>,
-    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))] pub Stream7<T>,
+/// Alias for a tuple with all DMA channels.
+pub struct ChannelsTuple<T>(
+    pub Channel1<T>,
+    pub Channel2<T>,
+    pub Channel3<T>,
+    pub Channel4<T>,
+    pub Channel5<T>,
+    pub Channel6<T>,
+    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))] pub Channel7<T>,
+    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))] pub Channel8<T>,
 );
 
 pub trait DMAExt<I> {
-    fn split(self, rcc: &Rcc) -> StreamsTuple<I>;
+    fn split(self, rcc: &Rcc) -> ChannelsTuple<I>;
 }
 
 impl DMAExt<Self> for DMA1 {
-    fn split(self, rcc: &Rcc) -> StreamsTuple<DMA1> {
+    fn split(self, rcc: &Rcc) -> ChannelsTuple<DMA1> {
         // Enable DMAMux is not yet enabled
         if !rcc.rb.ahb1enr().read().dmamuxen().bit_is_set() {
             // Enable peripheral
@@ -139,12 +97,12 @@ impl DMAExt<Self> for DMA1 {
         // Enable peripheral
         rcc.rb.ahb1enr().modify(|_, w| w.dma1en().set_bit());
 
-        StreamsTuple::new(self)
+        ChannelsTuple::new(self)
     }
 }
 
 impl DMAExt<Self> for DMA2 {
-    fn split(self, rcc: &Rcc) -> StreamsTuple<DMA2> {
+    fn split(self, rcc: &Rcc) -> ChannelsTuple<DMA2> {
         // Enable DMAMux is not yet enabled
         if !rcc.rb.ahb1enr().read().dmamuxen().bit_is_set() {
             // Enable peripheral
@@ -154,38 +112,45 @@ impl DMAExt<Self> for DMA2 {
         // Enable peripheral
         rcc.rb.ahb1enr().modify(|_, w| w.dma2en().set_bit());
 
-        StreamsTuple::new(self)
+        ChannelsTuple::new(self)
     }
 }
 
-impl<I: Instance> StreamsTuple<I> {
-    /// Splits the DMA peripheral into streams.
+impl<I: Instance> ChannelsTuple<I> {
+    /// Splits the DMA peripheral into channels.
     pub(crate) fn new(_regs: I) -> Self {
         Self(
-            Stream0 { _dma: PhantomData },
-            Stream1 { _dma: PhantomData },
-            Stream2 { _dma: PhantomData },
-            Stream3 { _dma: PhantomData },
-            Stream4 { _dma: PhantomData },
-            Stream5 { _dma: PhantomData },
+            Channel1 { _dma: PhantomData },
+            Channel2 { _dma: PhantomData },
+            Channel3 { _dma: PhantomData },
+            Channel4 { _dma: PhantomData },
+            Channel5 { _dma: PhantomData },
+            Channel6 { _dma: PhantomData },
             #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))]
-            Stream6 { _dma: PhantomData },
+            Channel7 { _dma: PhantomData },
             #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))]
-            Stream7 { _dma: PhantomData },
+            Channel8 { _dma: PhantomData },
         )
     }
 }
 
-// Macro that creates a struct representing a stream on either DMA controller
+// Macro that creates a struct representing a channel on either DMA controller
 //
 // The implementation does the heavy lifting of mapping to the right fields on
-// the stream
-macro_rules! dma_stream {
-    ($(($name:ident, $number:expr, $x:literal)),+$(,)*) => {
+// the channel
+macro_rules! dma_channel {
+    ($(($name:ident, $number:expr)),+$(,)*) => {
         $(
-            impl<I: Instance> Stream for $name<I> {
+            /// Channel $number on DMA
+            pub struct $name<DMA> {
+                _dma: PhantomData<DMA>,
+            }
 
-                const NUMBER: usize = $number;
+            impl<DMA> Sealed for $name<DMA> {}
+
+            impl<I: Instance> Channel for $name<I> {
+
+                const NUMBER: usize = $number - 1;
                 type Config = DmaConfig;
                 type Interrupts = DmaInterrupts;
 
@@ -208,7 +173,7 @@ macro_rules! dma_stream {
                     let num = Self::NUMBER as u8;
 
                     //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
-                    // that belongs to the StreamX
+                    // that belongs to the ChannelX
                     let dma = unsafe { &*I::ptr() };
                     dma.ifcr().write(|w| w
                         .ctcif(num).set_bit() //Clear transfer complete interrupt flag
@@ -223,7 +188,7 @@ macro_rules! dma_stream {
                 #[inline(always)]
                 fn clear_transfer_complete_flag(&mut self) {
                     //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
-                    // that belongs to the StreamX
+                    // that belongs to the ChannelX
                     let dma = unsafe { &*I::ptr() };
                     dma.ifcr().write(|w| w.ctcif(Self::NUMBER as u8).set_bit());
                 }
@@ -240,7 +205,7 @@ macro_rules! dma_stream {
                 #[inline(always)]
                 fn clear_transfer_error_interrupt(&mut self) {
                     //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
-                    // that belongs to the StreamX
+                    // that belongs to the ChannelX
                     let dma = unsafe { &*I::ptr() };
                     dma.ifcr().write(|w| w.ctcif(Self::NUMBER as u8).set_bit());
                     let _ = dma.isr().read();
@@ -263,7 +228,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 unsafe fn enable(&mut self) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = &unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| w.en().set_bit());
                 }
@@ -277,7 +242,7 @@ macro_rules! dma_stream {
 
                 fn disable(&mut self) {
                     if Self::is_enabled() {
-                        //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                        //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                         let dma_ch = &unsafe { &*I::ptr() }.ch(Self::NUMBER);
 
                         // Aborting an on-going transfer might cause interrupts to fire, disable
@@ -295,7 +260,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn set_request_line(&mut self, request_line: u8) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dmamux = unsafe { &*I::mux_ptr() };
                     unsafe {
                         dmamux.ccr($number)
@@ -305,14 +270,14 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn set_priority(&mut self, priority: config::Priority) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = &unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| unsafe { w.pl().bits(priority.bits()) });
                 }
 
                 #[inline(always)]
                 fn disable_interrupts(&mut self) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dmacr = &unsafe { &*I::ptr() }.ch(Self::NUMBER).cr();
                     dmacr.modify(|_, w| w
                         .tcie().clear_bit()
@@ -324,7 +289,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn enable_interrupts(&mut self, interrupt: Self::Interrupts) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = &unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| w
                         .tcie().bit(interrupt.transfer_complete)
@@ -335,7 +300,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn get_interrupts_enable() -> Self::Interrupts {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     let cr = dma_ch.cr().read();
 
@@ -349,7 +314,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn set_transfer_complete_interrupt_enable(&mut self, transfer_complete_interrupt: bool) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dmacr = &unsafe { &*I::ptr() }.ch(Self::NUMBER).cr();
                     dmacr.modify(|_, w| w.tcie().bit(transfer_complete_interrupt));
                     let _ = dmacr.read();
@@ -358,7 +323,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn set_transfer_error_interrupt_enable(&mut self, transfer_error_interrupt: bool) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dmacr = &unsafe { &*I::ptr() }.ch(Self::NUMBER).cr();
                     dmacr.modify(|_, w| w.teie().bit(transfer_error_interrupt));
                     let _ = dmacr.read();
@@ -367,7 +332,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn set_half_transfer_interrupt_enable(&mut self, half_transfer_interrupt: bool) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dmacr = &unsafe { &*I::ptr() }.ch(Self::NUMBER).cr();
                     dmacr.modify(|_, w| w.htie().bit(half_transfer_interrupt));
                     let _ = dmacr.read();
@@ -384,7 +349,7 @@ macro_rules! dma_stream {
                 #[inline(always)]
                 fn clear_half_transfer_interrupt(&mut self) {
                     //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
-                    // that belongs to the StreamX
+                    // that belongs to the ChannelX
                     let dma = unsafe { &*I::ptr() };
                     dma.ifcr().write(|w| w.chtif(Self::NUMBER as u8).set_bit());
                     let _ = dma.isr().read();
@@ -393,69 +358,69 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 unsafe fn set_peripheral_address(&mut self, value: u32) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.par().write(|w| w.pa().bits(value));
                 }
 
                 #[inline(always)]
                 unsafe fn set_memory_address(&mut self, value: u32) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.mar().write(|w| w.ma().bits(value) );
                 }
 
                 #[inline(always)]
                 fn get_memory_address(&self) -> u32 {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.mar().read().ma().bits()
                 }
 
                 #[inline(always)]
                 fn set_number_of_transfers(&mut self, value: u16) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.ndtr().write(|w| unsafe {w.ndt().bits(value) });
                 }
 
                 #[inline(always)]
                 fn get_number_of_transfers() -> u16 {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.ndtr().read().ndt().bits()
                 }
                 #[inline(always)]
                 unsafe fn set_memory_size(&mut self, size: u8) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| w.msize().bits(size));
                 }
 
                 #[inline(always)]
                 unsafe fn set_peripheral_size(&mut self, size: u8) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| w.psize().bits(size));
                 }
 
                 #[inline(always)]
                 fn set_memory_increment(&mut self, increment: bool) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| w.minc().bit(increment));
                 }
 
                 #[inline(always)]
                 fn set_peripheral_increment(&mut self, increment: bool) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| w.pinc().bit(increment));
                 }
 
                 #[inline(always)]
                 fn set_direction(&mut self, direction: DmaDirection) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| {
                         match direction {
@@ -471,7 +436,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 fn set_circular_buffer(&mut self, circular_buffer: bool) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dma_ch = unsafe { &*I::ptr() }.ch(Self::NUMBER);
                     dma_ch.cr().modify(|_, w| w.circ().bit(circular_buffer));
                 }
@@ -481,7 +446,7 @@ macro_rules! dma_stream {
                 #[inline(always)]
                 pub fn clear_half_transfer_interrupt(&mut self) {
                     //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
-                    // that belongs to the StreamX
+                    // that belongs to the ChannelX
                     let dma = unsafe { &*I::ptr() };
                     dma.ifcr().write(|w| w.chtif(Self::NUMBER as u8).set_bit());
                     let _ = dma.isr().read();
@@ -497,7 +462,7 @@ macro_rules! dma_stream {
 
                 #[inline(always)]
                 pub fn set_half_transfer_interrupt_enable(&mut self, half_transfer_interrupt: bool) {
-                    //NOTE(unsafe) We only access the registers that belongs to the StreamX
+                    //NOTE(unsafe) We only access the registers that belongs to the ChannelX
                     let dmacr = &unsafe { &*I::ptr() }.ch(Self::NUMBER).cr();
                     dmacr.modify(|_, w| w.htie().bit(half_transfer_interrupt));
                     let _ = dmacr.read();
@@ -508,15 +473,13 @@ macro_rules! dma_stream {
     };
 }
 
-dma_stream!(
-    // Note: the field names start from one, unlike the RM where they start from
-    // zero. May need updating if it gets fixed upstream.
-    (Stream0, 0, 1),
-    (Stream1, 1, 2),
-    (Stream2, 2, 3),
-    (Stream3, 3, 4),
-    (Stream4, 4, 5),
-    (Stream5, 5, 6),
+dma_channel!(
+    (Channel1, 1),
+    (Channel2, 2),
+    (Channel3, 3),
+    (Channel4, 4),
+    (Channel5, 5),
+    (Channel6, 6),
 );
 
 // Cat 3 and 4 devices
@@ -529,9 +492,4 @@ dma_stream!(
     feature = "stm32g491",
     feature = "stm32g4a1",
 ))]
-dma_stream!(
-    // Note: the field names start from one, unlike the RM where they start from
-    // zero. May need updating if it gets fixed upstream.
-    (Stream6, 6, 7),
-    (Stream7, 7, 8),
-);
+dma_channel!((Channel7, 7), (Channel8, 8),);
