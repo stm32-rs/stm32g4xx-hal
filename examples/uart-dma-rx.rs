@@ -65,7 +65,7 @@ fn main() -> ! {
 
     let (_tx, rx) = usart.split();
 
-    let mut transfer = channels.0.into_circ_peripheral_to_memory_transfer(
+    let mut transfer = channels.ch1.into_circ_peripheral_to_memory_transfer(
         rx.enable_dma(),
         &mut rx_buffer[..],
         config,

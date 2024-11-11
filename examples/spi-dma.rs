@@ -62,7 +62,7 @@ fn main() -> ! {
         *item = index as u8;
     }
     let dma_buf = cortex_m::singleton!(: [u8; BUFFER_SIZE] = buf).unwrap();
-    let mut transfer_dma = channels.0.into_memory_to_peripheral_transfer(
+    let mut transfer_dma = channels.ch1.into_memory_to_peripheral_transfer(
         spi.enable_tx_dma(),
         &mut dma_buf[..],
         config,

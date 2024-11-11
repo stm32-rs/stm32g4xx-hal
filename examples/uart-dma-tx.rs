@@ -64,10 +64,11 @@ fn main() -> ! {
     let (tx, _rx) = usart.split();
 
     // Setup DMA for USART2 TX with dma channel 1.
-    let mut transfer =
-        channels
-            .0
-            .into_memory_to_peripheral_transfer(tx.enable_dma(), &mut tx_buffer[..], config);
+    let mut transfer = channels.ch1.into_memory_to_peripheral_transfer(
+        tx.enable_dma(),
+        &mut tx_buffer[..],
+        config,
+    );
 
     transfer.start(|_tx| {});
     loop {

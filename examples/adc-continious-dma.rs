@@ -62,7 +62,7 @@ fn main() -> ! {
 
     info!("Setup DMA");
     let first_buffer = cortex_m::singleton!(: [u16; 15] = [0; 15]).unwrap();
-    let mut transfer = channels.0.into_circ_peripheral_to_memory_transfer(
+    let mut transfer = channels.ch1.into_circ_peripheral_to_memory_transfer(
         adc.enable_dma(AdcDma::Continuous),
         &mut first_buffer[..],
         config,

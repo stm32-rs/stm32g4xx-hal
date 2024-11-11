@@ -61,7 +61,7 @@ fn main() -> ! {
 
     info!("Setup DMA");
     let first_buffer = cortex_m::singleton!(: [u16; 2] = [0; 2]).unwrap();
-    let mut transfer = channels.0.into_peripheral_to_memory_transfer(
+    let mut transfer = channels.ch1.into_peripheral_to_memory_transfer(
         adc.enable_dma(AdcDma::Single),
         &mut first_buffer[..],
         config,
@@ -74,10 +74,10 @@ fn main() -> ! {
     info!("Conversion Done");
 
     transfer.pause(|adc| adc.cancel_conversion());
-    let (s0, adc, first_buffer) = transfer.free();
+    let (ch1, adc, first_buffer) = transfer.free();
     let adc = adc.disable();
 
-    channels.0 = s0;
+    channels.ch1 = ch1;
 
     let millivolts = adc.sample_to_millivolts(first_buffer[0]);
     info!("pa3: {}mV", millivolts);

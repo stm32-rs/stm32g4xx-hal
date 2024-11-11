@@ -71,23 +71,25 @@ pub struct DmaInterrupts {
 }
 
 /// Alias for a tuple with all DMA channels.
-pub struct ChannelsTuple<T>(
-    pub Channel1<T>,
-    pub Channel2<T>,
-    pub Channel3<T>,
-    pub Channel4<T>,
-    pub Channel5<T>,
-    pub Channel6<T>,
-    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))] pub Channel7<T>,
-    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))] pub Channel8<T>,
-);
+pub struct Channels<T> {
+    pub ch1: Channel1<T>,
+    pub ch2: Channel2<T>,
+    pub ch3: Channel3<T>,
+    pub ch4: Channel4<T>,
+    pub ch5: Channel5<T>,
+    pub ch6: Channel6<T>,
+    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))]
+    pub ch7: Channel7<T>,
+    #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))]
+    pub ch8: Channel8<T>,
+}
 
 pub trait DMAExt<I> {
-    fn split(self, rcc: &Rcc) -> ChannelsTuple<I>;
+    fn split(self, rcc: &Rcc) -> Channels<I>;
 }
 
 impl DMAExt<Self> for DMA1 {
-    fn split(self, rcc: &Rcc) -> ChannelsTuple<DMA1> {
+    fn split(self, rcc: &Rcc) -> Channels<DMA1> {
         // Enable DMAMux is not yet enabled
         if !rcc.rb.ahb1enr().read().dmamuxen().bit_is_set() {
             // Enable peripheral
@@ -97,12 +99,12 @@ impl DMAExt<Self> for DMA1 {
         // Enable peripheral
         rcc.rb.ahb1enr().modify(|_, w| w.dma1en().set_bit());
 
-        ChannelsTuple::new(self)
+        Channels::new(self)
     }
 }
 
 impl DMAExt<Self> for DMA2 {
-    fn split(self, rcc: &Rcc) -> ChannelsTuple<DMA2> {
+    fn split(self, rcc: &Rcc) -> Channels<DMA2> {
         // Enable DMAMux is not yet enabled
         if !rcc.rb.ahb1enr().read().dmamuxen().bit_is_set() {
             // Enable peripheral
@@ -112,25 +114,25 @@ impl DMAExt<Self> for DMA2 {
         // Enable peripheral
         rcc.rb.ahb1enr().modify(|_, w| w.dma2en().set_bit());
 
-        ChannelsTuple::new(self)
+        Channels::new(self)
     }
 }
 
-impl<I: Instance> ChannelsTuple<I> {
+impl<I: Instance> Channels<I> {
     /// Splits the DMA peripheral into channels.
     pub(crate) fn new(_regs: I) -> Self {
-        Self(
-            Channel1 { _dma: PhantomData },
-            Channel2 { _dma: PhantomData },
-            Channel3 { _dma: PhantomData },
-            Channel4 { _dma: PhantomData },
-            Channel5 { _dma: PhantomData },
-            Channel6 { _dma: PhantomData },
+        Self {
+            ch1: Channel1 { _dma: PhantomData },
+            ch2: Channel2 { _dma: PhantomData },
+            ch3: Channel3 { _dma: PhantomData },
+            ch4: Channel4 { _dma: PhantomData },
+            ch5: Channel5 { _dma: PhantomData },
+            ch6: Channel6 { _dma: PhantomData },
             #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))]
-            Channel7 { _dma: PhantomData },
+            ch7: Channel7 { _dma: PhantomData },
             #[cfg(not(any(feature = "stm32g431", feature = "stm32g441",)))]
-            Channel8 { _dma: PhantomData },
-        )
+            ch8: Channel8 { _dma: PhantomData },
+        }
     }
 }
 
