@@ -30,23 +30,22 @@ pub struct EevInputs {
 impl EevInputs {
     pub(crate) unsafe fn new() -> Self {
         EevInputs {
-            eev_input1: EevInput { _x: PhantomData },
-            eev_input2: EevInput { _x: PhantomData },
-            eev_input3: EevInput { _x: PhantomData },
-            eev_input4: EevInput { _x: PhantomData },
-            eev_input5: EevInput { _x: PhantomData },
-            eev_input6: EevInput { _x: PhantomData },
-            eev_input7: EevInput { _x: PhantomData },
-            eev_input8: EevInput { _x: PhantomData },
-            eev_input9: EevInput { _x: PhantomData },
-            eev_input10: EevInput { _x: PhantomData },
+            eev_input1: EevInput,
+            eev_input2: EevInput,
+            eev_input3: EevInput,
+            eev_input4: EevInput,
+            eev_input5: EevInput,
+            eev_input6: EevInput,
+            eev_input7: EevInput,
+            eev_input8: EevInput,
+            eev_input9: EevInput,
+            eev_input10: EevInput,
         }
     }
 }
 
-pub struct EevInput<const N: u8> {
-    _x: PhantomData<()>,
-}
+#[non_exhaustive]
+pub struct EevInput<const N: u8>;
 
 /// This is implemented for types that can be used as inputs to the eev
 /// # Safety
