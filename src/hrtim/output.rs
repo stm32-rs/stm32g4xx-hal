@@ -70,23 +70,23 @@ macro_rules! hrtim_out {
 }
 
 hrtim_out! {
-    HRTIM_TIMA: HrOut1: ta1oen, ta1odis, ta1ods, seta1r, rsta1r,
-    HRTIM_TIMA: HrOut2: ta2oen, ta2odis, ta2ods, seta2r, rsta2r,
+    HRTIM_TIMA: HrOut1: ta1oen, ta1odis, ta1ods, set1r, rst1r,
+    HRTIM_TIMA: HrOut2: ta2oen, ta2odis, ta2ods, set2r, rst2r,
 
-    HRTIM_TIMB: HrOut1: tb1oen, tb1odis, tb1ods, setb1r, rstb1r,
-    HRTIM_TIMB: HrOut2: tb2oen, tb2odis, tb2ods, setb2r, rstb2r,
+    HRTIM_TIMB: HrOut1: tb1oen, tb1odis, tb1ods, set1r, rst1r,
+    HRTIM_TIMB: HrOut2: tb2oen, tb2odis, tb2ods, set2r, rst2r,
 
-    HRTIM_TIMC: HrOut1: tc1oen, tc1odis, tc1ods, setc1r, rstc1r,
-    HRTIM_TIMC: HrOut2: tc2oen, tc2odis, tc2ods, setc2r, rstc2r,
+    HRTIM_TIMC: HrOut1: tc1oen, tc1odis, tc1ods, set1r, rst1r,
+    HRTIM_TIMC: HrOut2: tc2oen, tc2odis, tc2ods, set2r, rst2r,
 
-    HRTIM_TIMD: HrOut1: td1oen, td1odis, td1ods, setd1r, rstd1r,
-    HRTIM_TIMD: HrOut2: td2oen, td2odis, td2ods, setd2r, rstd2r,
+    HRTIM_TIMD: HrOut1: td1oen, td1odis, td1ods, set1r, rst1r,
+    HRTIM_TIMD: HrOut2: td2oen, td2odis, td2ods, set2r, rst2r,
 
-    HRTIM_TIME: HrOut1: te1oen, te1odis, te1ods, sete1r, rste1r,
-    HRTIM_TIME: HrOut2: te2oen, te2odis, te2ods, sete2r, rste2r,
+    HRTIM_TIME: HrOut1: te1oen, te1odis, te1ods, set1r, rst1r,
+    HRTIM_TIME: HrOut2: te2oen, te2odis, te2ods, set2r, rst2r,
 
-    HRTIM_TIMF: HrOut1: tf1oen, tf1odis, tf1ods, setf1r, rstf1r,
-    HRTIM_TIMF: HrOut2: tf2oen, tf2odis, tf2ods, setf2r, rstf2r,
+    HRTIM_TIMF: HrOut1: tf1oen, tf1odis, tf1ods, set1r, rst1r,
+    HRTIM_TIMF: HrOut2: tf2oen, tf2odis, tf2ods, set2r, rst2r,
 }
 
 pub trait HrOutput<TIM, PSCL> {

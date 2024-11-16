@@ -267,7 +267,7 @@ macro_rules! impl_flt_monitor {
 }
 
 impl_flt_monitor!(
-    FltMonitorSys: (sysflt, sysfltc, sysflte),
+    FltMonitorSys: (sysflt, sysfltc, sysfltie),
     FltMonitor1: (flt1, flt1c, flt1ie),
     FltMonitor2: (flt2, flt2c, flt2ie),
     FltMonitor3: (flt3, flt3c, flt3ie),

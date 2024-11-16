@@ -149,7 +149,12 @@ pub fn dma_value_to_signed(x: u32, period: u16) -> i32 {
 }
 
 macro_rules! impl_capture {
-    ($($TIMX:ident: $CH:ident, $cptXYr:ident, $cptXYcr:ident, $cptXx:ident, $dier:ident, $icr:ident, $isr:ident, $cptXie:ident, $cptXde:ident, $cptXc:ident, $cptX:ident, $mux:expr),+) => {$(
+    ($($TIMX:ident: $mux:expr),+) => {$(
+        impl_capture!($TIMX: Ch1, cpt1r, cpt1cr, cpt1, cpt1ie, cpt1de, cpt1c, $mux);
+        impl_capture!($TIMX: Ch2, cpt2r, cpt2cr, cpt2, cpt2ie, cpt2de, cpt2c, $mux);
+    )+};
+
+    ($TIMX:ident: $CH:ident, $cptXr:ident, $cptXcr:ident, $cptX:ident, $cptXie:ident, $cptXde:ident, $cptXc:ident, $mux:expr) => {
         impl<PSCL> HrCapt<$TIMX, PSCL, $CH, NoDma> {
             /// Add event to capture
             ///
@@ -160,7 +165,7 @@ macro_rules! impl_capture {
 
                 // SAFETY: We are the only one with access to cptXYcr
                 unsafe {
-                    tim.$cptXYcr().modify(|r, w| w.bits(r.bits() | E::BITS));
+                    tim.$cptXcr().modify(|r, w| w.bits(r.bits() | E::BITS));
                 }
             }
 
@@ -170,7 +175,7 @@ macro_rules! impl_capture {
 
                 // SAFETY: We are the only one with access to cptXYcr
                 unsafe {
-                    tim.$cptXYcr().modify(|r, w| w.bits(r.bits() & !E::BITS));
+                    tim.$cptXcr().modify(|r, w| w.bits(r.bits() & !E::BITS));
                 }
             }
 
@@ -179,7 +184,7 @@ macro_rules! impl_capture {
                 // SAFETY: We are the only one with access to cptXYcr
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$cptXYcr().modify(|_, w| w.swcpt().set_bit());
+                tim.$cptXcr().modify(|_, w| w.swcpt().set_bit());
             }
 
             // TODO: It would be sufficient to instead of hr_control only require exclusive access to the owning timer
@@ -188,13 +193,13 @@ macro_rules! impl_capture {
             pub fn enable_interrupt(&mut self, enable: bool, _hr_control: &mut super::HrPwmControl) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$dier().modify(|_r, w| w.$cptXie().bit(enable));
+                tim.dier().modify(|_r, w| w.$cptXie().bit(enable));
             }
 
             pub fn enable_dma(self, _ch: timer::DmaChannel<$TIMX>) -> HrCapt<$TIMX, PSCL, $CH, Dma> {
                 // SAFETY: We own the only insance of this timers dma channel, no one else can do this
                 let tim = unsafe { &*$TIMX::ptr() };
-                tim.$dier().modify(|_r, w| w.$cptXde().set_bit());
+                tim.dier().modify(|_r, w| w.$cptXde().set_bit());
                 HrCapt {
                     _x: PhantomData
                 }
@@ -204,13 +209,13 @@ macro_rules! impl_capture {
         impl<PSCL, DMA> HrCapture for HrCapt<$TIMX, PSCL, $CH, DMA> {
             fn get_last(&self) -> (u16, CountingDirection) {
                 let tim = unsafe { &*$TIMX::ptr() };
-                let data = tim.$cptXYr().read();
+                let data = tim.$cptXr().read();
 
                 let dir = match data.dir().bit() {
                     true => CountingDirection::Down,
                     false => CountingDirection::Up,
                 };
-                let value = data.$cptXx().bits();
+                let value = data.cpt().bits();
 
                 (value, dir)
             }
@@ -219,14 +224,14 @@ macro_rules! impl_capture {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 // No need for exclusive access since this is a write only register
-                tim.$icr().write(|w| w.$cptXc().set_bit());
+                tim.icr().write(|w| w.$cptXc().bit(true));
             }
 
             fn is_pending(&self) -> bool {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 // No need for exclusive access since this is a read only register
-                tim.$isr().read().$cptX().bit()
+                tim.isr().read().$cptX().bit()
             }
         }
 
@@ -234,32 +239,21 @@ macro_rules! impl_capture {
             #[inline(always)]
             fn address(&self) -> u32 {
                 let tim = unsafe { &*$TIMX::ptr() };
-                &tim.$cptXYr() as *const _ as u32
+                &tim.$cptXr() as *const _ as u32
             }
 
             type MemSize = u32;
 
             const REQUEST_LINE: Option<u8> = Some($mux as u8);
         }
-    )+};
+    };
 }
 
 impl_capture! {
-    HRTIM_TIMA: Ch1, cpt1ar, cpt1acr, cpt1x, timadier, timaicr, timaisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMA,
-    HRTIM_TIMA: Ch2, cpt2ar, cpt2acr, cpt2x, timadier, timaicr, timaisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMA,
-
-    HRTIM_TIMB: Ch1, cpt1br, cpt1bcr, cpt1x, timbdier, timbicr, timbisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMB,
-    HRTIM_TIMB: Ch2, cpt2br, cpt2bcr, cpt2x, timbdier, timbicr, timbisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMB,
-
-    HRTIM_TIMC: Ch1, cpt1cr, cpt1ccr, cpt1x, timcdier, timcicr, timcisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMC,
-    HRTIM_TIMC: Ch2, cpt2cr, cpt2ccr, cpt2x, timcdier, timcicr, timcisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMC,
-
-    HRTIM_TIMD: Ch1, cpt1dr, cpt1dcr, cpt1x, timddier, timdicr, timdisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMD,
-    HRTIM_TIMD: Ch2, cpt2dr, cpt2dcr, cpt2x, timddier, timdicr, timdisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMD,
-
-    HRTIM_TIME: Ch1, cpt1er, cpt1ecr, cpt1x, timedier, timeicr, timeisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIME,
-    HRTIM_TIME: Ch2, cpt2er, cpt2ecr, cpt2x, timedier, timeicr, timeisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIME,
-
-    HRTIM_TIMF: Ch1, cpt1fr, cpt1fcr, cpt1x, timfdier, timficr, timfisr, cpt1ie, cpt1de, cpt1c, cpt1, DmaMuxResources::HRTIM_TIMF,
-    HRTIM_TIMF: Ch2, cpt2fr, cpt2fcr, cpt2x, timfdier, timficr, timfisr, cpt2ie, cpt2de, cpt2c, cpt2, DmaMuxResources::HRTIM_TIMF
+    HRTIM_TIMA: DmaMuxResources::HRTIM_TIMA,
+    HRTIM_TIMB: DmaMuxResources::HRTIM_TIMB,
+    HRTIM_TIMC: DmaMuxResources::HRTIM_TIMC,
+    HRTIM_TIMD: DmaMuxResources::HRTIM_TIMD,
+    HRTIM_TIME: DmaMuxResources::HRTIM_TIME,
+    HRTIM_TIMF: DmaMuxResources::HRTIM_TIMF
 }

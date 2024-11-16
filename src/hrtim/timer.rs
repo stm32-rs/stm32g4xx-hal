@@ -112,17 +112,7 @@ pub trait HrSlaveTimerCpt: HrSlaveTimer {
 macro_rules! hrtim_timer {
     ($(
         $TIMX:ident:
-        $cntXr:ident,
-        $cntx:ident,
-        $perXr:ident,
         $tXcen:ident,
-        $perx:ident,
-        $rep:ident,
-        $repx:ident,
-        $dier:ident,
-        $repie:ident,
-        $icr:ident,
-        $repc:ident,
         $tXudis:ident,
         $(($rstXr:ident))*,
     )+) => {$(
@@ -133,12 +123,12 @@ macro_rules! hrtim_timer {
             fn get_period(&self) -> u16 {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$perXr().read().$perx().bits()
+                tim.perr().read().per().bits()
             }
             fn set_period(&mut self, period: u16) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$perXr().write(|w| unsafe { w.$perx().bits(period as u16) });
+                tim.perr().write(|w| unsafe { w.per().bits(period as u16) });
             }
 
             /// Start timer
@@ -147,7 +137,7 @@ macro_rules! hrtim_timer {
 
                 // SAFETY: Since we hold _hr_control there is no risk for a race condition
                 let master = unsafe { &*HRTIM_MASTER::ptr() };
-                master.mcr().modify(|_r, w| { w.$tXcen().set_bit() });
+                master.cr().modify(|_r, w| { w.$tXcen().set_bit() });
             }
 
             /// Stop timer
@@ -155,7 +145,7 @@ macro_rules! hrtim_timer {
                 // Stop counter
                 // SAFETY: Since we hold _hr_control there is no risk for a race condition
                 let master = unsafe { &*HRTIM_MASTER::ptr() };
-                master.mcr().modify(|_r, w| { w.$tXcen().set_bit() });
+                master.cr().modify(|_r, w| { w.$tXcen().set_bit() });
             }
 
             /// Stop timer and reset counter
@@ -164,7 +154,7 @@ macro_rules! hrtim_timer {
 
                 // Reset counter
                 let tim = unsafe { &*$TIMX::ptr() };
-                unsafe { tim.$cntXr().write(|w| w.$cntx().bits(0)); }
+                unsafe { tim.cntr().write(|w| w.cnt().bits(0)); }
             }
 
             /// Make a handle to this timers reset event to use as adc trigger
@@ -180,7 +170,7 @@ macro_rules! hrtim_timer {
             fn clear_repetition_interrupt(&mut self) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$icr().write(|w| w.$repc().set_bit());
+                tim.icr().write(|w| w.repc().bit(true));
             }
 
             /// Disable register updates
@@ -211,13 +201,13 @@ macro_rules! hrtim_timer {
             pub fn set_repetition_counter(&mut self, repetition_counter: u8) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                unsafe { tim.$rep().write(|w| w.$repx().bits(repetition_counter)); }
+                unsafe { tim.repr().write(|w| w.rep().bits(repetition_counter)); }
             }
 
             pub fn enable_repetition_interrupt(&mut self, enable: bool) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.$dier().modify(|_r, w| w.$repie().bit(enable));
+                tim.dier().modify(|_r, w| w.repie().bit(enable));
             }
         }
 
@@ -329,14 +319,14 @@ use super::adc_trigger::Adc579Trigger as Adc579;
 use super::adc_trigger::Adc6810Trigger as Adc6810;
 
 hrtim_timer! {
-    HRTIM_MASTER: mcntr, mcnt, mper, mcen, mper, mrep, mrep, mdier, mrepie, micr, mrepc, mudis,,
+    HRTIM_MASTER: mcen, mudis,,
 
-    HRTIM_TIMA: cntar, cntx, perar, tacen, perx, repar, repx, timadier, repie, timaicr, repc, taudis, (rstar),
-    HRTIM_TIMB: cntr, cntx, perbr, tbcen, perx, repbr, repx, timbdier, repie, timbicr, repc, tbudis, (rstbr),
-    HRTIM_TIMC: cntcr, cntx, percr, tccen, perx, repcr, repx, timcdier, repie, timcicr, repc, tcudis, (rstcr),
-    HRTIM_TIMD: cntdr, cntx, perdr, tdcen, perx, repdr, repx, timddier, repie, timdicr, repc, tdudis, (rstdr),
-    HRTIM_TIME: cnter, cntx, perer, tecen, perx, reper, repx, timedier, repie, timeicr, repc, teudis, (rster),
-    HRTIM_TIMF: cntfr, cntx, perfr, tfcen, perx, repfr, repx, timfdier, repie, timficr, repc, tfudis, (rstfr),
+    HRTIM_TIMA: tacen, taudis, (rstr),
+    HRTIM_TIMB: tbcen, tbudis, (rstr),
+    HRTIM_TIMC: tccen, tcudis, (rstr),
+    HRTIM_TIMD: tdcen, tdudis, (rstr),
+    HRTIM_TIME: tecen, teudis, (rstr),
+    HRTIM_TIMF: tfcen, tfudis, (rstr),
 }
 
 hrtim_timer_adc_trigger! {
