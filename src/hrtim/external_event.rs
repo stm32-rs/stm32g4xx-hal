@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use crate::comparator::{COMP1, COMP2, COMP3, COMP4, COMP5, COMP6, COMP7};
 use crate::gpio::gpiob::{PB3, PB4, PB5, PB6, PB7, PB8, PB9};
 use crate::gpio::gpioc::{PC11, PC12, PC5, PC6};
@@ -9,10 +7,9 @@ use crate::stm32::HRTIM_COMMON;
 
 use super::control::HrTimCalibrated;
 
+#[non_exhaustive]
 #[derive(Copy, Clone, PartialEq)]
-pub struct ExternalEventSource<const N: u8, const IS_FAST: bool> {
-    _x: PhantomData<()>,
-}
+pub struct ExternalEventSource<const N: u8, const IS_FAST: bool>;
 
 pub struct EevInputs {
     pub eev_input1: EevInput<1>,
@@ -292,7 +289,7 @@ macro_rules! impl_eev1_5_to_es {
                     });
                 }
 
-                ExternalEventSource { _x: PhantomData }
+                ExternalEventSource
             }
         }
 
@@ -334,7 +331,7 @@ macro_rules! impl_eev6_10_to_es {
                     common.eecr3().modify(|_r, w| w.$eeXf().bits(filter_bits));
                 }
 
-                ExternalEventSource { _x: PhantomData }
+                ExternalEventSource
             }
         }
 

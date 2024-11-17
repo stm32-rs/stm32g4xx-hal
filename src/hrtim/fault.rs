@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use crate::comparator::{COMP1, COMP2, COMP3, COMP4, COMP5, COMP6};
 use crate::gpio::gpioa::{PA12, PA15};
 use crate::gpio::gpiob::{PB0, PB10, PB11};
@@ -75,14 +73,12 @@ macro_rules! impl_faults {
     )+) => {$(
 
         // This should NOT be Copy/Clone
-        pub struct $input {
-            pub(crate) _x: PhantomData<()>
-        }
+        #[non_exhaustive]
+        pub struct $input;
 
+        #[non_exhaustive]
         #[derive(Copy, Clone)]
-        pub struct $source {
-            _x: PhantomData<()>
-        }
+        pub struct $source;
 
         impl $input {
             pub fn bind_pin<IM>(self, pin: $pin<gpio::Input<IM>>) -> SourceBuilder<$input> {
@@ -127,9 +123,7 @@ macro_rules! impl_faults {
                     common.$fltinrZ().modify(|_r, w| w.$fltWlck().set_bit());
                 }
 
-                $source {
-                    _x: PhantomData
-                }
+                $source
             }
 
             pub fn polarity(mut self, polarity: super::Polarity) -> Self {
@@ -173,12 +167,12 @@ pub struct FaultInputs {
 impl FaultInputs {
     pub(crate) unsafe fn new() -> Self {
         FaultInputs {
-            fault_input1: FaultInput1 { _x: PhantomData },
-            fault_input2: FaultInput2 { _x: PhantomData },
-            fault_input3: FaultInput3 { _x: PhantomData },
-            fault_input4: FaultInput4 { _x: PhantomData },
-            fault_input5: FaultInput5 { _x: PhantomData },
-            fault_input6: FaultInput6 { _x: PhantomData },
+            fault_input1: FaultInput1,
+            fault_input2: FaultInput2,
+            fault_input3: FaultInput3,
+            fault_input4: FaultInput4,
+            fault_input5: FaultInput5,
+            fault_input6: FaultInput6,
         }
     }
 }
@@ -243,9 +237,8 @@ pub enum FaultSamplingFilter {
 
 macro_rules! impl_flt_monitor {
     ($($t:ident: ($fltx:ident, $fltxc:ident, $fltxie:ident),)+) => {$(
-        pub struct $t {
-            pub(crate) _x: PhantomData<()>
-        }
+        #[non_exhaustive]
+        pub struct $t;
 
         impl FaultMonitor for $t {
             fn enable_interrupt(&mut self, _hr_control: &mut HrPwmCtrl) {

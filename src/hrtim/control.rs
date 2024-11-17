@@ -1,5 +1,3 @@
-use core::marker::PhantomData;
-
 use crate::{
     hrtim::fault::{
         FltMonitor1, FltMonitor2, FltMonitor3, FltMonitor4, FltMonitor5, FltMonitor6, FltMonitorSys,
@@ -140,7 +138,7 @@ impl HrTimOngoingCalibration {
         unsafe { self.init() };
 
         (
-            HrTimCalibrated { _x: PhantomData },
+            HrTimCalibrated,
             unsafe { FaultInputs::new() },
             unsafe { EevInputs::new() },
         )
@@ -180,33 +178,31 @@ impl HrTimOngoingCalibration {
 /// This object may be used for things that needs to be done before any timers have been started but after the calibration has been completed. Its existence is proof that no timers have started.
 ///
 /// Once done with setup, use the `constrain` to get a `HrPwmControl` which can be used to start the timers.
-pub struct HrTimCalibrated {
-    _x: PhantomData<()>,
-}
+#[non_exhaustive]
+pub struct HrTimCalibrated;
 
 impl HrTimCalibrated {
     pub fn constrain(self) -> HrPwmControl {
         HrPwmControl {
-            _x: PhantomData,
-            control: HrPwmCtrl { _x: PhantomData },
-            fault_sys: FltMonitorSys { _x: PhantomData },
-            fault_1: FltMonitor1 { _x: PhantomData },
-            fault_2: FltMonitor2 { _x: PhantomData },
-            fault_3: FltMonitor3 { _x: PhantomData },
-            fault_4: FltMonitor4 { _x: PhantomData },
-            fault_5: FltMonitor5 { _x: PhantomData },
-            fault_6: FltMonitor6 { _x: PhantomData },
+            control: HrPwmCtrl,
+            fault_sys: FltMonitorSys,
+            fault_1: FltMonitor1,
+            fault_2: FltMonitor2,
+            fault_3: FltMonitor3,
+            fault_4: FltMonitor4,
+            fault_5: FltMonitor5,
+            fault_6: FltMonitor6,
 
-            adc_trigger1: Adc1Trigger { _x: PhantomData },
-            adc_trigger2: Adc2Trigger { _x: PhantomData },
-            adc_trigger3: Adc3Trigger { _x: PhantomData },
-            adc_trigger4: Adc4Trigger { _x: PhantomData },
-            adc_trigger5: Adc5Trigger { _x: PhantomData },
-            adc_trigger6: Adc6Trigger { _x: PhantomData },
-            adc_trigger7: Adc7Trigger { _x: PhantomData },
-            adc_trigger8: Adc8Trigger { _x: PhantomData },
-            adc_trigger9: Adc9Trigger { _x: PhantomData },
-            adc_trigger10: Adc10Trigger { _x: PhantomData },
+            adc_trigger1: Adc1Trigger,
+            adc_trigger2: Adc2Trigger,
+            adc_trigger3: Adc3Trigger,
+            adc_trigger4: Adc4Trigger,
+            adc_trigger5: Adc5Trigger,
+            adc_trigger6: Adc6Trigger,
+            adc_trigger7: Adc7Trigger,
+            adc_trigger8: Adc8Trigger,
+            adc_trigger9: Adc9Trigger,
+            adc_trigger10: Adc10Trigger,
         }
     }
 }
@@ -220,14 +216,12 @@ impl<'a> From<&'a mut HrPwmControl> for &'a mut HrPwmCtrl {
 /// Used as a token to guarantee unique access to resources common to multiple timers
 ///
 /// An instance of this object can be obtained from [`HrPwmControl`].control
-pub struct HrPwmCtrl {
-    _x: PhantomData<()>,
-}
+#[non_exhaustive]
+pub struct HrPwmCtrl;
 
 /// Used as a token to guarantee unique access to resources common to multiple timers
+#[non_exhaustive]
 pub struct HrPwmControl {
-    _x: PhantomData<()>,
-
     pub control: HrPwmCtrl,
 
     pub fault_sys: FltMonitorSys,
@@ -253,9 +247,8 @@ pub struct HrPwmControl {
 
 macro_rules! impl_adc1234_trigger {
     ($($t:ident: [$trait_:ident, $adcXr:ident, $variant345:ident $(, $variant12:ident)*]),*) => {$(
-        pub struct $t {
-            _x: PhantomData<()>,
-        }
+        #[non_exhaustive]
+        pub struct $t;
 
         impl $t {
             pub fn enable_source<T: $trait_>(&mut self, _trigger: &T) {
@@ -282,9 +275,8 @@ macro_rules! impl_adc1234_trigger {
 
 macro_rules! impl_adc5678910_trigger {
     ($($t:ident: [$trait_:ident, $adcXtrg:ident, $variant345:ident, $variant12:ident]),*) => {$(
-        pub struct $t {
-            _x: PhantomData<()>,
-        }
+        #[non_exhaustive]
+        pub struct $t;
 
         impl $t {
             pub fn enable_source<T: $trait_>(&mut self, _trigger: &T) {
