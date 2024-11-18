@@ -152,7 +152,7 @@ impl_faults!(
     FaultInput3 => FaultSource3: PINS=[(PB10, AF13)], COMP=COMP6, 0b000100, fltinr1, flt3src, flt3src_1, flt3p, flt3f, flt3e, flt3lck,
     FaultInput4 => FaultSource4: PINS=[(PB11, AF13)], COMP=COMP1, 0b001000, fltinr1, flt4src, flt4src_1, flt4p, flt4f, flt4e, flt4lck,
     FaultInput5 => FaultSource5: PINS=[(PB0, AF13), (PC7, AF3)], COMP=COMP3, 0b010000, fltinr2, flt5src, flt5src_1, flt5p, flt5f, flt5e, flt5lck,
-    FaultInput6 => FaultSource6: PINS=[(PC10, AF13)], COMP=COMP5, 0b100000, fltinr2, flt6src_0, flt6src_1, flt6p, flt6f, flt6e, flt6lck,
+    FaultInput6 => FaultSource6: PINS=[(PC10, AF13)], COMP=COMP5, 0b100000, fltinr2, flt6src, flt6src_1, flt6p, flt6f, flt6e, flt6lck,
 );
 
 pub struct FaultInputs {
@@ -253,7 +253,7 @@ macro_rules! impl_flt_monitor {
 
             fn clear_fault(&mut self) {
                 let common = unsafe { &*HRTIM_COMMON::ptr() };
-                common.icr().write(|w| w.$fltxc().set_bit());
+                common.icr().write(|w| w.$fltxc().clear());
             }
         }
     )+};

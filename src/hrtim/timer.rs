@@ -170,7 +170,7 @@ macro_rules! hrtim_timer {
             fn clear_repetition_interrupt(&mut self) {
                 let tim = unsafe { &*$TIMX::ptr() };
 
-                tim.icr().write(|w| w.repc().bit(true));
+                tim.icr().write(|w| w.repc().clear());
             }
 
             /// Disable register updates

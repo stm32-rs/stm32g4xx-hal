@@ -224,7 +224,7 @@ macro_rules! impl_capture {
                 let tim = unsafe { &*$TIMX::ptr() };
 
                 // No need for exclusive access since this is a write only register
-                tim.icr().write(|w| w.$cptXc().bit(true));
+                tim.icr().write(|w| w.$cptXc().clear());
             }
 
             fn is_pending(&self) -> bool {
