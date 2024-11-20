@@ -15,8 +15,7 @@ version = "0.0.2"
 nb = "0.1.1"
 #stm32g4 = { git = "https://github.com/stm32-rs/stm32-rs-nightlies" } #"0.15.1"
 #stm32g4 = { version = "0.18.0", package = "stm32g4-staging" }
-stm32g4 = { git = "https://github.com/stm32-rs/stm32-rs-nightlies", rev = "74b26b7" }
-#stm32g4 = { path = "../stm32-rs/stm32g4" }
+stm32g4 = { git = "https://github.com/stm32-rs/stm32-rs-nightlies", rev = "4c4f246" }
 paste = "1.0"
 bitflags = "1.2"
 vcell = "0.1"
