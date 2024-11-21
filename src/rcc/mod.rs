@@ -216,6 +216,12 @@ impl Rcc {
             _ => apb2_freq * 2,
         };
 
+        // Configure FDCAN clock source.
+        self.rb.ccipr.modify(|_, w| unsafe {
+            // This is sound, as `FdCanClockSource` only contains valid values for this field.
+            w.fdcansel().bits(rcc_cfg.fdcansel as u8)
+        });
+
         Rcc {
             rb: self.rb,
             clocks: Clocks {
