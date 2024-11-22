@@ -11,19 +11,6 @@ mod sealed {
     pub trait Rx<CAN> {}
 }
 
-/// Select an FDCAN Clock Source
-#[allow(clippy::upper_case_acronyms)]
-#[allow(dead_code)]
-enum FdCanClockSource {
-    /// Select HSE as the FDCAN clock source
-    HSE = 0b00,
-    /// Select PLL "Q" clock as the FDCAN clock source
-    PLLQ = 0b01,
-    /// Select "P" clock as the FDCAN clock source
-    PCLK = 0b10,
-    //Reserved = 0b10,
-}
-
 /// Storage type for the CAN controller
 #[derive(Debug)]
 pub struct Can<FDCAN> {
@@ -54,18 +41,6 @@ where
         RX: sealed::Rx<Self>,
     {
         Self::enable(&rcc.rb);
-
-        if rcc.rb.ccipr.read().fdcansel().is_hse() {
-            // Select P clock as FDCAN clock source
-            rcc.rb.ccipr.modify(|_, w| {
-                // This is sound, as `FdCanClockSource` only contains valid values for this field.
-                unsafe {
-                    w.fdcansel().bits(FdCanClockSource::PCLK as u8);
-                }
-
-                w
-            });
-        }
 
         self.fdcan_unchecked()
     }

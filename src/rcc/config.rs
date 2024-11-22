@@ -325,6 +325,18 @@ impl Default for PllConfig {
     }
 }
 
+/// FDCAN Clock Source
+#[allow(clippy::upper_case_acronyms)]
+pub enum FdCanClockSource {
+    /// Select HSE as the FDCAN clock source
+    HSE = 0b00,
+    /// Select PLL "Q" clock as the FDCAN clock source
+    PLLQ = 0b01,
+    /// Select "P" clock as the FDCAN clock source
+    PCLK = 0b10,
+    //Reserved = 0b10,
+}
+
 /// Clocks configutation
 pub struct Config {
     pub(crate) sys_mux: SysClockSrc,
@@ -335,6 +347,8 @@ pub struct Config {
 
     /// Required for f_sys > 150MHz
     pub(crate) enable_boost: bool,
+
+    pub(crate) fdcansel: FdCanClockSource,
 }
 
 impl Config {
@@ -379,6 +393,11 @@ impl Config {
         self.enable_boost = enable_boost;
         self
     }
+
+    pub fn fdcan_src(mut self, mux: FdCanClockSource) -> Self {
+        self.fdcansel = mux;
+        self
+    }
 }
 
 impl Default for Config {
@@ -390,6 +409,7 @@ impl Default for Config {
             apb1_psc: Prescaler::NotDivided,
             apb2_psc: Prescaler::NotDivided,
             enable_boost: false,
+            fdcansel: FdCanClockSource::HSE,
         }
     }
 }
