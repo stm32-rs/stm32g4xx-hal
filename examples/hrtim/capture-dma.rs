@@ -7,6 +7,7 @@
 mod utils;
 
 use cortex_m_rt::entry;
+use stm32g4xx_hal::hrtim::{timer::TimerSplitCapture, HrParts};
 use utils::logger::info;
 
 #[entry]
@@ -15,7 +16,7 @@ fn main() -> ! {
 
     use hal::{
         dma::{config::DmaConfig, stream::DMAExt, TransferExt},
-        gpio::{GpioExt, AF13},
+        gpio::GpioExt,
         hrtim::{
             capture, compare_register::HrCompareRegister, control::HrControltExt, external_event,
             external_event::ToExternalEventSource, output::HrOutput, timer::HrSlaveTimerCpt,
@@ -37,7 +38,7 @@ fn main() -> ! {
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
-            mux: rcc::PLLSrc::HSI,
+            mux: rcc::PllSrc::HSI,
             n: rcc::PllNMul::MUL_15,
             m: rcc::PllMDiv::DIV_1,
             r: Some(rcc::PllRDiv::DIV_2),
@@ -83,7 +84,13 @@ fn main() -> ! {
         .finalize(&mut hr_control);
 
     let mut hr_control = hr_control.constrain();
-    let (timer, (mut cr1, _cr2, _cr3, _cr4), mut out1, dma_ch) = dp
+    let HrParts {
+        timer,
+        mut cr1,
+        out: mut out1,
+        dma_channel,
+        ..
+    } = dp
         .HRTIM_TIMA
         .pwm_advanced(pin_a, &mut rcc)
         .prescaler(prescaler)
@@ -93,7 +100,11 @@ fn main() -> ! {
     out1.enable_set_event(&timer); // Set high at new period
     cr1.set_duty(period / 2);
 
-    let (mut timer, mut capture, _capture_ch2) = timer.split_capture();
+    let TimerSplitCapture {
+        mut timer,
+        ch1: mut capture,
+        ..
+    } = timer.split_capture();
     timer.start(&mut hr_control.control);
     out1.enable();
 
@@ -109,7 +120,7 @@ fn main() -> ! {
 
     let first_buffer = cortex_m::singleton!(: [u32; 16] = [0; 16]).unwrap();
     let mut transfer = streams.0.into_circ_peripheral_to_memory_transfer(
-        capture.enable_dma(dma_ch),
+        capture.enable_dma(dma_channel),
         &mut first_buffer[..],
         config,
     );
@@ -121,7 +132,7 @@ fn main() -> ! {
         for duty in (u32::from(period) / 10)..(9 * u32::from(period) / 10) {
             let mut data = [0; 2];
             transfer.read_exact(&mut data);
-            let [t1, t2] = data.map(capture::dma_value_to_signed);
+            let [t1, t2] = data.map(|x| capture::dma_value_to_signed(x, period));
             cr1.set_duty(duty as u16);
             info!("Capture: t1: {}, t2: {}, duty: {}, ", t1, t2, old_duty);
             old_duty = duty;

@@ -7,6 +7,7 @@
 mod utils;
 
 use cortex_m_rt::entry;
+use stm32g4xx_hal::hrtim::HrParts;
 use utils::logger::info;
 
 #[entry]
@@ -79,19 +80,24 @@ fn main() -> ! {
         .finalize(&mut hr_control);
 
     let mut hr_control = hr_control.constrain();
-    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1, ..) = dp
+    let HrParts {
+        mut timer,
+        mut cr1,
+        mut out,
+        ..
+    } = dp
         .HRTIM_TIMA
         .pwm_advanced(pin_a, &mut rcc)
         .prescaler(prescaler)
         .period(period)
         .finalize(&mut hr_control);
 
-    out1.enable_rst_event(&cr1); // Set low on compare match with cr1
-    out1.enable_set_event(&timer); // Set high at new period
+    out.enable_rst_event(&cr1); // Set low on compare match with cr1
+    out.enable_set_event(&timer); // Set high at new period
 
     cr1.set_duty(period / 2);
     timer.start(&mut hr_control.control);
-    out1.enable();
+    out.enable();
 
     let capture = timer.capture_ch1();
     capture.enable_interrupt(true, &mut hr_control);

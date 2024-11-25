@@ -8,6 +8,7 @@
 mod utils;
 
 use cortex_m_rt::entry;
+use stm32g4xx_hal::hrtim::HrParts;
 use utils::logger::info;
 
 #[entry]
@@ -74,7 +75,12 @@ fn main() -> ! {
     //   -----------------------------------------        --------------------------
     //        .               .               .  *            .               .
     //        .               .               .  *            .               .
-    let (mut timer, (mut cr1, _cr2, _cr3, _cr4), mut out1, ..) = dp
+    let HrParts {
+        mut timer,
+        mut cr1,
+        mut out,
+        ..
+    } = dp
         .HRTIM_TIMA
         .pwm_advanced(pin_a, &mut rcc)
         .prescaler(prescaler)
@@ -92,11 +98,11 @@ fn main() -> ! {
         // as normal
         .finalize(&mut hr_control);
 
-    out1.enable_rst_event(&cr1); // Set low on compare match with cr1
-    out1.enable_set_event(&timer); // Set high at new period
+    out.enable_rst_event(&cr1); // Set low on compare match with cr1
+    out.enable_set_event(&timer); // Set high at new period
     cr1.set_duty(timer.get_period() / 3);
     //unsafe {((HRTIM_COMMON::ptr() as *mut u8).offset(0x14) as *mut u32).write_volatile(1); }
-    out1.enable();
+    out.enable();
     timer.start(&mut hr_control.control);
 
     info!("Started");
@@ -104,11 +110,11 @@ fn main() -> ! {
     loop {
         for _ in 0..5 {
             delay.delay(500_u32.millis());
-            info!("State: {:?}", out1.get_state());
+            info!("State: {:?}", out.get_state());
         }
         if hr_control.fault_3.is_fault_active() {
             hr_control.fault_3.clear_fault(); // Clear fault every 5s
-            out1.enable();
+            out.enable();
             info!("failt cleared, and output reenabled");
         }
     }

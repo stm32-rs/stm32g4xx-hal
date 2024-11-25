@@ -7,6 +7,7 @@
 mod utils;
 
 use cortex_m_rt::entry;
+use stm32g4xx_hal::hrtim::HrParts;
 use utils::logger::info;
 
 #[entry]
@@ -87,7 +88,14 @@ fn main() -> ! {
     let period = 0xFFFF;
     let (hr_control, ..) = dp.HRTIM_COMMON.hr_control(&mut rcc).wait_for_calibration();
     let mut hr_control = hr_control.constrain();
-    let (mut timer, (mut cr1, _cr2, mut cr3, mut cr4), (mut out1, mut out2), ..) = dp
+    let HrParts {
+        mut timer,
+        mut cr1,
+        mut cr3,
+        mut cr4,
+        out: (mut out1, mut out2),
+        ..
+    } = dp
         .HRTIM_TIMA
         .pwm_advanced((pin_a, pin_b), &mut rcc)
         .prescaler(prescaler)

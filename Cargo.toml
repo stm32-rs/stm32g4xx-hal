@@ -135,6 +135,11 @@ required-features = ["hrtim"]
 path = "examples/hrtim/capture.rs"
 
 [[example]]
+name = "hrtim-capture-dma"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture-dma.rs"
+
+[[example]]
 name = "hrtim-eev-comp"
 required-features = ["hrtim"]
 path = "examples/hrtim/eev-comp.rs"
