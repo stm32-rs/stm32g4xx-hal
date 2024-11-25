@@ -13,7 +13,6 @@ pub mod timer_eev_cfg;
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
-use crate::hrtim::capture::HrCapt;
 use crate::hrtim::compare_register::{HrCr1, HrCr2, HrCr3, HrCr4};
 use crate::hrtim::fault::{FaultAction, FaultSource};
 use crate::hrtim::timer::HrTim;
@@ -21,6 +20,7 @@ use crate::stm32::{
     HRTIM_COMMON, HRTIM_MASTER, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME,
     HRTIM_TIMF,
 };
+use capture::{HrCaptCh1, HrCaptCh2};
 use fugit::HertzU64;
 
 use self::control::HrPwmControl;
@@ -188,6 +188,18 @@ pub struct HrPwmBuilder<TIM, PSCL, PS, PINS> {
     out2_polarity: Polarity,
 }
 
+pub struct HrParts<TIM, PSCL, OUT> {
+    pub timer: HrTim<TIM, PSCL, HrCaptCh1<TIM, PSCL>, HrCaptCh2<TIM, PSCL>>,
+
+    pub cr1: HrCr1<TIM, PSCL>,
+    pub cr2: HrCr2<TIM, PSCL>,
+    pub cr3: HrCr3<TIM, PSCL>,
+    pub cr4: HrCr4<TIM, PSCL>,
+
+    pub out: OUT,
+    pub dma_channel: timer::DmaChannel<TIM>,
+}
+
 pub enum PreloadSource {
     /// Preloaded registers are updated on counter roll over or counter reset
     OnCounterReset,
@@ -249,7 +261,7 @@ macro_rules! hrtim_finalize_body {
                 // Set counting direction
                 w.udm().bit($this.counting_direction == HrCountingDirection::UpDown)
             );
-           
+
             tim.cr().modify(|_r, w|
                 // Push-Pull mode
                 w.pshpll().bit($this.enable_push_pull)
@@ -552,20 +564,7 @@ macro_rules! hrtim_hal {
                 PSCL: HrtimPrescaler,
                 PINS: ToHrOut<$TIMX>,
             {
-                pub fn finalize(self, _control: &mut HrPwmControl) -> (
-                    HrTim<$TIMX, PSCL,
-                        HrCapt<$TIMX, PSCL, capture::Ch1, capture::NoDma>,
-                        HrCapt<$TIMX, PSCL, capture::Ch2, capture::NoDma>
-                    >, (
-                            HrCr1<$TIMX, PSCL>,
-                            HrCr2<$TIMX, PSCL>,
-                            HrCr3<$TIMX, PSCL>,
-                            HrCr4<$TIMX, PSCL>
-                        ),
-                        PINS::Out<PSCL>,
-                        timer::DmaChannel<$TIMX>,
-                    ) {
-
+                pub fn finalize(self, _control: &mut HrPwmControl) -> HrParts<$TIMX, PSCL, PINS::Out<PSCL>> {
                     hrtim_finalize_body!(
                         self, PreloadSource,
                         $TIMX, $($out)*
@@ -660,7 +659,6 @@ macro_rules! hrtim_hal {
     };
 }
 
-
 impl HrPwmAdvExt for HRTIM_MASTER {
     type PreloadSource = MasterPreloadSource;
 
@@ -701,25 +699,12 @@ impl HrPwmAdvExt for HRTIM_MASTER {
     }
 }
 
-impl<PSCL, PINS>
-    HrPwmBuilder<HRTIM_MASTER, PSCL, MasterPreloadSource, PINS>
+impl<PSCL, PINS> HrPwmBuilder<HRTIM_MASTER, PSCL, MasterPreloadSource, PINS>
 where
     PSCL: HrtimPrescaler,
     PINS: ToHrOut<HRTIM_MASTER>,
 {
-    pub fn finalize(self, _control: &mut HrPwmControl) -> (
-        HrTim<HRTIM_MASTER, PSCL,
-            HrCapt<HRTIM_MASTER, PSCL, capture::Ch1, capture::NoDma>,
-            HrCapt<HRTIM_MASTER, PSCL, capture::Ch2, capture::NoDma>,
-        >, (
-            HrCr1<HRTIM_MASTER, PSCL>,
-            HrCr2<HRTIM_MASTER, PSCL>,
-            HrCr3<HRTIM_MASTER, PSCL>,
-            HrCr4<HRTIM_MASTER, PSCL>
-        ),
-        timer::DmaChannel<HRTIM_MASTER>,
-    ) {
-
+    pub fn finalize(self, _control: &mut HrPwmControl) -> HrParts<HRTIM_MASTER, PSCL, ()> {
         hrtim_finalize_body!(self, MasterPreloadSource, HRTIM_MASTER,)
     }
 

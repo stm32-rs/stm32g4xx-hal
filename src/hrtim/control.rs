@@ -137,11 +137,9 @@ impl HrTimOngoingCalibration {
         // Calibration is now done, it is safe to continue
         unsafe { self.init() };
 
-        (
-            HrTimCalibrated,
-            unsafe { FaultInputs::new() },
-            unsafe { EevInputs::new() },
-        )
+        (HrTimCalibrated, unsafe { FaultInputs::new() }, unsafe {
+            EevInputs::new()
+        })
     }
 
     pub fn set_adc1_trigger_psc(mut self, post_scaler: AdcTriggerPostscaler) -> Self {

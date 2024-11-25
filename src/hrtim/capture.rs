@@ -11,6 +11,12 @@ pub struct Ch2;
 pub struct Dma;
 pub struct NoDma;
 
+/// Type alias for the default capture for channel 1
+pub type HrCaptCh1<TIM, PSCL> = HrCapt<TIM, PSCL, Ch1, NoDma>;
+
+/// Type alias for the default capture for channel 2
+pub type HrCaptCh2<TIM, PSCL> = HrCapt<TIM, PSCL, Ch2, NoDma>;
+
 pub struct HrCapt<TIM, PSCL, CH, DMA> {
     _x: PhantomData<(TIM, PSCL, CH, DMA)>,
 }
