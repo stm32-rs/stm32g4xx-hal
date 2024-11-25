@@ -149,12 +149,12 @@ pub fn dma_value_to_signed(x: u32, period: u16) -> i32 {
 }
 
 macro_rules! impl_capture {
-    ($($TIMX:ident: $mux:expr),+) => {$(
-        impl_capture!($TIMX: Ch1, cpt1r, cpt1cr, cpt1, cpt1ie, cpt1de, cpt1c, $mux);
-        impl_capture!($TIMX: Ch2, cpt2r, cpt2cr, cpt2, cpt2ie, cpt2de, cpt2c, $mux);
+    ($($TIMX:ident),+) => {$(
+        impl_capture!($TIMX: Ch1, cpt1r, cpt1cr, cpt1, cpt1ie, cpt1de, cpt1c);
+        impl_capture!($TIMX: Ch2, cpt2r, cpt2cr, cpt2, cpt2ie, cpt2de, cpt2c);
     )+};
 
-    ($TIMX:ident: $CH:ident, $cptXr:ident, $cptXcr:ident, $cptX:ident, $cptXie:ident, $cptXde:ident, $cptXc:ident, $mux:expr) => {
+    ($TIMX:ident: $CH:ident, $cptXr:ident, $cptXcr:ident, $cptX:ident, $cptXie:ident, $cptXde:ident, $cptXc:ident) => {
         impl<PSCL> HrCapt<$TIMX, PSCL, $CH, NoDma> {
             /// Add event to capture
             ///
@@ -244,16 +244,16 @@ macro_rules! impl_capture {
 
             type MemSize = u32;
 
-            const REQUEST_LINE: Option<u8> = Some($mux as u8);
+            const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::$TIMX as u8);
         }
     };
 }
 
 impl_capture! {
-    HRTIM_TIMA: DmaMuxResources::HRTIM_TIMA,
-    HRTIM_TIMB: DmaMuxResources::HRTIM_TIMB,
-    HRTIM_TIMC: DmaMuxResources::HRTIM_TIMC,
-    HRTIM_TIMD: DmaMuxResources::HRTIM_TIMD,
-    HRTIM_TIME: DmaMuxResources::HRTIM_TIME,
-    HRTIM_TIMF: DmaMuxResources::HRTIM_TIMF
+    HRTIM_TIMA,
+    HRTIM_TIMB,
+    HRTIM_TIMC,
+    HRTIM_TIMD,
+    HRTIM_TIME,
+    HRTIM_TIMF
 }
