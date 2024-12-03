@@ -56,9 +56,8 @@ impl EnabledState for Locked {}
 
 macro_rules! impl_comp {
     ($($t:ident: $reg:ident,)+) => {$(
-        pub struct $t {
-            _rb: PhantomData<()>,
-        }
+        #[non_exhaustive]
+        pub struct $t;
 
         impl $t {
             pub fn csr(&self) -> &$crate::stm32::comp::CCSR {
@@ -548,31 +547,31 @@ pub fn split(_comp: COMP, rcc: &mut Rcc) -> Comparators {
     rcc.rb.apb2rstr().modify(|_, w| w.syscfgrst().clear_bit());
 
     (
-        COMP1 { _rb: PhantomData },
-        COMP2 { _rb: PhantomData },
-        COMP3 { _rb: PhantomData },
-        COMP4 { _rb: PhantomData },
+        COMP1,
+        COMP2,
+        COMP3,
+        COMP4,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g483",
             feature = "stm32g474",
             feature = "stm32g484"
         ))]
-        COMP5 { _rb: PhantomData },
+        COMP5,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g483",
             feature = "stm32g474",
             feature = "stm32g484"
         ))]
-        COMP6 { _rb: PhantomData },
+        COMP6,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g483",
             feature = "stm32g474",
             feature = "stm32g484"
         ))]
-        COMP7 { _rb: PhantomData },
+        COMP7,
     )
 }
 

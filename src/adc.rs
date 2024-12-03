@@ -1885,6 +1885,11 @@ macro_rules! adc {
                 /// Calibrate the adc for <Input Type>
                 #[inline(always)]
                 pub fn calibrate(&mut self, it: config::InputType) {
+                    let cr = self.adc_reg.cr().read();
+                    assert!(cr.aden().bit_is_clear());
+                    assert!(cr.adstart().bit_is_clear());
+                    assert!(cr.jadstart().bit_is_clear());
+
                     match it {
                         config::InputType::SingleEnded => {
                             self.adc_reg.cr().modify(|_, w| w.adcaldif().clear_bit() );
@@ -2336,8 +2341,8 @@ macro_rules! adc {
 
                 /// Sets which external trigger to use and if it is disabled, rising, falling or both
                 #[inline(always)]
-                pub fn set_external_trigger(&mut self, (edge, extsel): (config::TriggerMode, $trigger_type)) {
-                    self.adc.set_external_trigger( (edge, extsel) )
+                pub fn set_external_trigger<T: Into<$trigger_type>>(&mut self, (edge, extsel): (config::TriggerMode, T)) {
+                    self.adc.set_external_trigger( (edge, extsel.into()) )
                 }
 
                 /// Sets auto delay to true or false

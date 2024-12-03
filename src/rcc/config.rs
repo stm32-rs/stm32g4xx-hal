@@ -46,6 +46,16 @@ pub enum PllSrc {
     HSE_BYPASS(Hertz),
 }
 
+impl PllSrc {
+    pub const fn frequency(self) -> Hertz {
+        match self {
+            PllSrc::HSI => Hertz::MHz(16),
+            PllSrc::HSE(f) => f,
+            PllSrc::HSE_BYPASS(f) => f,
+        }
+    }
+}
+
 /// Divider for the PLL clock input (M)
 /// This must be set based on the input clock to keep the PLL input frequency within the limits
 /// specified in the datasheet.
@@ -70,11 +80,11 @@ pub enum PllMDiv {
 }
 
 impl PllMDiv {
-    pub fn divisor(&self) -> u32 {
+    pub const fn divisor(&self) -> u32 {
         (*self as u32) + 1
     }
 
-    pub fn register_setting(&self) -> u8 {
+    pub const fn register_setting(&self) -> u8 {
         *self as u8
     }
 }
@@ -108,11 +118,11 @@ pub enum PllRDiv {
 }
 
 impl PllRDiv {
-    pub fn divisor(&self) -> u32 {
+    pub const fn divisor(&self) -> u32 {
         ((*self as u32) + 1) * 2
     }
 
-    pub fn register_setting(&self) -> u8 {
+    pub const fn register_setting(&self) -> u8 {
         *self as u8
     }
 }
@@ -157,11 +167,11 @@ pub enum PllPDiv {
 }
 
 impl PllPDiv {
-    pub fn divisor(&self) -> u32 {
+    pub const fn divisor(&self) -> u32 {
         *self as u32
     }
 
-    pub fn register_setting(&self) -> u8 {
+    pub const fn register_setting(&self) -> u8 {
         *self as u8
     }
 }
@@ -292,7 +302,7 @@ pub enum PllNMul {
 }
 
 impl PllNMul {
-    pub fn multiplier(&self) -> u32 {
+    pub const fn multiplier(&self) -> u32 {
         *self as u32
     }
 

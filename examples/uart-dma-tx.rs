@@ -5,9 +5,9 @@
 
 extern crate cortex_m_rt as rt;
 
-use core::fmt::Write;
-
-use hal::dma::{config::DmaConfig, stream::DMAExt, TransferExt};
+use core::fmt::Write as _;
+use embedded_io::Write as _;
+use hal::dma::stream::DMAExt;
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::serial::*;
@@ -33,10 +33,6 @@ fn main() -> ! {
     let mut rcc = rcc.freeze(rcc::Config::hsi(), pwr);
 
     let streams = dp.DMA1.split(&rcc);
-    let config = DmaConfig::default()
-        .transfer_complete_interrupt(false)
-        .circular_buffer(false)
-        .memory_increment(true);
 
     info!("Init UART");
     let gpioa = dp.GPIOA.split(&mut rcc);
@@ -53,28 +49,44 @@ fn main() -> ! {
         .unwrap();
 
     let mut delay_syst = cp.SYST.delay(&rcc.clocks);
-    let mut led = gpioa.pa5.into_push_pull_output();
+    let mut led1 = gpioa.pa5.into_push_pull_output();
+    let mut led2 = gpioa.pa6.into_push_pull_output();
 
     info!("Start writing");
 
     writeln!(usart, "Hello without DMA\r").unwrap();
 
-    let tx_buffer = cortex_m::singleton!(: [u8; 17] = *b"Hello with DMA!\r\n").unwrap();
+    let tx_buffer = cortex_m::singleton!(: [u8; 64] = [0; 64]).unwrap();
 
     let (tx, _rx) = usart.split();
 
     // Setup DMA for USART2 TX with dma channel 1.
-    let mut transfer =
-        streams
-            .0
-            .into_memory_to_peripheral_transfer(tx.enable_dma(), &mut tx_buffer[..], config);
+    let mut tx = tx.enable_dma(streams.0, &mut tx_buffer[..]);
 
-    transfer.start(|_tx| {});
     loop {
-        while !transfer.get_transfer_complete_flag() {}
+        for i in 0.. {
+            // This will write to the DMA buffer and return directly, proveded the buffer is empty
+            // and there is enough room in the buffer for the entire message. Otherwise it will block.
+            led1.set_high().unwrap();
+            writeln!(&mut tx, "Hello with DMA").unwrap();
+            led1.set_low().unwrap();
 
-        delay_syst.delay(1000.millis());
-        led.toggle().unwrap();
-        transfer.restart(|_tx| {});
+            delay_syst.delay(100.millis());
+
+            // This will not block due the message above since we have a delay. However do watch out for the
+            // `{i}` since this will invoke another DMA transfer. This will block until the first part of
+            // the message before the `{i}` has been flushed. Same thing for the part after the `{i}`.
+            led2.set_high().unwrap();
+            writeln!(&mut tx, "Partially blocking DMA write: {i}!").unwrap();
+            led2.set_low().unwrap();
+
+            // Something like this ensures there is only one DMA transfer. This, assuming the DMA buffer is empty and
+            // the data fits, guarantees a non blocking write:
+            //let mut bytes = heapless::Vec::<_, 64>::new();
+            //writeln!(&mut bytes, "Non blocking write of complex message: {i} % 10 = {}!", i % 10);
+            //tx.write(bytes.as_slice()).unwrap();
+
+            delay_syst.delay(1000.millis());
+        }
     }
 }

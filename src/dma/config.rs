@@ -38,7 +38,6 @@ pub struct DmaConfig {
     pub(crate) transfer_complete_interrupt: bool,
     pub(crate) half_transfer_interrupt: bool,
     pub(crate) transfer_error_interrupt: bool,
-    pub(crate) double_buffer: bool,
 }
 
 impl DmaConfig {
@@ -82,12 +81,6 @@ impl DmaConfig {
     #[inline(always)]
     pub fn transfer_error_interrupt(mut self, transfer_error_interrupt: bool) -> Self {
         self.transfer_error_interrupt = transfer_error_interrupt;
-        self
-    }
-    /// Set the double_buffer.
-    #[inline(always)]
-    pub fn double_buffer(mut self, double_buffer: bool) -> Self {
-        self.double_buffer = double_buffer;
         self
     }
 }
