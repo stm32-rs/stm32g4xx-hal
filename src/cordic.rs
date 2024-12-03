@@ -713,7 +713,7 @@ pub mod op {
         func: &'a Op::Func,
     }
 
-    impl<'a, Arg, Res, Op> Operation<'a, Arg, Res, Op>
+    impl<Arg, Res, Op> Operation<'_, Arg, Res, Op>
     where
         Arg: types::arg::State,
         Res: types::res::State,
