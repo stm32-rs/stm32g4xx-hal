@@ -88,6 +88,14 @@ mod app {
             0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC, 0xDE, 0xF0, 0x12, 0x34, 0x56, 0x78, 0x9A, 0xBC,
             0xDE, 0xF0 as u8,
         ];
+        let data = [
+            &one_byte[..],
+            &two_bytes[..],
+            &three_bytes[..],
+            &four_bytes[..],
+            &eight_bytes[..],
+            &sixteen_bytes[..],
+        ];
         let mut flash = dp.FLASH.constrain();
         let mut flash_writer = flash.writer::<2048>(FlashSize::Sz256K);
 
@@ -102,197 +110,40 @@ mod app {
             .erase(FLASH_EXAMPLE_START_ADDRESS, 128)
             .unwrap(); // Erase entire page
 
-        for i in 0..6 {
-            match i {
-                0 => {
-                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &one_byte,
-                        false,
-                    );
-                    assert!(result.is_err());
-                    assert_eq!(
-                        result.err().unwrap(),
-                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
-                    );
+        for (i, data) in data.iter().enumerate() {
+            let i = i as u32;
+            // This test should fail, as the data needs to be divisible by 8 and force padding is false
+            let result =
+                flash_writer.write(FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING, data, false);
+            assert!(data.len() % 8 == 0 || result.is_err());
+            assert_eq!(
+                result.err().unwrap(),
+                stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
+            );
 
-                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &one_byte,
-                        true,
-                    );
-                    assert!(result.is_ok());
-                    logger::info!(
-                        "Wrote 1 byte to address {}",
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING
-                    );
-                }
-                1 => {
-                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &two_bytes,
-                        false,
-                    );
-                    assert!(result.is_err());
-                    assert_eq!(
-                        result.err().unwrap(),
-                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
-                    );
-
-                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &two_bytes,
-                        true,
-                    );
-                    assert!(result.is_ok());
-                    logger::info!(
-                        "Wrote 2 bytes to address {}",
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING
-                    );
-                }
-                2 => {
-                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &three_bytes,
-                        false,
-                    );
-                    assert!(result.is_err());
-                    assert_eq!(
-                        result.err().unwrap(),
-                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
-                    );
-
-                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &three_bytes,
-                        true,
-                    );
-                    assert!(result.is_ok());
-                    logger::info!(
-                        "Wrote 3 bytes to address {}",
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING
-                    );
-                }
-                3 => {
-                    // This test should fail, as the data needs to be divisible by 8 and force padding is false
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &four_bytes,
-                        false,
-                    );
-                    assert!(result.is_err());
-                    assert_eq!(
-                        result.err().unwrap(),
-                        stm32g4xx_hal::flash::Error::ArrayMustBeDivisibleBy8
-                    );
-
-                    // This test should pass, as the data needs to be divisible by 8 and force padding is true, so the one_byte array will be padded with 7 bytes of 0xFF
-                    let result = flash_writer.write(
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                        &four_bytes,
-                        true,
-                    );
-                    assert!(result.is_ok());
-                    logger::info!(
-                        "Wrote 4 bytes to address {}",
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING
-                    );
-                }
-                4 => {
-                    flash_writer
-                        .write(
-                            FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                            &eight_bytes,
-                            false,
-                        )
-                        .unwrap();
-                    logger::info!(
-                        "Wrote 8 bytes to address {}",
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING
-                    );
-                }
-                5 => {
-                    flash_writer
-                        .write(FLASH_EXAMPLE_START_ADDRESS + i * 16, &sixteen_bytes, false)
-                        .unwrap();
-                    logger::info!(
-                        "Wrote 16 bytes to address {}",
-                        FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING
-                    );
-                }
-                _ => (),
-            }
+            // This test should pass, as the data needs to be divisible by 8 and force padding is true.
+            // For example, the one_byte array will be padded with 7 bytes of 0xFF
+            let result =
+                flash_writer.write(FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING, data, true);
+            assert!(result.is_ok());
+            logger::info!(
+                "Wrote {} byte to address {}",
+                data.len(),
+                FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING
+            );
         }
 
-        logger::info!("Validating data written data by performing read and compare");
+        logger::info!("Validating data written by performing read and compare");
 
-        for i in 0..6 {
-            match i {
-                0 => {
-                    let bytes = flash_writer
-                        .read(FLASH_EXAMPLE_START_ADDRESS as u32, one_byte.len())
-                        .unwrap();
-                    assert!(compare_arrays(&bytes, &one_byte));
-                    logger::info!("Validated 1 byte data");
-                }
-                1 => {
-                    let bytes = flash_writer
-                        .read(
-                            FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                            two_bytes.len(),
-                        )
-                        .unwrap();
-                    assert!(compare_arrays(&bytes, &two_bytes));
-                    logger::info!("Validated 2 byte data");
-                }
-                2 => {
-                    let bytes = flash_writer
-                        .read(
-                            FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                            three_bytes.len(),
-                        )
-                        .unwrap();
-                    assert!(compare_arrays(&bytes, &three_bytes));
-                    logger::info!("Validated 3 byte data");
-                }
-                3 => {
-                    let bytes = flash_writer
-                        .read(
-                            FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                            four_bytes.len(),
-                        )
-                        .unwrap();
-                    assert!(compare_arrays(&bytes, &four_bytes));
-                    logger::info!("Validated 4 byte data");
-                }
-                4 => {
-                    let bytes = flash_writer
-                        .read(
-                            FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                            eight_bytes.len(),
-                        )
-                        .unwrap();
-                    assert!(compare_arrays(&bytes, &eight_bytes));
-                    logger::info!("Validated 8 byte data");
-                }
-                5 => {
-                    let bytes = flash_writer
-                        .read(
-                            FLASH_EXAMPLE_START_ADDRESS + i * FLASH_SPACING,
-                            sixteen_bytes.len(),
-                        )
-                        .unwrap();
-                    assert!(compare_arrays(&bytes, &sixteen_bytes));
-                    logger::info!("Validated 5 byte data");
-                }
-                _ => (),
-            }
+        for (i, data) in data.iter().enumerate() {
+            let bytes = flash_writer
+                .read(
+                    FLASH_EXAMPLE_START_ADDRESS + i as u32 * FLASH_SPACING,
+                    data.len(),
+                )
+                .unwrap();
+            assert_eq!(&bytes, data);
+            logger::info!("Validated {} byte data", data.len());
         }
 
         logger::info!(
