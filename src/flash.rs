@@ -58,7 +58,7 @@ pub struct FlashWriter<'a, const SECTOR_SZ_KB: u32> {
     flash_sz: FlashSize,
     verify: bool,
 }
-impl<'a, const SECTOR_SZ_KB: u32> FlashWriter<'a, SECTOR_SZ_KB> {
+impl<const SECTOR_SZ_KB: u32> FlashWriter<'_, SECTOR_SZ_KB> {
     #[allow(unused)]
     fn unlock_options(&mut self) -> Result<()> {
         // Check if flash is busy

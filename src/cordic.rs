@@ -713,7 +713,7 @@ pub mod op {
         func: &'a Op::Func,
     }
 
-    impl<'a, Arg, Res, Op> Operation<'a, Arg, Res, Op>
+    impl<Arg, Res, Op> Operation<'_, Arg, Res, Op>
     where
         Arg: types::arg::State,
         Res: types::res::State,
@@ -914,10 +914,12 @@ pub mod op {
         pub struct Any;
 
         impl Feature for Any {
-            type NArgs<Arg> = ()
+            type NArgs<Arg>
+                = ()
             where
                 Arg: types::arg::State + types::sealed::Tag;
-            type NRes<Res> = ()
+            type NRes<Res>
+                = ()
             where
                 Res: types::res::State + types::sealed::Tag;
             type Scale = ();
