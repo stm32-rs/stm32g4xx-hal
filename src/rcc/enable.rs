@@ -239,3 +239,8 @@ bus! {
     HRTIM_TIME => (APB2, 26),
     HRTIM_TIMF => (APB2, 26),
 }
+
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
+bus! {
+    HRTIM_COMMON => (APB2, 26),
+}
