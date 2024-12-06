@@ -67,6 +67,8 @@ pub use stm32g4::stm32g491 as stm32;
 #[cfg(feature = "stm32g4a1")]
 pub use stm32g4::stm32g4a1 as stm32;
 
+pub use stm32 as pac;
+
 #[cfg(feature = "rt")]
 pub use crate::stm32::interrupt;
 
