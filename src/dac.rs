@@ -418,6 +418,11 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS,
     }
 }
 
+impl<DAC: Instance, const CH: u8, const MODE_BITS: u8, ED> crate::stasis::Freeze
+    for DacCh<DAC, CH, MODE_BITS, ED>
+{
+}
+
 /// Sawtooth generator state implementation
 impl<DAC: Instance, const CH: u8, const MODE_BITS: u8>
     DacCh<DAC, CH, MODE_BITS, SawtoothGenerator>

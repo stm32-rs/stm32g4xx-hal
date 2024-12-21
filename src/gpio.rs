@@ -442,6 +442,8 @@ macro_rules! gpio {
                     }
                 }
 
+                impl<MODE> crate::stasis::Freeze for $PXi<MODE> { }
+
                 impl<MODE> $PXi<MODE> {
                     /// Configures the pin to operate as a floating input pin
                     pub fn into_floating_input(self) -> $PXi<Input<Floating>> {

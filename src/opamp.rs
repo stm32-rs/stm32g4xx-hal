@@ -60,6 +60,7 @@
 // TODO: Add support for calibration
 
 use core::{borrow::Borrow, marker::PhantomData};
+use crate::stasis;
 
 /// PGA Gain
 pub enum Gain {
@@ -356,6 +357,9 @@ macro_rules! opamps {
                     }
                 }
 
+                impl<Input, Output> stasis::Freeze for Follower<$opamp, Input, Output> { }
+                impl<Output> stasis::Freeze for Locked<$opamp, Output> { }
+
                 impl<Input, Output> Follower<$opamp, Input, Output> {
                     /// Set the lock bit in the registers. After the lock bit is
                     /// set the opamp cannot be reconfigured until the chip is
@@ -404,6 +408,8 @@ macro_rules! opamps {
                         }
                     }
                 }
+
+                impl<NonInverting, Inverting, Output> stasis::Freeze for OpenLoop<$opamp, NonInverting, Inverting, Output> { }
 
                 impl<NonInverting, Inverting, Output> OpenLoop<$opamp, NonInverting, Inverting, Output> {
                     /// Set the lock bit in the registers. After the lock bit is
@@ -455,6 +461,8 @@ macro_rules! opamps {
                         }
                     }
                 }
+
+                impl<NonInverting, Output> stasis::Freeze for Pga<$opamp, NonInverting, Output> { }
 
                 impl<NonInverting, Output> Pga<$opamp, NonInverting, Output> {
                     /// Set the lock bit in the registers. After the lock bit is
