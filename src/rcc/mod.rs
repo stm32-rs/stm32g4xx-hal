@@ -240,7 +240,7 @@ impl Rcc {
     pub fn unlock_rtc(&mut self) {
         self.rb.apb1enr1().modify(|_, w| w.pwren().set_bit());
         let pwr = unsafe { &(*PWR::ptr()) };
-        pwr.cr1().modify(|_, w| w.dbp().set_bit());
+        pwr.pwr_cr1().modify(|_, w| w.dbp().set_bit());
     }
 
     fn config_pll(&self, pll_cfg: PllConfig) -> PLLClocks {
@@ -455,7 +455,7 @@ impl Rcc {
         let csr = self.rb.csr().read();
 
         ResetReason {
-            low_power: csr.lpwrstf().bit(),
+            low_power: csr.lpwrrstf().bit(),
             window_watchdog: csr.wwdgrstf().bit(),
             independent_watchdog: csr.iwdgrstf().bit(),
             software: csr.sftrstf().bit(),
