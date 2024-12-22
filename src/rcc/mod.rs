@@ -240,7 +240,7 @@ impl Rcc {
     pub fn unlock_rtc(&mut self) {
         self.rb.apb1enr1().modify(|_, w| w.pwren().set_bit());
         let pwr = unsafe { &(*PWR::ptr()) };
-        pwr.pwr_cr1().modify(|_, w| w.dbp().set_bit());
+        pwr.cr1().modify(|_, w| w.dbp().set_bit());
     }
 
     fn config_pll(&self, pll_cfg: PllConfig) -> PLLClocks {
