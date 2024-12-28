@@ -1663,14 +1663,14 @@ macro_rules! adc {
                     self.calibrate_all();
                     self.apply_config(self.config);
 
-                    self.adc_reg.isr().modify(|_, w| w.adrdy().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.adrdy().clear());
                     self.adc_reg.cr().modify(|_, w| w.aden().set_bit());
 
                     // Wait for adc to get ready
                     while !self.adc_reg.isr().read().adrdy().bit_is_set() {}
 
                     // Clear ready flag
-                    self.adc_reg.isr().modify(|_, w| w.adrdy().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.adrdy().clear());
 
                     self.clear_end_of_conversion_flag();
                 }
@@ -1841,25 +1841,25 @@ macro_rules! adc {
                     self.config.difsel = df;
 
                     self.adc_reg.difsel().modify(|_, w| {w
-                        .difsel_0().bit(df.get_channel(0).into() )
-                        .difsel_1().bit(df.get_channel(1).into() )
-                        .difsel_2().bit(df.get_channel(2).into() )
-                        .difsel_3().bit(df.get_channel(3).into() )
-                        .difsel_4().bit(df.get_channel(4).into() )
-                        .difsel_5().bit(df.get_channel(5).into() )
-                        .difsel_6().bit(df.get_channel(6).into() )
-                        .difsel_7().bit(df.get_channel(7).into() )
-                        .difsel_8().bit(df.get_channel(8).into() )
-                        .difsel_9().bit(df.get_channel(9).into() )
-                        .difsel_10().bit(df.get_channel(10).into() )
-                        .difsel_11().bit(df.get_channel(11).into() )
-                        .difsel_12().bit(df.get_channel(12).into() )
-                        .difsel_13().bit(df.get_channel(13).into() )
-                        .difsel_14().bit(df.get_channel(14).into() )
-                        .difsel_15().bit(df.get_channel(15).into() )
-                        .difsel_16().bit(df.get_channel(16).into() )
-                        .difsel_17().bit(df.get_channel(17).into() )
-                        .difsel_18().bit(df.get_channel(18).into() )
+                        .difsel0().bit(df.get_channel(0).into() )
+                        .difsel1().bit(df.get_channel(1).into() )
+                        .difsel2().bit(df.get_channel(2).into() )
+                        .difsel3().bit(df.get_channel(3).into() )
+                        .difsel4().bit(df.get_channel(4).into() )
+                        .difsel5().bit(df.get_channel(5).into() )
+                        .difsel6().bit(df.get_channel(6).into() )
+                        .difsel7().bit(df.get_channel(7).into() )
+                        .difsel8().bit(df.get_channel(8).into() )
+                        .difsel9().bit(df.get_channel(9).into() )
+                        .difsel10().bit(df.get_channel(10).into() )
+                        .difsel11().bit(df.get_channel(11).into() )
+                        .difsel12().bit(df.get_channel(12).into() )
+                        .difsel13().bit(df.get_channel(13).into() )
+                        .difsel14().bit(df.get_channel(14).into() )
+                        .difsel15().bit(df.get_channel(15).into() )
+                        .difsel16().bit(df.get_channel(16).into() )
+                        .difsel17().bit(df.get_channel(17).into() )
+                        .difsel18().bit(df.get_channel(18).into() )
                     });
                 }
 
@@ -2015,7 +2015,7 @@ macro_rules! adc {
                 /// Resets the end-of-conversion flag
                 #[inline(always)]
                 pub fn clear_end_of_conversion_flag(&mut self) {
-                    self.adc_reg.isr().modify(|_, w| w.eoc().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.eoc().clear());
                 }
 
                 /// Block until the conversion is completed and return to configured
@@ -2124,7 +2124,7 @@ macro_rules! adc {
                 /// Resets the overrun flag
                 #[inline(always)]
                 pub fn clear_overrun_flag(&mut self) {
-                    self.adc_reg.isr().modify(|_, w| w.ovr().set_bit());
+                    self.adc_reg.isr().modify(|_, w| w.ovr().clear());
                 }
             }
 
