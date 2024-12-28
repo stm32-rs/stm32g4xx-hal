@@ -15,6 +15,7 @@ version = "0.0.2"
 nb = "0.1.1"
 #stm32g4 = { git = "https://github.com/stm32-rs/stm32-rs-nightlies" } #"0.15.1"
 stm32g4 = { version = "0.19.0", package = "stm32g4-staging" }
+proto-hal = { git = "https://github.com/AdinAck/proto-hal", rev = "9030895" }
 paste = "1.0"
 bitflags = "1.2"
 vcell = "0.1"

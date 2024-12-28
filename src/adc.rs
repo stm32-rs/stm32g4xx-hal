@@ -24,6 +24,7 @@ use embedded_hal::{
     adc::{Channel, OneShot},
     blocking::delay::DelayUs,
 };
+use proto_hal::stasis;
 
 use self::config::ExternalTrigger12;
 
@@ -136,7 +137,9 @@ impl Temperature {
 macro_rules! adc_pins {
     ($($pin:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
         $(
-            impl Channel<stm32::$adc> for $pin {
+            impl<P> Channel<stm32::$adc> for P
+                where P: stasis::EntitlementLock<Resource = $pin>
+            {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
@@ -147,22 +150,30 @@ macro_rules! adc_pins {
 macro_rules! adc_opamp {
     ($($opamp:ty => ($adc:ident, $chan:expr)),+ $(,)*) => {
         $(
-            impl<A> Channel<stm32::$adc> for opamp::Follower<$opamp, A, InternalOutput> {
+            impl<A, P> Channel<stm32::$adc> for P
+                where P: stasis::EntitlementLock<Resource = opamp::Follower<$opamp, A, InternalOutput>>
+            {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
 
-            impl<A, B> Channel<stm32::$adc> for opamp::OpenLoop<$opamp, A, B, InternalOutput> {
+            impl<A, B, P> Channel<stm32::$adc> for P
+                where P: stasis::EntitlementLock<Resource = opamp::OpenLoop<$opamp, A, B, InternalOutput>>
+            {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
 
-            impl<A> Channel<stm32::$adc> for opamp::Pga<$opamp, A, InternalOutput> {
+            impl<A, P> Channel<stm32::$adc> for P
+                where P: stasis::EntitlementLock<Resource = opamp::Pga<$opamp, A, InternalOutput>>
+            {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }
 
-            impl Channel<stm32::$adc> for opamp::Locked<$opamp, InternalOutput> {
+            impl<P> Channel<stm32::$adc> for P
+                where P: stasis::EntitlementLock<Resource = opamp::Locked<$opamp, InternalOutput>>
+            {
                 type ID = u8;
                 fn channel() -> u8 { $chan }
             }

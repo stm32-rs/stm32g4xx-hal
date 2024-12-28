@@ -218,6 +218,8 @@ macro_rules! dac_helper {
                 }
             }
 
+            impl<const MODE_BITS: u8, ED> proto_hal::stasis::Freeze for $CX<MODE_BITS, ED> { }
+
             impl<const MODE_BITS: u8, ED> $CX<MODE_BITS, ED> {
                 /// Calibrate the DAC output buffer by performing a "User
                 /// trimming" operation. It is useful when the VDDA/VREF+
