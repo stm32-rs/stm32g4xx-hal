@@ -401,7 +401,7 @@ macro_rules! gpio {
                             gpio.pupdr().modify(|_, w| {
                                 w.pupdr($i).pull_down()
                             });
-                            
+
                         });
                         $PXi { _mode: PhantomData }
                     }
