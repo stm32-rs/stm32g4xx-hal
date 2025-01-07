@@ -346,7 +346,7 @@ impl<I: Instance, const N: u8> Channel for C<I, N> {
     fn get_half_transfer_flag(&self) -> bool {
         //NOTE(unsafe) Atomic read with no side effects
         let dma = unsafe { &*I::ptr() };
-        dma.isr().read().htif(N as u8).bit_is_set()
+        dma.isr().read().htif(N).bit_is_set()
     }
 
     #[inline(always)]
@@ -354,7 +354,7 @@ impl<I: Instance, const N: u8> Channel for C<I, N> {
         //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
         // that belongs to the ChannelX
         let dma = unsafe { &*I::ptr() };
-        dma.ifcr().write(|w| w.chtif(N as u8).set_bit());
+        dma.ifcr().write(|w| w.chtif(N).set_bit());
         let _ = dma.isr().read();
         let _ = dma.isr().read(); // Delay 2 peripheral clocks
     }
@@ -446,7 +446,7 @@ impl<I: Instance, const N: u8> C<I, N> {
         //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
         // that belongs to the ChannelX
         let dma = unsafe { &*I::ptr() };
-        dma.ifcr().write(|w| w.chtif(N as u8).set_bit());
+        dma.ifcr().write(|w| w.chtif(N).set_bit());
         let _ = dma.isr().read();
         let _ = dma.isr().read(); // Delay 2 peripheral clocks
     }
@@ -455,7 +455,7 @@ impl<I: Instance, const N: u8> C<I, N> {
     pub fn get_half_transfer_flag() -> bool {
         //NOTE(unsafe) Atomic read with no side effects
         let dma = unsafe { &*I::ptr() };
-        dma.isr().read().htif(N as u8).bit_is_set()
+        dma.isr().read().htif(N).bit_is_set()
     }
 
     #[inline(always)]
