@@ -16,6 +16,7 @@ pub const HSI_FREQ: u32 = 16_000_000;
 
 /// Clock frequencies
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Clocks {
     /// System frequency
     pub sys_clk: Hertz,
@@ -37,6 +38,7 @@ pub struct Clocks {
 
 /// PLL Clock frequencies
 #[derive(Clone, Copy, Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PLLClocks {
     /// R frequency
     pub r: Option<Hertz>,
