@@ -43,3 +43,4 @@ pub use crate::pwm::PwmExt as _;
 // pub use crate::timer::TimerExt as _;
 // pub use crate::watchdog::IWDGExt as _;
 // pub use crate::watchdog::WWDGExt as _;
+pub use crate::pwr::PwrExt as _;
