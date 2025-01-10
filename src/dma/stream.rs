@@ -71,34 +71,42 @@ pub struct DmaInterrupts {
 }
 
 /// Stream 0 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream0<DMA> {
     _dma: PhantomData<DMA>,
 }
 /// Stream 1 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream1<DMA> {
     _dma: PhantomData<DMA>,
 }
 /// Stream 2 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream2<DMA> {
     _dma: PhantomData<DMA>,
 }
 /// Stream 3 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream3<DMA> {
     _dma: PhantomData<DMA>,
 }
 /// Stream 4 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream4<DMA> {
     _dma: PhantomData<DMA>,
 }
 /// Stream 5 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream5<DMA> {
     _dma: PhantomData<DMA>,
 }
 /// Stream 6 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream6<DMA> {
     _dma: PhantomData<DMA>,
 }
 /// Stream 7 on DMA
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Stream7<DMA> {
     _dma: PhantomData<DMA>,
 }

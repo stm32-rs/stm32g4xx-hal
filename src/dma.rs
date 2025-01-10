@@ -28,6 +28,7 @@ pub use transfer::{Transfer, TransferExt};
 
 /// Errors.
 #[derive(PartialEq, Debug, Copy, Clone)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DMAError {
     /// DMA not ready to change buffers.
     NotReady,
@@ -39,6 +40,7 @@ pub enum DMAError {
 
 /// Possible DMA's directions.
 #[derive(Debug, Clone, Copy, PartialEq)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum DmaDirection {
     /// Memory to Memory transfer.
     MemoryToMemory,
@@ -50,6 +52,7 @@ pub enum DmaDirection {
 
 /// DMA from a peripheral to a memory location.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PeripheralToMemory;
 
 impl PeripheralToMemory {
@@ -73,6 +76,7 @@ impl Direction for PeripheralToMemory {
 
 /// DMA from one memory location to another memory location.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MemoryToMemory<T>
 where
     T: Into<u32>,
@@ -101,6 +105,7 @@ where
 
 /// DMA from a memory location to a peripheral.
 #[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MemoryToPeripheral;
 
 impl MemoryToPeripheral {
