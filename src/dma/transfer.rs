@@ -17,6 +17,7 @@ pub struct MutTransfer;
 pub struct ConstTransfer;
 
 /// DMA Transfer.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Transfer<STREAM, PERIPHERAL, DIR, BUF, TXFRT>
 where
     STREAM: Stream,
