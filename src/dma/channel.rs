@@ -91,9 +91,9 @@ pub trait DMAExt<I> {
 impl DMAExt<Self> for DMA1 {
     fn split(self, rcc: &Rcc) -> Channels<DMA1> {
         // Enable DMAMux is not yet enabled
-        if !rcc.rb.ahb1enr().read().dmamuxen().bit_is_set() {
+        if !rcc.rb.ahb1enr().read().dmamux1en().bit_is_set() {
             // Enable peripheral
-            rcc.rb.ahb1enr().modify(|_, w| w.dmamuxen().set_bit());
+            rcc.rb.ahb1enr().modify(|_, w| w.dmamux1en().set_bit());
         }
 
         // Enable peripheral
@@ -106,9 +106,9 @@ impl DMAExt<Self> for DMA1 {
 impl DMAExt<Self> for DMA2 {
     fn split(self, rcc: &Rcc) -> Channels<DMA2> {
         // Enable DMAMux is not yet enabled
-        if !rcc.rb.ahb1enr().read().dmamuxen().bit_is_set() {
+        if !rcc.rb.ahb1enr().read().dmamux1en().bit_is_set() {
             // Enable peripheral
-            rcc.rb.ahb1enr().modify(|_, w| w.dmamuxen().set_bit());
+            rcc.rb.ahb1enr().modify(|_, w| w.dmamux1en().set_bit());
         }
 
         // Enable peripheral

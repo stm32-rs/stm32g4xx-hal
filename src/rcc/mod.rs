@@ -457,7 +457,7 @@ impl Rcc {
         let csr = self.rb.csr().read();
 
         ResetReason {
-            low_power: csr.lpwrstf().bit(),
+            low_power: csr.lpwrrstf().bit(),
             window_watchdog: csr.wwdgrstf().bit(),
             independent_watchdog: csr.iwdgrstf().bit(),
             software: csr.sftrstf().bit(),
