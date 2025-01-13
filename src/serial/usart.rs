@@ -16,6 +16,7 @@ use nb::block;
 use crate::serial::config::*;
 /// Serial error
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Framing error
     Framing,
@@ -28,6 +29,7 @@ pub enum Error {
 }
 
 /// Interrupt event
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Event {
     /// TXFIFO reaches the threshold
     TXFT = 1 << 27,
@@ -74,6 +76,7 @@ impl Event {
 }
 
 /// Serial receiver
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Rx<USART, Pin, Dma> {
     pin: Pin,
     _usart: PhantomData<USART>,
@@ -81,6 +84,7 @@ pub struct Rx<USART, Pin, Dma> {
 }
 
 /// Serial transmitter
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Tx<USART, Pin, Dma> {
     pin: Pin,
     usart: USART,
@@ -88,6 +92,7 @@ pub struct Tx<USART, Pin, Dma> {
 }
 
 /// Serial abstraction
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Serial<USART, TXPin, RXPin> {
     tx: Tx<USART, TXPin, NoDMA>,
     rx: Rx<USART, RXPin, NoDMA>,
@@ -99,15 +104,18 @@ pub trait TxPin<USART> {}
 /// Serial RX pin
 pub trait RxPin<USART> {}
 
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct NoTx;
 
 impl<USART> TxPin<USART> for NoTx {}
 
 /// Type state for Tx/Rx, indicating operation without DMA
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct NoDMA;
 /// Type state for Tx/Rx, indicating configuration for DMA
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct DMA;
 
 pub trait SerialExt<USART, Config> {
