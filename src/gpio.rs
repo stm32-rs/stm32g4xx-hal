@@ -18,34 +18,43 @@ pub trait GpioExt {
 }
 
 /// Input mode (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Input<MODE> {
     _mode: PhantomData<MODE>,
 }
 
 /// Floating input (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Floating;
 
 /// Pulled down input (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PullDown;
 
 /// Pulled up input (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PullUp;
 
 /// Open drain input or output (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct OpenDrain;
 
 /// Analog mode (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Analog;
 
 /// Output mode (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Output<MODE> {
     _mode: PhantomData<MODE>,
 }
 
 /// Push pull output (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct PushPull;
 
 /// GPIO Pin speed selection
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Speed {
     Low = 0,
     Medium = 1,
@@ -54,6 +63,7 @@ pub enum Speed {
 }
 
 /// Trigger edgw
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum SignalEdge {
     Rising,
     Falling,
@@ -61,7 +71,9 @@ pub enum SignalEdge {
 }
 
 /// Altername Mode (type state)
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Alternate<const A: u8>;
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct AlternateOD<const A: u8>;
 
 pub const AF0: u8 = 0;
@@ -267,6 +279,7 @@ macro_rules! gpio {
             }
 
             /// Partially erased pin
+            #[cfg_attr(feature = "defmt", derive(defmt::Format))]
             pub struct $PXx<MODE> {
                 i: u8,
                 _mode: PhantomData<MODE>,
@@ -338,6 +351,7 @@ macro_rules! gpio {
             exti_erased!($PXx<Input<MODE>>, $Pxn);
 
             $(
+                #[cfg_attr(feature = "defmt", derive(defmt::Format))]
                 pub struct $PXi<MODE> {
                     _mode: PhantomData<MODE>,
                 }
