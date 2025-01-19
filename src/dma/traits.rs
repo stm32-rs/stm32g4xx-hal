@@ -13,21 +13,16 @@ pub(crate) mod sealed {
     }
     pub trait Sealed {}
 }
+use config::DmaConfig;
 use sealed::Sealed;
 
 /// Minimal trait for DMA channels
 pub trait Channel: Sealed {
-    /// Number of the channel register
-    const NUMBER: usize;
-
-    /// Configuration structure for this channel.
-    type Config;
-
     /// Structure representing interrupts
     type Interrupts: Copy + Debug;
 
     /// Apply the configation structure to this channel.
-    fn apply_config(&mut self, config: Self::Config);
+    fn apply_config(&mut self, config: DmaConfig);
 
     /// Clear all interrupts for the DMA channel.
     fn clear_interrupts(&mut self);
@@ -45,10 +40,10 @@ pub trait Channel: Sealed {
     fn clear_transfer_error_interrupt(&mut self);
 
     /// Get transfer complete flag.
-    fn get_transfer_complete_flag() -> bool;
+    fn get_transfer_complete_flag(&self) -> bool;
 
     /// Get transfer error flag.
-    fn get_transfer_error_flag() -> bool;
+    fn get_transfer_error_flag(&self) -> bool;
 
     /// Enable the DMA channel.
     ///
@@ -58,7 +53,7 @@ pub trait Channel: Sealed {
     unsafe fn enable(&mut self);
 
     /// Returns the state of the DMA channel.
-    fn is_enabled() -> bool;
+    fn is_enabled(&self) -> bool;
 
     /// Disable the DMA channel.
     ///
@@ -81,7 +76,7 @@ pub trait Channel: Sealed {
     fn enable_interrupts(&mut self, interrupts: Self::Interrupts);
 
     /// Get the value of all the interrupts for this DMA channel
-    fn get_interrupts_enable() -> Self::Interrupts;
+    fn get_interrupts_enable(&self) -> Self::Interrupts;
 
     /// Enable/disable the transfer complete interrupt (tcie) of the DMA channel.
     fn set_transfer_complete_interrupt_enable(&mut self, transfer_complete_interrupt: bool);
@@ -110,7 +105,7 @@ pub trait Channel: Sealed {
     fn clear_half_transfer_interrupt(&mut self);
 
     /// Get half transfer flag.
-    fn get_half_transfer_flag() -> bool;
+    fn get_half_transfer_flag(&self) -> bool;
 
     /// Get the memory address for the DMA channel.
     fn get_memory_address(&self) -> u32;
@@ -125,7 +120,7 @@ pub trait Channel: Sealed {
     fn set_number_of_transfers(&mut self, value: u16);
 
     /// Get the number of transfers (ndt) for the DMA channel.
-    fn get_number_of_transfers() -> u16;
+    fn get_number_of_transfers(&self) -> u16;
 
     /// Set the memory size (msize) for the DMA channel.
     ///

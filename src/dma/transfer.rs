@@ -11,6 +11,8 @@ use core::{
 };
 use embedded_dma::{StaticReadBuffer, StaticWriteBuffer};
 
+use super::config::DmaConfig;
+
 /// Marker type for a transfer with a mutable source and backed by a
 pub struct MutTransfer;
 /// Marker type for a transfer with a constant source and backed by a
@@ -33,10 +35,10 @@ where
 macro_rules! transfer_def {
     ($Marker:ty, $init:ident, $Buffer:tt, $rw_buffer:ident $(, $mut:tt)*;
      $($constraint:stmt)*) => {
-        impl<CHANNEL, CONFIG, PERIPHERAL, DIR, BUF>
+        impl<CHANNEL, PERIPHERAL, DIR, BUF>
             Transfer<CHANNEL, PERIPHERAL, DIR, BUF, $Marker>
         where
-            CHANNEL: Channel<Config = CONFIG>,
+            CHANNEL: Channel,
             DIR: Direction,
             PERIPHERAL: TargetAddress<DIR>,
             BUF: $Buffer<Word = <PERIPHERAL as TargetAddress<DIR>>::MemSize>,
@@ -52,7 +54,7 @@ macro_rules! transfer_def {
                 mut channel: CHANNEL,
                 peripheral: PERIPHERAL,
                 $($mut)* memory: BUF,
-                config: CONFIG,
+                config: DmaConfig,
             ) -> Self {
                 channel.disable();
 
@@ -141,14 +143,14 @@ transfer_def!(MutTransfer, init, StaticWriteBuffer, write_buffer, mut;);
 transfer_def!(ConstTransfer, init_const, StaticReadBuffer, read_buffer;
                  assert!(DIR::direction() != DmaDirection::PeripheralToMemory));
 
-impl<CHANNEL, CONFIG, PERIPHERAL, DIR, BUF, TXFRT> Transfer<CHANNEL, PERIPHERAL, DIR, BUF, TXFRT>
+impl<CHANNEL, PERIPHERAL, DIR, BUF, TXFRT> Transfer<CHANNEL, PERIPHERAL, DIR, BUF, TXFRT>
 where
-    CHANNEL: Channel<Config = CONFIG>,
+    CHANNEL: Channel,
     DIR: Direction,
     PERIPHERAL: TargetAddress<DIR>,
 {
     /// Applies all fields in DmaConfig.
-    fn apply_config(&mut self, config: CONFIG) {
+    fn apply_config(&mut self, config: DmaConfig) {
         let msize = mem::size_of::<<PERIPHERAL as TargetAddress<DIR>>::MemSize>() / 2;
 
         self.channel.clear_interrupts();
@@ -178,7 +180,7 @@ where
         fence(Ordering::SeqCst);
 
         // Check how many data in the transfer are remaining.
-        let remaining_data = CHANNEL::get_number_of_transfers();
+        let remaining_data = self.channel.get_number_of_transfers();
 
         let result = func(&self.buf, remaining_data as usize);
 
@@ -262,12 +264,12 @@ where
 
     #[inline(always)]
     pub fn get_transfer_complete_flag(&self) -> bool {
-        CHANNEL::get_transfer_complete_flag()
+        self.channel.get_transfer_complete_flag()
     }
 
     #[inline(always)]
     pub fn get_transfer_error_flag(&self) -> bool {
-        CHANNEL::get_transfer_error_flag()
+        self.channel.get_transfer_error_flag()
     }
 
     /// Clear half transfer interrupt (htif) for the DMA channel.
@@ -278,7 +280,7 @@ where
 
     #[inline(always)]
     pub fn get_half_transfer_flag(&self) -> bool {
-        CHANNEL::get_half_transfer_flag()
+        self.channel.get_half_transfer_flag()
     }
 }
 
@@ -307,9 +309,9 @@ where
     r_pos: usize,
 }
 
-impl<CHANNEL, CONFIG, PERIPHERAL, BUF> CircTransfer<CHANNEL, PERIPHERAL, BUF>
+impl<CHANNEL, PERIPHERAL, BUF> CircTransfer<CHANNEL, PERIPHERAL, BUF>
 where
-    CHANNEL: Channel<Config = CONFIG>,
+    CHANNEL: Channel,
     BUF: StaticWriteBuffer + Deref,
     <BUF as Deref>::Target:
         Index<Range<usize>, Output = [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize]>,
@@ -319,7 +321,7 @@ where
     /// Return the number of elements available to read
     pub fn elements_available(&mut self) -> usize {
         let blen = unsafe { self.transfer.buf.static_write_buffer().1 };
-        let ndtr = CHANNEL::get_number_of_transfers() as usize;
+        let ndtr = self.transfer.channel.get_number_of_transfers() as usize;
         let pos_at = self.r_pos;
 
         // the position the DMA would write to next
@@ -461,9 +463,9 @@ where
 
 macro_rules! impl_adc_overrun {
     ($($adc:ident, )*) => {$(
-        impl<CHANNEL, CONFIG, BUF> CircTransfer<CHANNEL, crate::adc::Adc<crate::stm32::$adc, crate::adc::DMA>, BUF>
+        impl<CHANNEL, BUF> CircTransfer<CHANNEL, crate::adc::Adc<crate::stm32::$adc, crate::adc::DMA>, BUF>
         where
-            CHANNEL: Channel<Config = CONFIG>,
+            CHANNEL: Channel,
             BUF: StaticWriteBuffer + Deref,
             <BUF as Deref>::Target: Index<Range<usize>, Output = [u16]> {
             /// This is set when the AD finishes a conversion before the DMA has hade time to transfer the previous value
@@ -539,7 +541,7 @@ where
         self,
         per: PERIPHERAL,
         buf: BUF,
-        config: <CHANNEL as traits::Channel>::Config,
+        config: DmaConfig,
     ) -> Transfer<CHANNEL, PERIPHERAL, MemoryToMemory<T>, BUF, MutTransfer>
     where
         T: Into<u32>,
@@ -549,7 +551,7 @@ where
         self,
         per: PERIPHERAL,
         buf: BUF,
-        config: <CHANNEL as traits::Channel>::Config,
+        config: DmaConfig,
     ) -> Transfer<CHANNEL, PERIPHERAL, PeripheralToMemory, BUF, MutTransfer>
     where
         PERIPHERAL: TargetAddress<PeripheralToMemory>,
@@ -558,7 +560,7 @@ where
         self,
         per: PERIPHERAL,
         buf: BUF,
-        config: <CHANNEL as traits::Channel>::Config,
+        config: DmaConfig,
     ) -> Transfer<CHANNEL, PERIPHERAL, MemoryToPeripheral, BUF, ConstTransfer>
     where
         PERIPHERAL: TargetAddress<MemoryToPeripheral>,
@@ -567,7 +569,7 @@ where
         self,
         src: PSRC,
         dst: PDST,
-        config: <CHANNEL as traits::Channel>::Config,
+        config: DmaConfig,
     ) -> Transfer<CHANNEL, PSRC, PeripheralToMemory, &'static mut [PDST::MemSize; 1], MutTransfer>
     where
         PSRC: TargetAddress<PeripheralToMemory>,
@@ -579,7 +581,7 @@ where
         self,
         per: PERIPHERAL,
         buf: BUF,
-        config: <CHANNEL as traits::Channel>::Config,
+        config: DmaConfig,
     ) -> CircTransfer<CHANNEL, PERIPHERAL, BUF>
     where
         PERIPHERAL: TargetAddress<PeripheralToMemory>,
@@ -592,126 +594,87 @@ where
         >;
 }
 
-macro_rules! transfer_constructor {
-    ($(($DMA:ident, $CHANNEL:ident),)+) => {
-        $(
-        impl TransferExt<Self> for crate::dma::channel::$CHANNEL<crate::stm32::$DMA>
-        where
-            crate::stm32::$DMA: crate::dma::channel::Instance,
-            Self: traits::Channel,
-        {
-            fn into_memory_to_memory_transfer<PERIPHERAL, BUF, T>(
-                self,
-                per: PERIPHERAL,
-                buf: BUF,
-                mut config: <Self as traits::Channel>::Config,
-            ) -> Transfer<Self, PERIPHERAL, MemoryToMemory<T>, BUF, MutTransfer>
-            where
-                T: Into<u32>,
-                PERIPHERAL: TargetAddress<MemoryToMemory<T>>,
-                BUF: StaticWriteBuffer<
-                    Word = <PERIPHERAL as TargetAddress<MemoryToMemory<T>>>::MemSize,
-                >,
-            {
-                config.circular_buffer = false;
-                Transfer::init(self, per, buf, config)
-            }
-            fn into_peripheral_to_memory_transfer<PERIPHERAL, BUF>(
-                self,
-                per: PERIPHERAL,
-                buf: BUF,
-                config: <Self as traits::Channel>::Config,
-            ) -> Transfer<Self, PERIPHERAL, PeripheralToMemory, BUF, MutTransfer>
-            where
-                PERIPHERAL: TargetAddress<PeripheralToMemory>,
-                BUF: StaticWriteBuffer<
-                    Word = <PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize,
-                >,
-            {
-                Transfer::init(self, per, buf, config)
-            }
-            fn into_memory_to_peripheral_transfer<PERIPHERAL, BUF>(
-                self,
-                per: PERIPHERAL,
-                buf: BUF,
-                config: <Self as traits::Channel>::Config,
-            ) -> Transfer<Self, PERIPHERAL, MemoryToPeripheral, BUF, ConstTransfer>
-            where
-                PERIPHERAL: TargetAddress<MemoryToPeripheral>,
-                BUF: StaticReadBuffer<
-                    Word = <PERIPHERAL as TargetAddress<MemoryToPeripheral>>::MemSize,
-                >,
-            {
-                Transfer::init_const(self, per, buf, config)
-            }
-            fn into_peripheral_to_peripheral_transfer<PSRC, PDST>(
-                self,
-                src: PSRC,
-                dst: PDST,
-                config: <Self as traits::Channel>::Config,
-            ) -> Transfer<Self, PSRC, PeripheralToMemory, &'static mut [PDST::MemSize; 1], MutTransfer>
-            where
-                PSRC: TargetAddress<PeripheralToMemory>,
-                PDST: TargetAddress<MemoryToPeripheral>,
-                [<PDST as TargetAddress<MemoryToPeripheral>>::MemSize; 1]: embedded_dma::WriteTarget,
-                &'static mut [<PDST as TargetAddress<MemoryToPeripheral>>::MemSize; 1]:
-                StaticWriteBuffer<Word = <PSRC as TargetAddress<PeripheralToMemory>>::MemSize> {
-                let data_addr: u32 = dst.address();
-                let ptr: &mut PDST::MemSize = unsafe { &mut *(data_addr as *mut _) };
-                 //TODO: check that this is correct; nightly has core::array::from_mut...
-                let dst: &mut [PDST::MemSize; 1] = core::array::from_mut(ptr);
-                Transfer::init(self, src, dst, config)
-            }
-            fn into_circ_peripheral_to_memory_transfer<PERIPHERAL, BUF>(
-                self,
-                per: PERIPHERAL,
-                buf: BUF,
-                config: <Self as traits::Channel>::Config,
-            ) -> CircTransfer<Self, PERIPHERAL, BUF>
-            where PERIPHERAL: TargetAddress<PeripheralToMemory>,
-                <PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize: Copy,
-                BUF: StaticWriteBuffer<Word = <PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize>,
-                BUF: Deref,
-                <BUF as Deref>::Target: Index< Range<usize>,
-                    Output = [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize], > {
-                CircTransfer {
-                    transfer: Transfer::init(self, per, buf, config),
-                    r_pos: 0,
-                }
-            }
+impl<DMA, const N: u8> TransferExt<Self> for crate::dma::channel::C<DMA, N>
+where
+    DMA: crate::dma::channel::Instance,
+    Self: traits::Channel,
+{
+    fn into_memory_to_memory_transfer<PERIPHERAL, BUF, T>(
+        self,
+        per: PERIPHERAL,
+        buf: BUF,
+        mut config: DmaConfig,
+    ) -> Transfer<Self, PERIPHERAL, MemoryToMemory<T>, BUF, MutTransfer>
+    where
+        T: Into<u32>,
+        PERIPHERAL: TargetAddress<MemoryToMemory<T>>,
+        BUF: StaticWriteBuffer<Word = <PERIPHERAL as TargetAddress<MemoryToMemory<T>>>::MemSize>,
+    {
+        config.circular_buffer = false;
+        Transfer::init(self, per, buf, config)
+    }
+    fn into_peripheral_to_memory_transfer<PERIPHERAL, BUF>(
+        self,
+        per: PERIPHERAL,
+        buf: BUF,
+        config: DmaConfig,
+    ) -> Transfer<Self, PERIPHERAL, PeripheralToMemory, BUF, MutTransfer>
+    where
+        PERIPHERAL: TargetAddress<PeripheralToMemory>,
+        BUF: StaticWriteBuffer<Word = <PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize>,
+    {
+        Transfer::init(self, per, buf, config)
+    }
+    fn into_memory_to_peripheral_transfer<PERIPHERAL, BUF>(
+        self,
+        per: PERIPHERAL,
+        buf: BUF,
+        config: DmaConfig,
+    ) -> Transfer<Self, PERIPHERAL, MemoryToPeripheral, BUF, ConstTransfer>
+    where
+        PERIPHERAL: TargetAddress<MemoryToPeripheral>,
+        BUF: StaticReadBuffer<Word = <PERIPHERAL as TargetAddress<MemoryToPeripheral>>::MemSize>,
+    {
+        Transfer::init_const(self, per, buf, config)
+    }
+    fn into_peripheral_to_peripheral_transfer<PSRC, PDST>(
+        self,
+        src: PSRC,
+        dst: PDST,
+        config: DmaConfig,
+    ) -> Transfer<Self, PSRC, PeripheralToMemory, &'static mut [PDST::MemSize; 1], MutTransfer>
+    where
+        PSRC: TargetAddress<PeripheralToMemory>,
+        PDST: TargetAddress<MemoryToPeripheral>,
+        [<PDST as TargetAddress<MemoryToPeripheral>>::MemSize; 1]: embedded_dma::WriteTarget,
+        &'static mut [<PDST as TargetAddress<MemoryToPeripheral>>::MemSize; 1]:
+            StaticWriteBuffer<Word = <PSRC as TargetAddress<PeripheralToMemory>>::MemSize>,
+    {
+        let data_addr: u32 = dst.address();
+        let ptr: &mut PDST::MemSize = unsafe { &mut *(data_addr as *mut _) };
+        //TODO: check that this is correct; nightly has core::array::from_mut...
+        let dst: &mut [PDST::MemSize; 1] = core::array::from_mut(ptr);
+        Transfer::init(self, src, dst, config)
+    }
+    fn into_circ_peripheral_to_memory_transfer<PERIPHERAL, BUF>(
+        self,
+        per: PERIPHERAL,
+        buf: BUF,
+        config: DmaConfig,
+    ) -> CircTransfer<Self, PERIPHERAL, BUF>
+    where
+        PERIPHERAL: TargetAddress<PeripheralToMemory>,
+        <PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize: Copy,
+        BUF: StaticWriteBuffer<Word = <PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize>,
+        BUF: Deref,
+        <BUF as Deref>::Target: Index<
+            Range<usize>,
+            Output = [<PERIPHERAL as TargetAddress<PeripheralToMemory>>::MemSize],
+        >,
+    {
+        CircTransfer {
+            transfer: Transfer::init(self, per, buf, config),
+            r_pos: 0,
         }
-        )+
-    };
+    }
 }
-
-transfer_constructor!(
-    (DMA1, Channel1),
-    (DMA1, Channel2),
-    (DMA1, Channel3),
-    (DMA1, Channel4),
-    (DMA1, Channel5),
-    (DMA1, Channel6),
-    (DMA2, Channel1),
-    (DMA2, Channel2),
-    (DMA2, Channel3),
-    (DMA2, Channel4),
-    (DMA2, Channel5),
-    (DMA2, Channel6),
-);
-
-// Cat 3 and 4 devices
-#[cfg(any(
-    feature = "stm32g471",
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484",
-    feature = "stm32g491",
-    feature = "stm32g4a1",
-))]
-transfer_constructor!(
-    (DMA1, Channel7),
-    (DMA1, Channel8),
-    (DMA2, Channel7),
-    (DMA2, Channel8),
-);
