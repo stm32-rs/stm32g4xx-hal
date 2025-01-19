@@ -3,8 +3,7 @@
 #![no_main]
 #![no_std]
 
-use core::fmt::Write;
-
+use embedded_io::{Read, Write};
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::serial::FullConfig;
@@ -12,7 +11,6 @@ use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use nb::block;
 use utils::logger::info;
 
 #[macro_use]
@@ -54,11 +52,15 @@ fn main() -> ! {
         .unwrap();
 
     writeln!(usart, "Hello USART3, yay!!\r\n").unwrap();
+    let mut read_buf = [0u8; 8];
+    usart.read_exact(&mut read_buf).unwrap();
+    usart.write_all(&read_buf).unwrap();
 
+    let mut single_byte_buffer = [0; 1];
     let mut cnt = 0;
     loop {
-        match block!(usart.read()) {
-            Ok(byte) => writeln!(usart, "{}: {}\r", cnt, byte).unwrap(),
+        match usart.read_exact(&mut single_byte_buffer) {
+            Ok(()) => writeln!(usart, "{}: {}\r", cnt, single_byte_buffer[0]).unwrap(),
             Err(e) => writeln!(usart, "E: {:?}\r", e).unwrap(),
         };
         cnt += 1;

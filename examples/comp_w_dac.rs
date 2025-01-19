@@ -10,7 +10,6 @@ use rt::entry;
 
 #[entry]
 fn main() -> ! {
-    use embedded_hal::Direction;
     use hal::comparator::{self, ComparatorExt, ComparatorSplit};
     use hal::dac::{Dac1IntSig1, DacExt, DacOut};
     use hal::delay::SYSTDelayExt;
@@ -48,6 +47,11 @@ fn main() -> ! {
     // changed directly by the comparator.
     comp.output_pin(led2);
     let _comp1 = comp.enable().lock();
+
+    enum Direction {
+        Upcounting,
+        Downcounting,
+    }
 
     let mut dir = Direction::Upcounting;
     let mut val = 0;

@@ -8,7 +8,6 @@
 #![no_main]
 #![no_std]
 
-use embedded_hal::Direction;
 use hal::dac::{DacExt, DacOut, GeneratorConfig};
 use hal::delay::SYSTDelayExt;
 use hal::gpio::GpioExt;
@@ -36,6 +35,11 @@ fn main() -> ! {
 
     // dac_generator will have its value set automatically from its internal noise generator
     let mut dac_generator = dac1ch2.enable_generator(GeneratorConfig::noise(11));
+
+    enum Direction {
+        Upcounting,
+        Downcounting,
+    }
 
     let mut dir = Direction::Upcounting;
     let mut val = 0;

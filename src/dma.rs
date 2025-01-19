@@ -13,7 +13,7 @@
 //! instructions in DMA controller configuration.
 //!
 //! Adapted from
-//! https://github.com/stm32-rs/stm32h7xx-hal/blob/master/src/dma/mod.rs
+//! <https://github.com/stm32-rs/stm32h7xx-hal/blob/master/src/dma/mod.rs>
 
 use core::fmt::Debug;
 

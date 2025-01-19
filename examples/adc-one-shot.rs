@@ -3,7 +3,6 @@
 
 use crate::hal::{
     adc::{config::SampleTime, AdcClaim},
-    delay::SYSTDelayExt,
     pwr::PwrExt,
     rcc::Config,
     stm32::Peripherals,
@@ -13,10 +12,9 @@ use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
 
-use log::info;
-
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {

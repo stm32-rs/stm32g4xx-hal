@@ -14,7 +14,7 @@ use core::cell::RefCell;
 use core::sync::atomic::{AtomicBool, Ordering};
 use cortex_m::{asm::wfi, interrupt::Mutex};
 use cortex_m_rt::entry;
-use embedded_hal::digital::v2::OutputPin;
+use embedded_hal::digital::OutputPin;
 
 type ButtonPin = gpioc::PC13<Input<PullDown>>;
 

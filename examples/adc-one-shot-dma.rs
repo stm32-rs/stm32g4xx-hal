@@ -17,10 +17,9 @@ use crate::hal::{
 };
 use stm32g4xx_hal as hal;
 
-use log::info;
-
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -49,6 +48,7 @@ fn main() -> ! {
 
     info!("Setup Adc1");
     let mut delay = cp.SYST.delay(&rcc.clocks);
+
     let mut adc = dp
         .ADC1
         .claim(ClockSource::SystemClock, &rcc, &mut delay, true);

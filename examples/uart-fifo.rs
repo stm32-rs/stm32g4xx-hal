@@ -7,6 +7,7 @@ extern crate cortex_m_rt as rt;
 
 use core::fmt::Write;
 
+use embedded_io::{Read, ReadReady};
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::serial::*;
@@ -14,10 +15,10 @@ use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use log::info;
 
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -50,23 +51,24 @@ fn main() -> ! {
 
     let (mut tx1, mut rx1) = usart.split();
 
+    let mut buffer = [0; 4];
     let mut cnt = 0;
     loop {
         if rx1.fifo_threshold_reached() {
             loop {
-                match rx1.read() {
-                    Err(nb::Error::WouldBlock) => {
-                        // no more data available in fifo
-                        break;
-                    }
-                    Err(nb::Error::Other(_err)) => {
+                match rx1.read_ready() {
+                    Ok(true) => (),
+                    Ok(false) => break, // no more data available in fifo
+                    Err(e) => {
                         // Handle other error Overrun, Framing, Noise or Parity
-                    }
-                    Ok(byte) => {
-                        writeln!(tx1, "{}: {}\r", cnt, byte).unwrap();
-                        cnt += 1;
+                        utils::logger::error!("Error: {:?}", e);
                     }
                 }
+
+                let count = rx1.read(&mut buffer).unwrap();
+                let bytes = &buffer[count];
+                writeln!(tx1, "{}: {}\r", cnt, bytes).unwrap();
+                cnt += count;
             }
         }
     }
