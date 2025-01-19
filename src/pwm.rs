@@ -172,7 +172,6 @@
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
-use crate::hal;
 use crate::stm32::LPTIMER1;
 use crate::stm32::RCC;
 #[cfg(any(
@@ -215,6 +214,8 @@ use crate::gpio::gpiog::*;
 use crate::gpio::AF14;
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiof::*};
 use crate::gpio::{Alternate, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
+
+use core::mem::size_of;
 
 // This trait marks that a GPIO pin can be used with a specific timer channel
 // TIM is the timer being used
@@ -1404,7 +1405,7 @@ macro_rules! tim_hal {
             $(
                 impl<PINS, CHANNEL, COMP> PwmBuilder<$TIMX, PINS, CHANNEL, FaultDisabled, COMP, $typ> {
                     /// Configure a break pin that will disable PWM when activated (active level based on polarity argument)
-                    /// Note: not all timers have fault inputs; FaultPins<TIM> is only implemented for valid pins/timers.
+                    /// Note: not all timers have fault inputs; `FaultPins<TIM>` is only implemented for valid pins/timers.
                     pub fn with_break_pin<P: FaultPins<$TIMX>>(self, _pin: P, polarity: Polarity) -> PwmBuilder<$TIMX, PINS, CHANNEL, FaultEnabled, COMP, $typ> {
                         PwmBuilder {
                             _tim: PhantomData,
@@ -1495,18 +1496,14 @@ macro_rules! tim_pin_hal {
         $ccrx:ident, $typ:ident $(,$ccxne:ident, $ccxnp:ident)*),)+
     ) => {
         $(
-            impl<COMP, POL, NPOL> hal::PwmPin for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+            impl<COMP, POL, NPOL> Pwm<$TIMX, $CH, COMP, POL, NPOL>
                 where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
-                type Duty = $typ;
 
-                // You may not access self in the following methods!
-                // See unsafe above
-
-                fn disable(&mut self) {
+                pub fn disable(&mut self) {
                     self.ccer_disable();
                 }
 
-                fn enable(&mut self) {
+                pub fn enable(&mut self) {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     tim.$ccmrx_output().modify(|_, w|
@@ -1517,6 +1514,23 @@ macro_rules! tim_pin_hal {
                     );
 
                     self.ccer_enable();
+                }
+            }
+            impl<COMP, POL, NPOL> embedded_hal_old::PwmPin for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+                where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
+                type Duty = $typ;
+
+                // You may not access self in the following methods!
+                // See unsafe above
+
+                #[inline]
+                fn disable(&mut self) {
+                    Pwm::<$TIMX, $CH, COMP, POL, NPOL>::disable(self)
+                }
+
+                #[inline]
+                fn enable(&mut self) {
+                    Pwm::<$TIMX, $CH, COMP, POL, NPOL>::enable(self)
                 }
 
                 fn get_duty(&self) -> Self::Duty {
@@ -1540,8 +1554,7 @@ macro_rules! tim_pin_hal {
                     // In that case, 100% duty cycle is not possible, only 65535/65536
                     if arr == Self::Duty::MAX {
                         arr
-                    }
-                    else {
+                    } else {
                         arr + 1
                     }
                 }
@@ -1550,6 +1563,32 @@ macro_rules! tim_pin_hal {
                     let tim = unsafe { &*$TIMX::ptr() };
 
                     tim.$ccrx().write(|w| unsafe { w.ccr().bits(duty.into()) });
+                }
+            }
+
+            impl<COMP, POL, NPOL> embedded_hal::pwm::ErrorType for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+                where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
+                type Error = core::convert::Infallible;
+            }
+            impl<COMP, POL, NPOL> embedded_hal::pwm::SetDutyCycle for Pwm<$TIMX, $CH, COMP, POL, NPOL>
+                where Pwm<$TIMX, $CH, COMP, POL, NPOL>: PwmPinEnable {
+                fn max_duty_cycle(&self) -> u16 {
+                    let tim = unsafe { &*$TIMX::ptr() };
+                    let arr = tim.arr().read().arr().bits() as $typ;
+                    let arr = (arr >> (8*(size_of::<$typ>() - size_of::<u16>()))) as u16;
+                    // see note above
+                    if arr == u16::MAX {
+                        arr
+                    } else {
+                        arr + 1
+                    }
+                }
+                fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+                    // hal trait always has 16 bit resolution
+                    let duty = (duty as $typ) << (8*(size_of::<$typ>() - size_of::<u16>()));
+                    let tim = unsafe { &*$TIMX::ptr() };
+                    tim.$ccrx().write(|w| unsafe { w.ccr().bits(duty.into()) });
+                    Ok(())
                 }
             }
 
@@ -1823,7 +1862,7 @@ macro_rules! lptim_hal {
                 unsafe { MaybeUninit::<PINS::Channel>::uninit().assume_init() }
             }
 
-            impl hal::PwmPin for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+            impl embedded_hal_old::PwmPin for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
                 type Duty = u16;
 
                 // You may not access self in the following methods!
@@ -1861,6 +1900,24 @@ macro_rules! lptim_hal {
                     tim.cmp().write(|w| unsafe { w.cmp().bits(duty) });
                     while !tim.isr().read().cmpok().bit_is_set() {}
                     tim.icr().write(|w| w.cmpokcf().set_bit());
+                }
+            }
+
+            impl embedded_hal::pwm::ErrorType for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+                type Error = core::convert::Infallible;
+            }
+            impl embedded_hal::pwm::SetDutyCycle for Pwm<$TIMX, C1, ComplementaryImpossible, ActiveHigh, ActiveHigh> {
+                fn max_duty_cycle(&self) -> u16 {
+                    let tim = unsafe { &*$TIMX::ptr() };
+                    tim.arr().read().arr().bits()
+                }
+                fn set_duty_cycle(&mut self, duty: u16) -> Result<(), Self::Error> {
+                    let tim = unsafe { &*$TIMX::ptr() };
+
+                    tim.cmp().write(|w| unsafe { w.cmp().bits(duty) });
+                    while !tim.isr().read().cmpok().bit_is_set() {}
+                    tim.icr().write(|w| w.cmpokcf().set_bit());
+                    Ok(())
                 }
             }
         )+

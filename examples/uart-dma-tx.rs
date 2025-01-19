@@ -16,10 +16,10 @@ use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use log::info;
 
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
