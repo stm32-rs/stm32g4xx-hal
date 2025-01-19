@@ -10,14 +10,13 @@ use rt::entry;
 
 #[entry]
 fn main() -> ! {
-    use embedded_hal_old::Direction;
     use hal::comparator::{self, ComparatorExt, ComparatorSplit};
     use hal::dac::{Dac1IntSig1, DacExt, DacOut};
+    use hal::delay::SYSTDelayExt;
     use hal::gpio::GpioExt;
     use hal::rcc::RccExt;
     use hal::stm32;
     use stm32g4xx_hal as hal;
-    use stm32g4xx_hal::delay::SYSTDelayExt;
 
     let dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
@@ -48,6 +47,11 @@ fn main() -> ! {
     // changed directly by the comparator.
     comp.output_pin(led2);
     let _comp1 = comp.enable().lock();
+
+    enum Direction {
+        Upcounting,
+        Downcounting,
+    }
 
     let mut dir = Direction::Upcounting;
     let mut val = 0;

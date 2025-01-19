@@ -6,13 +6,14 @@ use crate::hal::{
         config::{Continuous, Resolution, SampleTime, Sequence},
         AdcClaim, ClockSource, Temperature, Vref,
     },
+    delay::SYSTDelayExt,
     gpio::GpioExt,
     pwr::PwrExt,
     rcc::{Config, RccExt},
     signature::{VrefCal, VDDA_CALIB},
     stm32::Peripherals,
 };
-use stm32g4xx_hal::{self as hal, delay::SYSTDelayExt};
+use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
 

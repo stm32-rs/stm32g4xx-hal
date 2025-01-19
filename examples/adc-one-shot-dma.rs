@@ -8,13 +8,14 @@ use crate::hal::{
         config::{Continuous, Dma as AdcDma, Resolution, SampleTime, Sequence},
         AdcClaim, ClockSource, Temperature,
     },
+    delay::SYSTDelayExt,
     dma::{config::DmaConfig, stream::DMAExt, TransferExt},
     gpio::GpioExt,
     pwr::PwrExt,
     rcc::{Config, RccExt},
     stm32::Peripherals,
 };
-use stm32g4xx_hal::{self as hal, delay::SYSTDelayExt};
+use stm32g4xx_hal as hal;
 
 #[macro_use]
 mod utils;

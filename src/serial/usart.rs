@@ -18,6 +18,7 @@ use embedded_io::{ReadReady, WriteReady};
 use crate::serial::config::*;
 /// Serial error
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Framing error
     Framing,

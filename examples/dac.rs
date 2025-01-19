@@ -8,12 +8,11 @@
 #![no_main]
 #![no_std]
 
-use embedded_hal_old::Direction;
 use hal::dac::{DacExt, DacOut, GeneratorConfig};
+use hal::delay::SYSTDelayExt;
 use hal::gpio::GpioExt;
 use hal::rcc::RccExt;
 use stm32g4xx_hal as hal;
-use stm32g4xx_hal::delay::SYSTDelayExt;
 mod utils;
 extern crate cortex_m_rt as rt;
 
@@ -26,7 +25,6 @@ fn main() -> ! {
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     let mut rcc = dp.RCC.constrain();
-    // cortex-m doesn't yet support hal-1 DelayNs on systick (PR #504)
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
     let gpioa = dp.GPIOA.split(&mut rcc);
@@ -37,6 +35,11 @@ fn main() -> ! {
 
     // dac_generator will have its value set automatically from its internal noise generator
     let mut dac_generator = dac1ch2.enable_generator(GeneratorConfig::noise(11));
+
+    enum Direction {
+        Upcounting,
+        Downcounting,
+    }
 
     let mut dir = Direction::Upcounting;
     let mut val = 0;
