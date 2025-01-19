@@ -3,8 +3,6 @@
 #![no_main]
 #![no_std]
 
-use embedded_hal::delay::DelayNs;
-use hal::delay::DelayFromCountDownTimer;
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::rcc::Config;
@@ -38,7 +36,7 @@ fn main() -> ! {
 
     info!("Init Timer2 delay");
     let timer2 = Timer::new(dp.TIM2, &rcc.clocks);
-    let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.millis()));
+    let mut delay_tim2 = timer2.start_count_down(100.millis()).delay();
 
     loop {
         info!("Toggle");

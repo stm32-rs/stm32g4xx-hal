@@ -3,7 +3,7 @@
 //! Pins can be used for PWM output in both push-pull mode (`Alternate`) and open-drain mode
 //! (`AlternateOD`).
 
-use crate::delay::CountDown;
+use crate::delay::{CountDown, DelayFromCountDownTimer};
 use cast::{u16, u32};
 use cortex_m::peripheral::syst::SystClkSource;
 use cortex_m::peripheral::{DCB, DWT, SYST};
@@ -286,6 +286,10 @@ macro_rules! hal {
                     // pause counter
                     self.tim.cr1.modify(|_, w| w.cen().clear_bit());
                     self.tim
+                }
+
+                pub fn delay(self) -> DelayFromCountDownTimer<Self> {
+                    DelayFromCountDownTimer::new(self)
                 }
             }
 
