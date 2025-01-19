@@ -10,10 +10,10 @@ use hal::time::RateExtU32;
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use log::info;
 
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -35,7 +35,7 @@ fn main() -> ! {
 
     let buf: [u8; 1] = [0];
     loop {
-        match i2c.write(0x3c, &buf) {
+        match i2c.write(0x3Cu8, &buf) {
             Ok(_) => info!("ok"),
             Err(err) => info!("error: {:?}", err),
         }

@@ -5,14 +5,14 @@
 #![no_main]
 #![no_std]
 
-use crate::hal::{
-    block,
+use hal::{
     delay::DelayFromCountDownTimer,
     gpio::gpioa::PA5,
     gpio::gpioa::PA6,
     gpio::gpioa::PA7,
     gpio::Alternate,
     gpio::AF5,
+    hal_02::spi::FullDuplex,
     prelude::*,
     pwr::PwrExt,
     rcc::Config,
@@ -59,11 +59,11 @@ fn main() -> ! {
         for byte in message.iter() {
             cs.set_low().unwrap();
             spi.send(*byte as u8).unwrap();
-            received_byte = block!(spi.read()).unwrap();
+            received_byte = nb::block!(FullDuplex::read(&mut spi)).unwrap();
             cs.set_high().unwrap();
 
             info!("{}", received_byte as char);
         }
-        delay_tim2.delay_ms(1000_u16);
+        delay_tim2.delay_ms(1000);
     }
 }
