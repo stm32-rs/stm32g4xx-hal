@@ -22,10 +22,9 @@ use core::num::{NonZeroU16, NonZeroU8};
 
 use cortex_m_rt::entry;
 
-use log::info;
-
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
@@ -116,7 +115,7 @@ fn main() -> ! {
         bit_rate_switching: false,
         marker: None,
     };
-    info!("Initial Header: {:#X?}", &header);
+    info!("Initial Header: {:#?}", &header);
 
     info!("Transmit initial message");
     block!(can.transmit(header, &buffer)).unwrap();

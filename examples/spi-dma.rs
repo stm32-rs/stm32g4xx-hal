@@ -28,6 +28,7 @@ use stm32g4xx_hal::dma::TransferExt;
 
 #[macro_use]
 mod utils;
+// use utils::logger::info;
 
 const BUFFER_SIZE: usize = 254;
 
@@ -69,6 +70,6 @@ fn main() -> ! {
     );
     transfer_dma.start(|_spi| {});
     loop {
-        delay_tim2.delay_ms(1000_u16);
+        delay_tim2.delay_ms(1000);
     }
 }
