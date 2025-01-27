@@ -6,16 +6,19 @@ use crate::dma::{
 };
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*};
 use crate::gpio::{Alternate, AlternateOD, AF12, AF5, AF7, AF8};
-use crate::prelude::*;
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::*;
 
 use cortex_m::interrupt;
 use nb::block;
 
+use embedded_hal_old::serial::Write;
+use embedded_io::{ReadReady, WriteReady};
+
 use crate::serial::config::*;
 /// Serial error
 #[derive(Debug)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub enum Error {
     /// Framing error
     Framing,
@@ -25,6 +28,17 @@ pub enum Error {
     Overrun,
     /// Parity check error
     Parity,
+}
+
+impl embedded_io::Error for Error {
+    fn kind(&self) -> embedded_io::ErrorKind {
+        match self {
+            Error::Framing => embedded_io::ErrorKind::InvalidData,
+            Error::Noise => embedded_io::ErrorKind::InvalidData,
+            Error::Overrun => embedded_io::ErrorKind::Other,
+            Error::Parity => embedded_io::ErrorKind::InvalidData,
+        }
+    }
 }
 
 /// Interrupt event
@@ -125,7 +139,7 @@ pub trait SerialExt<USART, Config> {
 
 impl<USART, TX, RX> fmt::Write for Serial<USART, TX, RX>
 where
-    Serial<USART, TX, RX>: hal::serial::Write<u8>,
+    Serial<USART, TX, RX>: embedded_hal_old::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
@@ -135,7 +149,7 @@ where
 
 impl<USART, Pin, Dma> fmt::Write for Tx<USART, Pin, Dma>
 where
-    Tx<USART, Pin, Dma>: hal::serial::Write<u8>,
+    Tx<USART, Pin, Dma>: embedded_hal_old::serial::Write<u8>,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
@@ -202,6 +216,29 @@ macro_rules! uart_shared {
                     _dma: PhantomData,
                 }
             }
+            fn data_ready(&mut self) -> nb::Result<(), Error> {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                let isr = usart.isr().read();
+                Err(
+                    if isr.pe().bit_is_set() {
+                        usart.icr().write(|w| w.pecf().set_bit());
+                        nb::Error::Other(Error::Parity)
+                    } else if isr.fe().bit_is_set() {
+                        usart.icr().write(|w| w.fecf().set_bit());
+                        nb::Error::Other(Error::Framing)
+                    } else if isr.nf().bit_is_set() {
+                        usart.icr().write(|w| w.ncf().set_bit());
+                        nb::Error::Other(Error::Noise)
+                    } else if isr.ore().bit_is_set() {
+                        usart.icr().write(|w| w.orecf().set_bit());
+                        nb::Error::Other(Error::Overrun)
+                    } else if isr.rxne().bit_is_set() {
+                        return Ok(())
+                    } else {
+                        nb::Error::WouldBlock
+                    }
+                )
+            }
         }
 
         impl<Pin> Rx<$USARTX, Pin, DMA> {
@@ -220,35 +257,16 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> hal::serial::Read<u8> for Rx<$USARTX, Pin, NoDMA> {
+        impl<Pin> embedded_hal_old::serial::Read<u8> for Rx<$USARTX, Pin, NoDMA> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
                 let usart = unsafe { &(*$USARTX::ptr()) };
-                let isr = usart.isr().read();
-                Err(
-                    if isr.pe().bit_is_set() {
-                        usart.icr().write(|w| w.pecf().set_bit());
-                        nb::Error::Other(Error::Parity)
-                    } else if isr.fe().bit_is_set() {
-                        usart.icr().write(|w| w.fecf().set_bit());
-                        nb::Error::Other(Error::Framing)
-                    } else if isr.nf().bit_is_set() {
-                        usart.icr().write(|w| w.ncf().set_bit());
-                        nb::Error::Other(Error::Noise)
-                    } else if isr.ore().bit_is_set() {
-                        usart.icr().write(|w| w.orecf().set_bit());
-                        nb::Error::Other(Error::Overrun)
-                    } else if isr.rxne().bit_is_set() {
-                        return Ok(usart.rdr().read().bits() as u8)
-                    } else {
-                        nb::Error::WouldBlock
-                    }
-                )
+                self.data_ready().map(|_| usart.rdr().read().bits() as u8)
             }
         }
 
-        impl<TX, RX> hal::serial::Read<u8> for Serial<$USARTX, TX, RX> {
+        impl<TX, RX> embedded_hal_old::serial::Read<u8> for Serial<$USARTX, TX, RX> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -314,7 +332,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> hal::serial::Write<u8> for Tx<$USARTX, Pin, NoDMA> {
+        impl<Pin> embedded_hal_old::serial::Write<u8> for Tx<$USARTX, Pin, NoDMA> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -337,7 +355,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX> hal::serial::Write<u8> for Serial<$USARTX, TX, RX> {
+        impl<TX, RX> embedded_hal_old::serial::Write<u8> for Serial<$USARTX, TX, RX> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -349,6 +367,91 @@ macro_rules! uart_shared {
             }
         }
 
+        impl<Pin> embedded_io::ErrorType for Tx<$USARTX, Pin, NoDMA> {
+            type Error = Error;
+        }
+        impl<Pin> WriteReady for Tx<$USARTX, Pin, NoDMA> {
+            fn write_ready(&mut self) -> Result<bool, Self::Error> {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                Ok(usart.isr().read().txe().bit_is_set())
+            }
+        }
+        // writes until fifo (or tdr) is full
+        impl<Pin> embedded_io::Write for Tx<$USARTX, Pin, NoDMA> {
+            fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+                if buf.len() == 0 { return Ok(0) }
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                while !self.write_ready()? {
+                    core::hint::spin_loop()
+                }
+                // can't know fifo capacity in advance
+                let count = buf.into_iter()
+                    .take_while(|_| usart.isr().read().txe().bit_is_set())
+                    .map(|b| usart.tdr().write(|w| unsafe { w.tdr().bits(*b as u16) }))
+                    .count();
+
+                Ok(count)
+            }
+            fn flush(&mut self) -> Result<(), Error> {
+                nb::block!(embedded_hal_old::serial::Write::<u8>::flush(self))
+            }
+        }
+
+        impl<Pin> embedded_io::ErrorType for Rx<$USARTX, Pin, NoDMA> {
+            type Error = Error;
+        }
+        impl<Pin> ReadReady for Rx<$USARTX, Pin, NoDMA> {
+            fn read_ready(&mut self) -> Result<bool, Self::Error> {
+                match self.data_ready() {
+                    Ok(()) => Ok(true),
+                    Err(nb::Error::WouldBlock) => Ok(false),
+                    Err(nb::Error::Other(e)) => Err(e),
+                }
+            }
+        }
+        impl<Pin> embedded_io::Read for Rx<$USARTX, Pin, NoDMA> {
+            fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+                if buf.len() == 0 { return Ok(0) }
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                let mut count = 0;
+
+                while !self.read_ready()? {
+                    core::hint::spin_loop()
+                }
+                while self.read_ready()? && count < buf.len() {
+                    buf[count] = usart.rdr().read().bits() as u8;
+                    count += 1
+                }
+                Ok(count)
+            }
+        }
+
+        impl<TX, RX> embedded_io::ErrorType for Serial<$USARTX, TX, RX> {
+            type Error = Error;
+        }
+        impl<TX, RX> WriteReady for Serial<$USARTX, TX, RX> {
+            fn write_ready(&mut self) -> Result<bool, Self::Error> {
+                self.tx.write_ready()
+            }
+        }
+        impl<TX, RX> embedded_io::Write for Serial<$USARTX, TX, RX> {
+            fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
+                embedded_io::Write::write(&mut self.tx, buf)
+            }
+            fn flush(&mut self) -> Result<(), Error> {
+                embedded_io::Write::flush(&mut self.tx)
+            }
+        }
+        impl<TX, RX> ReadReady for Serial<$USARTX, TX, RX> {
+            fn read_ready(&mut self) -> Result<bool, Self::Error> {
+                self.rx.read_ready()
+            }
+        }
+        impl<TX, RX> embedded_io::Read for Serial<$USARTX, TX, RX> {
+            fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
+                embedded_io::Read::read(&mut self.rx, buf)
+            }
+        }
 
         impl<TX, RX> Serial<$USARTX, TX, RX> {
 

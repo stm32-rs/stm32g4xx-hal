@@ -3,11 +3,11 @@
 //! Pins can be used for PWM output in both push-pull mode (`Alternate`) and open-drain mode
 //! (`AlternateOD`).
 
-use crate::delay::CountDown;
+use crate::delay::{CountDown, DelayFromCountDownTimer};
 use cast::{u16, u32};
 use cortex_m::peripheral::syst::SystClkSource;
 use cortex_m::peripheral::{DCB, DWT, SYST};
-use embedded_hal::timer::{Cancel, CountDown as _, Periodic};
+use embedded_hal_old::timer::{Cancel, CountDown as _, Periodic};
 use void::Void;
 
 use crate::stm32::RCC;
@@ -108,7 +108,7 @@ impl CountDownTimer<SYST> {
     }
 }
 
-impl embedded_hal::timer::CountDown for CountDownTimer<SYST> {
+impl embedded_hal_old::timer::CountDown for CountDownTimer<SYST> {
     type Time = MicroSecond;
 
     fn start<T>(&mut self, timeout: T)
@@ -287,9 +287,13 @@ macro_rules! hal {
                     self.tim.cr1().modify(|_, w| w.cen().clear_bit());
                     self.tim
                 }
+
+                pub fn delay(self) -> DelayFromCountDownTimer<Self> {
+                    DelayFromCountDownTimer::new(self)
+                }
             }
 
-            impl embedded_hal::timer::CountDown for CountDownTimer<$TIM> {
+            impl embedded_hal_old::timer::CountDown for CountDownTimer<$TIM> {
                 type Time = MicroSecond;
 
                 fn start<T>(&mut self, timeout: T)

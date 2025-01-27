@@ -1,9 +1,9 @@
 //! Delay providers
 //!
 //! There are currently two delay providers. In general you should prefer to use
-//! [Delay](Delay), however if you do not have access to `SYST` you can use
-//! [DelayFromCountDownTimer](DelayFromCountDownTimer) with any timer that
-//! implements the [CountDown](embedded_hal::timer::CountDown) trait. This can be
+//! [Delay], however if you do not have access to `SYST` you can use
+//! [DelayFromCountDownTimer] with any timer that
+//! implements the [CountDown](embedded_hal_old::timer::CountDown) trait. This can be
 //! useful if you're using [RTIC](https://rtic.rs)'s schedule API, which occupies
 //! the `SYST` peripheral.
 //!
@@ -38,24 +38,83 @@
 
 use crate::rcc::Clocks;
 use crate::time::MicroSecond;
-pub use cortex_m::delay::*;
+pub use cortex_m::delay::Delay;
 use cortex_m::peripheral::SYST;
+use fugit::ExtU32Ceil;
 
 use crate::nb::block;
 use crate::time::ExtU32;
-use embedded_hal::blocking::delay::{DelayMs, DelayUs};
+use embedded_hal::delay::DelayNs;
+use embedded_hal_old::blocking::delay::{DelayMs, DelayUs};
 
-pub trait CountDown: embedded_hal::timer::CountDown {
+pub trait CountDown: embedded_hal_old::timer::CountDown {
     fn max_period(&self) -> MicroSecond;
 }
 
 pub trait SYSTDelayExt {
-    fn delay(self, clocks: &Clocks) -> Delay;
+    fn delay(self, clocks: &Clocks) -> SystDelay;
 }
 
 impl SYSTDelayExt for SYST {
-    fn delay(self, clocks: &Clocks) -> Delay {
-        Delay::new(self, clocks.ahb_clk.raw())
+    fn delay(self, clocks: &Clocks) -> SystDelay {
+        SystDelay(Delay::new(self, clocks.ahb_clk.raw()))
+    }
+}
+
+/// Delay provider
+pub struct SystDelay(Delay);
+
+impl DelayNs for SystDelay {
+    // TODO: the current fallback to 1us resolution is a stopgap until the module is reworked
+    fn delay_ns(&mut self, ns: u32) {
+        self.0.delay_us(ns.div_ceil(1000))
+    }
+    fn delay_us(&mut self, us: u32) {
+        self.0.delay_us(us);
+    }
+    fn delay_ms(&mut self, mut ms: u32) {
+        const MAX_MILLIS: u32 = u32::MAX / 1000;
+        while ms > MAX_MILLIS {
+            ms -= MAX_MILLIS;
+            DelayNs::delay_us(self, MAX_MILLIS * 1000);
+        }
+        DelayNs::delay_us(self, ms * 1000);
+    }
+}
+
+impl DelayUs<u32> for SystDelay {
+    fn delay_us(&mut self, us: u32) {
+        DelayNs::delay_us(self, us);
+    }
+}
+
+impl DelayUs<u16> for SystDelay {
+    fn delay_us(&mut self, us: u16) {
+        DelayNs::delay_us(self, us as u32);
+    }
+}
+
+impl DelayUs<u8> for SystDelay {
+    fn delay_us(&mut self, us: u8) {
+        DelayNs::delay_us(self, us as u32);
+    }
+}
+
+impl DelayMs<u32> for SystDelay {
+    fn delay_ms(&mut self, ms: u32) {
+        DelayNs::delay_ms(self, ms);
+    }
+}
+
+impl DelayMs<u16> for SystDelay {
+    fn delay_ms(&mut self, ms: u16) {
+        DelayNs::delay_ms(self, ms as u32);
+    }
+}
+
+impl DelayMs<u8> for SystDelay {
+    fn delay_ms(&mut self, ms: u8) {
+        DelayNs::delay_ms(self, ms as u32);
     }
 }
 
@@ -65,12 +124,12 @@ pub trait DelayExt {
         T: Into<MicroSecond>;
 }
 
-impl DelayExt for Delay {
+impl DelayExt for SystDelay {
     fn delay<T>(&mut self, delay: T)
     where
         T: Into<MicroSecond>,
     {
-        self.delay_us(delay.into().ticks())
+        self.0.delay_us(delay.into().ticks())
     }
 }
 
@@ -132,7 +191,7 @@ macro_rules! impl_delay_from_count_down_timer  {
                 T: CountDown<Time = MicroSecond>,
             {
                 fn $delay(&mut self, t: u16) {
-                    self.$delay(t as u32);
+                    $Delay::$delay(self, t as u32);
                 }
             }
 
@@ -141,7 +200,7 @@ macro_rules! impl_delay_from_count_down_timer  {
                 T: CountDown<Time = MicroSecond>,
             {
                 fn $delay(&mut self, t: u8) {
-                    self.$delay(t as u32);
+                    $Delay::$delay(self, t as u32);
                 }
             }
         )+
@@ -151,4 +210,35 @@ macro_rules! impl_delay_from_count_down_timer  {
 impl_delay_from_count_down_timer! {
     (DelayMs, delay_ms, 1_000),
     (DelayUs, delay_us, 1)
+}
+
+// TODO: decouple the timer API from embedded-hal 0.2, stm32f4xx-hal with constant timer
+// frequencies looks like a good example
+impl<T: CountDown<Time = MicroSecond>> DelayNs for DelayFromCountDownTimer<T> {
+    // From a quick look at the clock diagram timer resolution can go down to ~3ns on most timers
+    // 170MHz (PLL-R as SysClk) / 1 (AHB Prescaler) / 1 (APBx prescaler) * 2 = 340MHz timer clock
+    // TODO: the current fallback to 1us resolution is a stopgap until the module is reworked
+    fn delay_ns(&mut self, ns: u32) {
+        DelayNs::delay_us(self, ns.div_ceil(1000))
+    }
+    fn delay_us(&mut self, mut us: u32) {
+        let max_sleep = self.0.max_period();
+        let max_us = max_sleep.to_micros();
+
+        while us > max_us {
+            self.0.start(max_us.micros_at_least());
+            let _ = nb::block!(self.0.wait());
+            us -= max_us;
+        }
+        self.0.start(us.micros_at_least());
+        let _ = nb::block!(self.0.wait());
+    }
+    fn delay_ms(&mut self, mut ms: u32) {
+        const MAX_MILLIS: u32 = u32::MAX / 1000;
+        while ms > MAX_MILLIS {
+            ms -= MAX_MILLIS;
+            DelayNs::delay_us(self, MAX_MILLIS * 1000);
+        }
+        DelayNs::delay_us(self, ms * 1000);
+    }
 }

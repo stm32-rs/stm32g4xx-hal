@@ -12,7 +12,7 @@ repository = "https://github.com/stm32-rs/stm32g4xx-hal"
 version = "0.0.2"
 
 [dependencies]
-nb = "0.1.1"
+nb = "1"
 #stm32g4 = { git = "https://github.com/stm32-rs/stm32-rs-nightlies" } #"0.15.1"
 stm32g4 = { version = "0.19.0", package = "stm32g4-staging" }
 paste = "1.0"
@@ -22,13 +22,14 @@ static_assertions = "1.1"
 fugit = "0.3.7"
 stm32-usbd = { version = "0.7.0", optional = true }
 fixed = { version = "1.28.0", optional = true }
+embedded-io = "0.6"
 
 [dependencies.cortex-m]
 version = "0.7.7"
 features = ["critical-section-single-core"]
 
 [dependencies.fdcan]
-version = "0.2.0"
+version = "0.2.1"
 features = ["fdcan_g0_g4_l5"]
 
 [dependencies.cast]
@@ -39,9 +40,13 @@ default-features = false
 features = ["const-fn"]
 version = "0.2.5"
 
-[dependencies.embedded-hal]
+[dependencies.embedded-hal-old]
+package = "embedded-hal"
 features = ["unproven"]
-version = "0.2.4"
+version = "0.2.7"
+
+[dependencies.embedded-hal]
+version = "1.0.0"
 
 [dependencies.embedded-dma]
 version = "0.1.2"
@@ -94,7 +99,7 @@ stm32g4a1 = ["stm32g4/stm32g4a1"]
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
-defmt = ["dep:defmt", "fugit/defmt"]
+defmt = ["dep:defmt", "fugit/defmt", "nb/defmt-0-3", "embedded-hal/defmt-03", "embedded-io/defmt-03"]
 cordic = ["dep:fixed"]
 
 [profile.dev]

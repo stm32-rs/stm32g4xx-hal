@@ -10,11 +10,11 @@ use hal::time::{ExtU32, RateExtU32};
 use stm32g4xx_hal as hal;
 
 use cortex_m_rt::entry;
-use log::info;
 use mpu6050::*;
 
 #[macro_use]
 mod utils;
+use utils::logger::info;
 
 #[entry]
 fn main() -> ! {
