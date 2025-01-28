@@ -120,6 +120,13 @@ codegen-units = 1
 incremental = false
 lto = true
 
+[profile.test]
+opt-level = "s"
+debug = true
+codegen-units = 1
+incremental = false
+lto = true
+
 [[example]]
 name = "flash_with_rtic"
 required-features = ["stm32g474"]

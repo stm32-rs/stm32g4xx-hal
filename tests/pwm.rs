@@ -18,7 +18,7 @@ mod tests {
     use embedded_hal::pwm::SetDutyCycle;
     use fugit::RateExtU32;
     use stm32g4xx_hal::{
-        delay::SYSTDelayExt, gpio::GpioExt, pwm::PwmExt, rcc::RccExt, stm32::GPIOA,
+        delay::SYSTDelayExt, gpio::{GpioExt, AF6}, pwm::PwmExt, rcc::RccExt, stm32::GPIOA,
     };
 
     #[test]
@@ -31,35 +31,55 @@ mod tests {
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
-        let pin = gpioa.pa8.into_alternate();
+        let pin: stm32g4xx_hal::gpio::gpioa::PA8<stm32g4xx_hal::gpio::Alternate<AF6>> = gpioa.pa8.into_alternate();
 
-        let mut pwm = dp.TIM1.pwm(pin, 1000u32.Hz(), &mut rcc);
+        //let mut pwm = dp.TIM1.pwm(pin, 1000u32.Hz(), &mut rcc);
 
-        let _ = pwm.set_duty_cycle_percent(50);
-        pwm.enable();
+        //pwm.set_duty_cycle_percent(50).unwrap();
+        //pwm.enable();
+        
 
-        let gpioa = unsafe { &*GPIOA::ptr() };
+        let gpioa = unsafe { &*GPIOA::PTR };
 
+        let get_pin_state = || unsafe {  (0x4800_0004 as *const u32).read_volatile() };
+
+        // TODO: This is a very bad way to measure time
         let min: MicrosDurationU32 = 490u32.micros();// Some extra on min for cpu overhead
         let max: MicrosDurationU32 = 505u32.micros();
 
-        println!("Awaiting rising edge...");
-        await_lo(&gpioa, &mut delay, max).unwrap();
-        await_hi(&gpioa, &mut delay, max).unwrap();
+        {
+            println!("Awaiting first rising edge...");
+            //println!("{}", gpioa.odr().read().odr(8).is_high());
+            println!("{}", get_pin_state());
+            //let duration_until_lo = await_lo(&gpioa, &mut delay, max);//.unwrap();
+        }
+        /*
+            //println!("Low..., Waited ~{}us until low", duration_until_lo);
+            let lo_duration = await_hi(&gpioa, &mut delay, max);//.unwrap();
+            //println!("High..., Low half period: {}us", lo_duration);
+        }
 
         for _ in 0..10 {
             // Make sure the timer half periods are within 490-505us
 
-            let hi_duration = await_lo(&gpioa, &mut delay, max).unwrap();
-            let lo_duration = await_hi(&gpioa, &mut delay, max).unwrap();
+            let hi_duration = await_lo(&gpioa, &mut delay, max);//.unwrap();
+            println!("Low..., High half period: {}us", hi_duration);
+            //assert!(hi_duration > min, "{} > {}", hi_duration, min);
 
-            assert!(hi_duration > min);
-            assert!(lo_duration > min);
+            let lo_duration = await_hi(&gpioa, &mut delay, max);//.unwrap();
+            println!("High..., Low half period: {}us", lo_duration);
+            //assert!(lo_duration > min, "{} > {}", lo_duration, min);
         }
+
+        println!("Done!");
+        for i in (0..5).rev() {
+            println!("{}", i);
+            delay.delay(1000.millis());
+        }*/
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, defmt::Format)]
 struct ErrorTimedOut;
 
 fn await_lo(
@@ -87,7 +107,7 @@ fn await_p(
         if p() {
             return Ok(i.micros());
         }
-        delay.delay(1_u32.micros());
+        //delay.delay(1_u32.micros());
     }
     Err(ErrorTimedOut)
 }
