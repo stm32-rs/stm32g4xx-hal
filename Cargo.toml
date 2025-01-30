@@ -140,7 +140,7 @@ name = "cordic"
 required-features = ["cordic"]
 
 [[test]]
-name = "pwm"
+name = "tests"
 harness = false
 
 [lib]

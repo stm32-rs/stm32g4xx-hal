@@ -95,7 +95,7 @@ mod tests {
     }
 
     #[test]
-    fn foo() {
+    fn pwm() {
         use super::*;
 
         // TODO: Is it ok to steal these?
