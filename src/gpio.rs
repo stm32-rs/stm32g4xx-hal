@@ -1,8 +1,8 @@
 //! General Purpose Input / Output
 use core::marker::PhantomData;
 
-use crate::rcc::Rcc;
-use crate::stm32::EXTI;
+use crate::rcc::{Enable, Rcc, Reset};
+use crate::stm32::{self, EXTI};
 use crate::syscfg::SysCfg;
 
 /// Default pin mode
@@ -256,8 +256,13 @@ macro_rules! gpio {
             impl GpioExt for $GPIOX {
                 type Parts = Parts;
 
-                fn split(self, rcc: &mut Rcc) -> Parts {
-                    rcc.rb.ahb2enr().modify(|_, w| w.$iopxenr().set_bit());
+                fn split(self, _rcc: &mut Rcc) -> Parts {
+                    unsafe {
+                        let rcc_ptr =  &(*stm32::RCC::ptr());
+                        $GPIOX::enable(rcc_ptr);
+                        $GPIOX::reset(rcc_ptr);
+                    };
+
                     Parts {
                         $(
                             $pxi: $PXi { _mode: PhantomData },
