@@ -1,7 +1,7 @@
 //! General Purpose Input / Output
 use core::marker::PhantomData;
 
-use crate::rcc::Rcc;
+use crate::rcc::{Enable, Rcc, Reset};
 use crate::stm32::EXTI;
 use crate::syscfg::SysCfg;
 
@@ -14,7 +14,7 @@ pub trait GpioExt {
     type Parts;
 
     /// Splits the GPIO block into independent pins and registers
-    fn split(self, rcc: &mut Rcc) -> Self::Parts;
+    fn split(self, rcc: &Rcc) -> Self::Parts;
 }
 
 /// Input mode (type state)
@@ -256,8 +256,10 @@ macro_rules! gpio {
             impl GpioExt for $GPIOX {
                 type Parts = Parts;
 
-                fn split(self, rcc: &mut Rcc) -> Parts {
-                    rcc.rb.ahb2enr.modify(|_, w| w.$iopxenr().set_bit());
+                fn split(self, rcc: &Rcc) -> Parts {
+                    $GPIOX::enable(&rcc.rb);
+                    $GPIOX::reset(&rcc.rb);
+                    
                     Parts {
                         $(
                             $pxi: $PXi { _mode: PhantomData },
