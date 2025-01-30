@@ -259,7 +259,7 @@ macro_rules! gpio {
                 fn split(self, rcc: &Rcc) -> Parts {
                     $GPIOX::enable(&rcc.rb);
                     $GPIOX::reset(&rcc.rb);
-                    
+
                     Parts {
                         $(
                             $pxi: $PXi { _mode: PhantomData },
