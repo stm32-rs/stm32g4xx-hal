@@ -443,14 +443,13 @@ macro_rules! gpio {
                 impl<MODE> $PXi<MODE> {
                     /// Configures the pin to operate as a floating input pin
                     pub fn into_floating_input(self) -> $PXi<Input<Floating>> {
-                        let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            gpio.pupdr().modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
+                            gpio.pupdr().modify(|_, w| {
+                                w.pupdr($i).floating()
                             });
-                            gpio.moder().modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).input()
                             })
                         };
                         $PXi { _mode: PhantomData }
@@ -458,14 +457,13 @@ macro_rules! gpio {
 
                     /// Configures the pin to operate as a pulled down input pin
                     pub fn into_pull_down_input(self) -> $PXi<Input<PullDown>> {
-                        let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            gpio.pupdr().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
+                            gpio.pupdr().modify(|_, w| {
+                                w.pupdr($i).pull_down()
                             });
-                            gpio.moder().modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).input()
                             })
                         };
                         $PXi { _mode: PhantomData }
@@ -473,14 +471,13 @@ macro_rules! gpio {
 
                     /// Configures the pin to operate as a pulled up input pin
                     pub fn into_pull_up_input(self) -> $PXi<Input<PullUp>> {
-                        let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            gpio.pupdr().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
+                            gpio.pupdr().modify(|_, w| {
+                                w.pupdr($i).pull_up()
                             });
-                            gpio.moder().modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).input()
                             })
                         };
                         $PXi { _mode: PhantomData }
@@ -488,14 +485,13 @@ macro_rules! gpio {
 
                     /// Configures the pin to operate as an analog pin
                     pub fn into_analog(self) -> $PXi<Analog> {
-                        let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            gpio.pupdr().modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
+                            gpio.pupdr().modify(|_, w| {
+                                w.pupdr($i).floating()
                             });
-                            gpio.moder().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (0b11 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).analog()
                             });
                         }
                         $PXi { _mode: PhantomData }
@@ -503,17 +499,16 @@ macro_rules! gpio {
 
                     /// Configures the pin to operate as an open drain output pin
                     pub fn into_open_drain_output(self) -> $PXi<Output<OpenDrain>> {
-                        let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            gpio.pupdr().modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
+                            gpio.pupdr().modify(|_, w| {
+                                w.pupdr($i).floating()
                             });
-                            gpio.otyper().modify(|r, w| {
-                                w.bits(r.bits() | (0b1 << $i))
+                            gpio.otyper().modify(|_, w| {
+                                w.ot($i).open_drain()
                             });
-                            gpio.moder().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).output()
                             })
                         };
                         $PXi { _mode: PhantomData }
@@ -521,17 +516,16 @@ macro_rules! gpio {
 
                     /// Configures the pin to operate as an push pull output pin
                     pub fn into_push_pull_output(self) -> $PXi<Output<PushPull>> {
-                        let offset = 2 * $i;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            gpio.pupdr().modify(|r, w| {
-                                w.bits(r.bits() & !(0b11 << offset))
+                            gpio.pupdr().modify(|_, w| {
+                                w.pupdr($i).floating()
                             });
-                            gpio.otyper().modify(|r, w| {
-                                w.bits(r.bits() & !(0b1 << $i))
+                            gpio.otyper().modify(|_, w| {
+                                w.ot($i).push_pull()
                             });
-                            gpio.moder().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (0b01 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).output()
                             })
                         };
                         $PXi { _mode: PhantomData }
@@ -555,52 +549,48 @@ macro_rules! gpio {
                     }
 
                     pub fn into_alternate<const A: u8>(self) -> $PXi<Alternate<A>> {
-                        let mode = A as u32;
-                        let offset = 2 * $i;
-                        let offset2 = 4 * $i;
+                        let mode = A as u8;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            if offset2 < 32 {
-                                gpio.afrl().modify(|r, w| {
-                                    w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
+                            if $i < 8 {
+                                gpio.afrl().modify(|_, w| {
+                                    w.afr($i).set(mode)
                                 });
                             } else {
-                                let offset2 = offset2 - 32;
-                                gpio.afrh().modify(|r, w| {
-                                    w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
+                                let offset = $i - 8;
+                                gpio.afrh().modify(|_, w| {
+                                    w.afr(offset).set(mode)
                                 });
                             }
-                            gpio.moder().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).alternate()
                             });
-                            gpio.otyper().modify(|r, w| {
-                                w.bits(r.bits() & !(0b1 << $i))
+                            gpio.otyper().modify(|_, w| {
+                                w.ot($i).push_pull()
                             });
                         }
                         $PXi { _mode: PhantomData }
                     }
 
                     pub fn into_alternate_open_drain<const A: u8>(self) -> $PXi<AlternateOD<A>> {
-                        let mode = A as u32;
-                        let offset = 2 * $i;
-                        let offset2 = 4 * $i;
+                        let mode = A as u8;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
-                            if offset2 < 32 {
-                                gpio.afrl().modify(|r, w| {
-                                    w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
+                            if $i < 8 {
+                                gpio.afrl().modify(|_, w| {
+                                    w.afr($i).set(mode)
                                 });
                             } else {
-                                let offset2 = offset2 - 32;
-                                gpio.afrh().modify(|r, w| {
-                                    w.bits((r.bits() & !(0b1111 << offset2)) | (mode << offset2))
+                                let offset = $i - 8;
+                                gpio.afrh().modify(|_, w| {
+                                    w.afr(offset).set(mode)
                                 });
                             }
-                            gpio.otyper().modify(|r, w| {
-                                w.bits(r.bits() | (0b1 << $i))
+                            gpio.otyper().modify(|_, w| {
+                                w.ot($i).open_drain()
                             });
-                            gpio.moder().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | (0b10 << offset))
+                            gpio.moder().modify(|_, w| {
+                                w.moder($i).alternate()
                             });
                         }
                         $PXi { _mode: PhantomData }
