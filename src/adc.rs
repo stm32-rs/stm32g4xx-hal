@@ -1839,26 +1839,11 @@ macro_rules! adc {
                 pub fn set_channel_input_type(&mut self, df: config::DifferentialSelection) {
                     self.config.difsel = df;
 
-                    self.adc_reg.difsel().modify(|_, w| {w
-                        .difsel0().bit(df.get_channel(0).into() )
-                        .difsel1().bit(df.get_channel(1).into() )
-                        .difsel2().bit(df.get_channel(2).into() )
-                        .difsel3().bit(df.get_channel(3).into() )
-                        .difsel4().bit(df.get_channel(4).into() )
-                        .difsel5().bit(df.get_channel(5).into() )
-                        .difsel6().bit(df.get_channel(6).into() )
-                        .difsel7().bit(df.get_channel(7).into() )
-                        .difsel8().bit(df.get_channel(8).into() )
-                        .difsel9().bit(df.get_channel(9).into() )
-                        .difsel10().bit(df.get_channel(10).into() )
-                        .difsel11().bit(df.get_channel(11).into() )
-                        .difsel12().bit(df.get_channel(12).into() )
-                        .difsel13().bit(df.get_channel(13).into() )
-                        .difsel14().bit(df.get_channel(14).into() )
-                        .difsel15().bit(df.get_channel(15).into() )
-                        .difsel16().bit(df.get_channel(16).into() )
-                        .difsel17().bit(df.get_channel(17).into() )
-                        .difsel18().bit(df.get_channel(18).into() )
+                    self.adc_reg.difsel().modify(|_, w| {
+                        for i in 0..18 {
+                            w.difsel(i).bit(df.get_channel(i).into());
+                        }
+                        w
                     });
                 }
 
