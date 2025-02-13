@@ -14,11 +14,14 @@ use embedded_dma::{StaticReadBuffer, StaticWriteBuffer};
 use super::config::DmaConfig;
 
 /// Marker type for a transfer with a mutable source and backed by a
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct MutTransfer;
 /// Marker type for a transfer with a constant source and backed by a
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct ConstTransfer;
 
 /// DMA Transfer.
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Transfer<CHANNEL, PERIPHERAL, DIR, BUF, TXFRT>
 where
     CHANNEL: Channel,
