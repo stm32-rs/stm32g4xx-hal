@@ -1,7 +1,7 @@
 //! General Purpose Input / Output
 use core::marker::PhantomData;
 
-use crate::rcc::Rcc;
+use crate::rcc::{Enable, Rcc, Reset};
 use crate::stm32::EXTI;
 use crate::syscfg::SysCfg;
 
@@ -257,7 +257,9 @@ macro_rules! gpio {
                 type Parts = Parts;
 
                 fn split(self, rcc: &mut Rcc) -> Parts {
-                    rcc.rb.ahb2enr().modify(|_, w| w.$iopxenr().set_bit());
+                    $GPIOX::enable(&rcc.rb);
+                    $GPIOX::reset(&rcc.rb);
+
                     Parts {
                         $(
                             $pxi: $PXi { _mode: PhantomData },
