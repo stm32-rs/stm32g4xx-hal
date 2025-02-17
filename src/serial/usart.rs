@@ -221,16 +221,16 @@ macro_rules! uart_shared {
                 let isr = usart.isr().read();
                 Err(
                     if isr.pe().bit_is_set() {
-                        usart.icr().write(|w| w.pecf().set_bit());
+                        usart.icr().write(|w| w.pecf().clear());
                         nb::Error::Other(Error::Parity)
                     } else if isr.fe().bit_is_set() {
-                        usart.icr().write(|w| w.fecf().set_bit());
+                        usart.icr().write(|w| w.fecf().clear());
                         nb::Error::Other(Error::Framing)
                     } else if isr.nf().bit_is_set() {
-                        usart.icr().write(|w| w.ncf().set_bit());
+                        usart.icr().write(|w| w.ncf().clear());
                         nb::Error::Other(Error::Noise)
                     } else if isr.ore().bit_is_set() {
-                        usart.icr().write(|w| w.orecf().set_bit());
+                        usart.icr().write(|w| w.orecf().clear());
                         nb::Error::Other(Error::Overrun)
                     } else if isr.rxne().bit_is_set() {
                         return Ok(())
@@ -827,7 +827,7 @@ macro_rules! uart_full {
             /// Clear pending receiver timeout interrupt
             pub fn clear_timeout(&mut self) {
                 let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.icr().write(|w| w.rtocf().set_bit());
+                usart.icr().write(|w| w.rtocf().clear());
             }
         }
     };
