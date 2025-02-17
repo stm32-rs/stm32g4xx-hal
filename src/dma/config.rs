@@ -1,9 +1,9 @@
 use super::Bits;
 
-/// Priority of the DMA stream, defaults to `Medium`. If two requests have
-/// the same software priority level, the stream with the lower number takes
-/// priority over the stream with the higher number. For example, Stream 2
-/// takes priority over Stream 4.
+/// Priority of the DMA channel, defaults to `Medium`. If two requests have
+/// the same software priority level, the channel with the lower number takes
+/// priority over the channel with the higher number. For example, channel 2
+/// takes priority over channel 4.
 #[derive(Debug, Clone, Copy, Default)]
 pub enum Priority {
     /// Low priority.
@@ -28,7 +28,7 @@ impl Bits<u8> for Priority {
     }
 }
 
-/// Contains the complete set of configuration for a DMA stream.
+/// Contains the complete set of configuration for a DMA channel.
 #[derive(Debug, Default, Clone, Copy)]
 pub struct DmaConfig {
     pub(crate) priority: Priority,

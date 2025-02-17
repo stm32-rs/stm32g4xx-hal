@@ -290,36 +290,36 @@ macro_rules! opamps {
                 pub struct $opamp;
 
                 impl LookupPgaGain for $opamp {
-                    type PgaGainReg = crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A;
+                    type PgaGainReg = crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN;
 
                     fn pga_gain(mode: PgaMode, gain: Gain) -> Self::PgaGainReg {
-                        use crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::PGA_GAIN;
 
                         match (mode, gain) {
-                            (PgaMode::Pga, Gain::Gain2) => PGA_GAIN_A::Gain2,
-                            (PgaMode::Pga, Gain::Gain4) => PGA_GAIN_A::Gain4,
-                            (PgaMode::Pga, Gain::Gain8) => PGA_GAIN_A::Gain8,
-                            (PgaMode::Pga, Gain::Gain16) => PGA_GAIN_A::Gain16,
-                            (PgaMode::Pga, Gain::Gain32) => PGA_GAIN_A::Gain32,
-                            (PgaMode::Pga, Gain::Gain64) => PGA_GAIN_A::Gain64,
-                            (PgaMode::PgaExternalFilter, Gain::Gain2) => PGA_GAIN_A::Gain2FilteringVinm0,
-                            (PgaMode::PgaExternalFilter, Gain::Gain4) => PGA_GAIN_A::Gain4FilteringVinm0,
-                            (PgaMode::PgaExternalFilter, Gain::Gain8) => PGA_GAIN_A::Gain8FilteringVinm0,
-                            (PgaMode::PgaExternalFilter, Gain::Gain16) => PGA_GAIN_A::Gain16FilteringVinm0,
-                            (PgaMode::PgaExternalFilter, Gain::Gain32) => PGA_GAIN_A::Gain32FilteringVinm0,
-                            (PgaMode::PgaExternalFilter, Gain::Gain64) => PGA_GAIN_A::Gain64FilteringVinm0,
-                            (PgaMode::PgaExternalBias, Gain::Gain2) => PGA_GAIN_A::Gain2InputVinm0,
-                            (PgaMode::PgaExternalBias, Gain::Gain4) => PGA_GAIN_A::Gain4InputVinm0,
-                            (PgaMode::PgaExternalBias, Gain::Gain8) => PGA_GAIN_A::Gain8InputVinm0,
-                            (PgaMode::PgaExternalBias, Gain::Gain16) => PGA_GAIN_A::Gain16InputVinm0,
-                            (PgaMode::PgaExternalBias, Gain::Gain32) => PGA_GAIN_A::Gain32InputVinm0,
-                            (PgaMode::PgaExternalBias, Gain::Gain64) => PGA_GAIN_A::Gain64InputVinm0,
-                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain2) => PGA_GAIN_A::Gain2InputVinm0filteringVinm1,
-                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain4) => PGA_GAIN_A::Gain4InputVinm0filteringVinm1,
-                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain8) => PGA_GAIN_A::Gain8InputVinm0filteringVinm1,
-                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain16) => PGA_GAIN_A::Gain16InputVinm0filteringVinm1,
-                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain32) => PGA_GAIN_A::Gain32InputVinm0filteringVinm1,
-                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain64) => PGA_GAIN_A::Gain64InputVinm0filteringVinm1,
+                            (PgaMode::Pga, Gain::Gain2) => PGA_GAIN::Gain2,
+                            (PgaMode::Pga, Gain::Gain4) => PGA_GAIN::Gain4,
+                            (PgaMode::Pga, Gain::Gain8) => PGA_GAIN::Gain8,
+                            (PgaMode::Pga, Gain::Gain16) => PGA_GAIN::Gain16,
+                            (PgaMode::Pga, Gain::Gain32) => PGA_GAIN::Gain32,
+                            (PgaMode::Pga, Gain::Gain64) => PGA_GAIN::Gain64,
+                            (PgaMode::PgaExternalFilter, Gain::Gain2) => PGA_GAIN::Gain2FilteringVinm0,
+                            (PgaMode::PgaExternalFilter, Gain::Gain4) => PGA_GAIN::Gain4FilteringVinm0,
+                            (PgaMode::PgaExternalFilter, Gain::Gain8) => PGA_GAIN::Gain8FilteringVinm0,
+                            (PgaMode::PgaExternalFilter, Gain::Gain16) => PGA_GAIN::Gain16FilteringVinm0,
+                            (PgaMode::PgaExternalFilter, Gain::Gain32) => PGA_GAIN::Gain32FilteringVinm0,
+                            (PgaMode::PgaExternalFilter, Gain::Gain64) => PGA_GAIN::Gain64FilteringVinm0,
+                            (PgaMode::PgaExternalBias, Gain::Gain2) => PGA_GAIN::Gain2InputVinm0,
+                            (PgaMode::PgaExternalBias, Gain::Gain4) => PGA_GAIN::Gain4InputVinm0,
+                            (PgaMode::PgaExternalBias, Gain::Gain8) => PGA_GAIN::Gain8InputVinm0,
+                            (PgaMode::PgaExternalBias, Gain::Gain16) => PGA_GAIN::Gain16InputVinm0,
+                            (PgaMode::PgaExternalBias, Gain::Gain32) => PGA_GAIN::Gain32InputVinm0,
+                            (PgaMode::PgaExternalBias, Gain::Gain64) => PGA_GAIN::Gain64InputVinm0,
+                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain2) => PGA_GAIN::Gain2InputVinm0filteringVinm1,
+                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain4) => PGA_GAIN::Gain4InputVinm0filteringVinm1,
+                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain8) => PGA_GAIN::Gain8InputVinm0filteringVinm1,
+                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain16) => PGA_GAIN::Gain16InputVinm0filteringVinm1,
+                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain32) => PGA_GAIN::Gain32InputVinm0filteringVinm1,
+                            (PgaMode::PgaExternalBiasAndFilter, Gain::Gain64) => PGA_GAIN::Gain64InputVinm0filteringVinm1,
                         }
                     }
                 }
@@ -327,32 +327,32 @@ macro_rules! opamps {
                 impl $opamp {
                     #[inline(always)]
                     unsafe fn _reset() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].reset()
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>]().reset()
                     }
 
                     #[inline(always)]
                     unsafe fn _disable_output() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].modify(|_, w|
-                            w.opaintoen().adcchannel())
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>]().modify(|_, w|
+                            w.opaintoen().adcchannel());
                     }
 
                     #[inline(always)]
                     unsafe fn _enable_output() {
-                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].modify(|_, w|
-                            w.opaintoen().output_pin())
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>]().modify(|_, w|
+                            w.opaintoen().output_pin());
                     }
 
                     #[inline(always)]
                     unsafe fn _lock() {
                         // Write the lock bit
-                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>].modify(|_, w|
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _csr>]().modify(|_, w|
                             w.lock().set_bit());
                         // Write the lock bit for the corresponding TCMR register.
                         // We don't currently expose TCMR functionality, but presumably
                         // the user doesn't want anything changing if they care to set
                         // the lock bit.
-                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _tcmr>].modify(|_, w|
-                            w.lock().set_bit())
+                        (*crate::stm32::OPAMP::ptr()).[<$opampreg _tcmr>]().modify(|_, w|
+                            w.lock().set_bit());
                     }
                 }
 
@@ -531,7 +531,7 @@ macro_rules! opamps {
                 ) -> (
                     $(Disabled::<$opamp>,)*
                 ) {
-                    rcc.rb.apb2enr.modify(|_, w| w.syscfgen().set_bit());
+                    rcc.rb.apb2enr().modify(|_, w| w.syscfgen().set_bit());
 
                     (
                         $(Disabled::<$opamp> { opamp: PhantomData },)*
@@ -581,9 +581,9 @@ macro_rules! opamps {
                 ) -> Follower<$opamp, $input, InternalOutput> {
                     let input = input.into();
                     unsafe {
-                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opampreg _csr>]
+                            .[<$opampreg _csr>]()
                             .write(|csr_w|
                                 csr_w
                                     .vp_sel()
@@ -591,7 +591,7 @@ macro_rules! opamps {
                                     .vm_sel()
                                     .output()
                                     .opaintoen()
-                                    .variant(OPAINTOEN_A::Adcchannel)
+                                    .variant(OPAINTOEN::Adcchannel)
                                     .opaen()
                                     .enabled()
                             );
@@ -665,16 +665,16 @@ macro_rules! opamps {
                     let non_inverting = non_inverting.into();
                     let inverting = inverting.into();
                     unsafe {
-                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
+                        use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN;
                         (*crate::stm32::OPAMP::ptr())
-                            .[<$opampreg _csr>]
+                            .[<$opampreg _csr>]()
                             .write(|csr_w|
                                 csr_w.vp_sel()
                                     .$non_inverting_mask()
                                     .vm_sel()
                                     .$inverting_mask()
                                     .opaintoen()
-                                    .variant(OPAINTOEN_A::Adcchannel)
+                                    .variant(OPAINTOEN::Adcchannel)
                                     .opaen()
                                     .enabled()
                             );
@@ -725,10 +725,10 @@ macro_rules! opamps {
 
                 /// Configures the opamp for programmable gain operation.
                 unsafe fn write_pga_reg(gain: Gain, mode: PgaMode, output_enable: bool) {
-                    use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN_A;
+                    use crate::stm32::opamp::[<$opampreg _csr>]::OPAINTOEN;
 
                     (*crate::stm32::OPAMP::ptr())
-                        .[<$opampreg _csr>]
+                        .[<$opampreg _csr>]()
                         .write(|csr_w|
                             csr_w.vp_sel()
                                 .$non_inverting_mask()
@@ -738,8 +738,8 @@ macro_rules! opamps {
                                 .variant($opamp::pga_gain(mode, gain))
                                 .opaintoen()
                                 .variant(match output_enable {
-                                    true => OPAINTOEN_A::OutputPin,
-                                    false => OPAINTOEN_A::Adcchannel,
+                                    true => OPAINTOEN::OutputPin,
+                                    false => OPAINTOEN::Adcchannel,
                                 })
                                 .opaen()
                                 .enabled()
@@ -864,7 +864,8 @@ macro_rules! opamps {
     };
 }
 
-#[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
+// TODO: Figure out a way to not duplicate this 3 times
+#[cfg(any(feature = "stm32g431", feature = "stm32g441"))]
 opamps! {
     Opamp1 => opamp1: {
         vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
@@ -908,6 +909,67 @@ opamps! {
             crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
         },
         output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
+    },
+}
+
+#[cfg(any(feature = "stm32g471", feature = "stm32g491", feature = "stm32g4a1"))]
+opamps! {
+    Opamp1 => opamp1: {
+        vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
+        inverting: {
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpioa::PA3<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp2,
+        },
+        output: crate::gpio::gpioa::PA2<crate::gpio::Analog>,
+    },
+    Opamp2 => opamp2: {
+        vinm0: crate::gpio::gpioa::PA5<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpioc::PC5<crate::gpio::Analog>,
+        inverting: {
+            crate::gpio::gpioa::PA5<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpioc::PC5<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpioa::PA7<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB14<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp2,
+            crate::gpio::gpiod::PD14<crate::gpio::Analog>: vinp3,
+        },
+        output: crate::gpio::gpioa::PA6<crate::gpio::Analog>,
+    },
+    Opamp3 => opamp3: {
+        vinm0: crate::gpio::gpiob::PB2<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpiob::PB10<crate::gpio::Analog>,
+        inverting: {
+            crate::gpio::gpiob::PB2<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiob::PB10<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpiob::PB0<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinp2,
+        },
+        output: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
+    },
+    Opamp6 => opamp6: {
+        vinm0: crate::gpio::gpioa::PA1<crate::gpio::Analog>,
+        vinm1: crate::gpio::gpiob::PB1<crate::gpio::Analog>,
+        inverting: {
+            crate::gpio::gpioa::PA1<crate::gpio::Analog>: vinm0,
+            crate::gpio::gpiob::PB1<crate::gpio::Analog>: vinm1,
+        },
+        non_inverting: {
+            crate::gpio::gpiob::PB12<crate::gpio::Analog>: vinp0,
+            crate::gpio::gpiod::PD9<crate::gpio::Analog>: vinp1,
+            crate::gpio::gpiob::PB13<crate::gpio::Analog>: vinp2,
+        },
+        output: crate::gpio::gpiob::PB11<crate::gpio::Analog>,
     },
 }
 
