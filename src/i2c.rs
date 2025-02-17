@@ -172,14 +172,14 @@ macro_rules! busy_wait {
             if isr.$flag().$variant() {
                 break;
             } else if isr.berr().bit_is_set() {
-                $i2c.icr().write(|w| w.berrcf().set_bit());
+                $i2c.icr().write(|w| w.berrcf().clear());
                 return Err(Error::BusError);
             } else if isr.arlo().bit_is_set() {
-                $i2c.icr().write(|w| w.arlocf().set_bit());
+                $i2c.icr().write(|w| w.arlocf().clear());
                 return Err(Error::ArbitrationLost);
             } else if isr.nackf().bit_is_set() {
                 $i2c.icr()
-                    .write(|w| w.stopcf().set_bit().nackcf().set_bit());
+                    .write(|w| w.stopcf().clear().nackcf().clear());
                 flush_txdr!($i2c);
                 return Err(Error::Nack);
             } else {
