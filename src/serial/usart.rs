@@ -4,7 +4,7 @@ use core::marker::PhantomData;
 use crate::dma::{
     mux::DmaMuxResources, traits::TargetAddress, MemoryToPeripheral, PeripheralToMemory,
 };
-use crate::gpio::{self, OpenDrain};
+use crate::gpio::{self, PushPull};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::*;
 
@@ -86,35 +86,30 @@ impl Event {
     }
 }
 
+pub use gpio::alt::SerialAsync as CommonPins;
+
+// Implemented by all USART/UART instances
+pub trait Instance: crate::Sealed + crate::Ptr + Enable + Reset + CommonPins {}
+
 /// Serial receiver
-pub struct Rx<USART, Pin, Dma> {
-    pin: Pin,
-    _usart: PhantomData<USART>,
+pub struct Rx<USART: Instance, Dma> {
+    pin: USART::Rx<PushPull>,
+    usart: USART,
     _dma: PhantomData<Dma>,
 }
 
 /// Serial transmitter
-pub struct Tx<USART, Pin, Dma> {
-    pin: Pin,
+pub struct Tx<USART: Instance, Dma, Otype = PushPull> {
+    pin: USART::Tx<Otype>,
     usart: USART,
     _dma: PhantomData<Dma>,
 }
 
 /// Serial abstraction
-pub struct Serial<USART, TXPin, RXPin> {
-    tx: Tx<USART, TXPin, NoDMA>,
-    rx: Rx<USART, RXPin, NoDMA>,
+pub struct Serial<USART: Instance, Otype = PushPull> {
+    tx: Tx<USART, NoDMA, Otype>,
+    rx: Rx<USART, NoDMA>,
 }
-
-/// Serial TX pin
-pub trait TxPin<USART> {}
-
-/// Serial RX pin
-pub trait RxPin<USART> {}
-
-pub struct NoTx;
-
-impl<USART> TxPin<USART> for NoTx {}
 
 /// Type state for Tx/Rx, indicating operation without DMA
 #[derive(Debug)]
@@ -123,20 +118,16 @@ pub struct NoDMA;
 #[derive(Debug)]
 pub struct DMA;
 
-pub trait SerialExt<USART, Config> {
-    fn usart<TX, RX>(
+pub trait SerialExt<Config>: Sized + Instance {
+    fn usart<Otype>(
         self,
-        tx: TX,
-        rx: RX,
-        config: Config,
+        pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
+        config: impl Into<Config>,
         rcc: &mut Rcc,
-    ) -> Result<Serial<USART, TX, RX>, InvalidConfig>
-    where
-        TX: TxPin<USART>,
-        RX: RxPin<USART>;
+    ) -> Result<Serial<Self, Otype>, InvalidConfig>;
 }
 
-impl<USART, TX, RX> fmt::Write for Serial<USART, TX, RX>
+impl<USART: Instance, Otype> fmt::Write for Serial<USART, Otype>
 where
     Self: embedded_hal_old::serial::Write<u8>,
     <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug,
@@ -149,7 +140,7 @@ where
     }
 }
 
-impl<USART, Pin, Dma> fmt::Write for Tx<USART, Pin, Dma>
+impl<USART: Instance, Dma, Otype> fmt::Write for Tx<USART, Dma, Otype>
 where
     Self: embedded_hal_old::serial::Write<u8>,
     <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug,
@@ -163,26 +154,10 @@ where
 }
 
 macro_rules! uart_shared {
-    ($USARTX:ident, $dmamux_rx:ident, $dmamux_tx:ident,
-        tx: [ $($( #[ $pmeta1:meta ] )* ($PTX:ident, $TAF:ident),)+ ],
-        rx: [ $($( #[ $pmeta2:meta ] )* ($PRX:ident, $RAF:ident),)+ ]) => {
+    ($USARTX:ident, $dmamux_rx:ident, $dmamux_tx:ident) => {
+        impl Instance for $USARTX {}
 
-        $(
-            $( #[ $pmeta1 ] )*
-            impl TxPin<$USARTX> for gpio::$PTX<gpio::$TAF> {
-            }
-            $( #[ $pmeta1 ] )*
-            impl TxPin<$USARTX> for gpio::$PTX<gpio::$TAF<OpenDrain>> {
-            }
-        )+
-
-        $(
-            $( #[ $pmeta2 ] )*
-            impl RxPin<$USARTX> for gpio::$PRX<gpio::$RAF> {
-            }
-        )+
-
-        impl<Pin, Dma> Rx<$USARTX, Pin, Dma> {
+        impl<Dma> Rx<$USARTX, Dma> {
             /// Starts listening for an interrupt event
             pub fn listen(&mut self) {
                 let usart = unsafe { &(*$USARTX::ptr()) };
@@ -208,8 +183,8 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> Rx<$USARTX, Pin, NoDMA> {
-            pub fn enable_dma(self) -> Rx<$USARTX, Pin, DMA> {
+        impl Rx<$USARTX, NoDMA> {
+            pub fn enable_dma(self) -> Rx<$USARTX, DMA> {
                 // NOTE(unsafe) critical section prevents races
                 cortex_m::interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3();
@@ -218,37 +193,35 @@ macro_rules! uart_shared {
 
                 Rx {
                     pin: self.pin,
-                    _usart: PhantomData,
+                    usart: self.usart,
                     _dma: PhantomData,
                 }
             }
             fn data_ready(&mut self) -> nb::Result<(), Error> {
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 let isr = usart.isr().read();
-                Err(
-                    if isr.pe().bit_is_set() {
-                        usart.icr().write(|w| w.pecf().clear());
-                        nb::Error::Other(Error::Parity)
-                    } else if isr.fe().bit_is_set() {
-                        usart.icr().write(|w| w.fecf().clear());
-                        nb::Error::Other(Error::Framing)
-                    } else if isr.nf().bit_is_set() {
-                        usart.icr().write(|w| w.ncf().clear());
-                        nb::Error::Other(Error::Noise)
-                    } else if isr.ore().bit_is_set() {
-                        usart.icr().write(|w| w.orecf().clear());
-                        nb::Error::Other(Error::Overrun)
-                    } else if isr.rxne().bit_is_set() {
-                        return Ok(())
-                    } else {
-                        nb::Error::WouldBlock
-                    }
-                )
+                Err(if isr.pe().bit_is_set() {
+                    usart.icr().write(|w| w.pecf().clear());
+                    nb::Error::Other(Error::Parity)
+                } else if isr.fe().bit_is_set() {
+                    usart.icr().write(|w| w.fecf().clear());
+                    nb::Error::Other(Error::Framing)
+                } else if isr.nf().bit_is_set() {
+                    usart.icr().write(|w| w.ncf().clear());
+                    nb::Error::Other(Error::Noise)
+                } else if isr.ore().bit_is_set() {
+                    usart.icr().write(|w| w.orecf().clear());
+                    nb::Error::Other(Error::Overrun)
+                } else if isr.rxne().bit_is_set() {
+                    return Ok(());
+                } else {
+                    nb::Error::WouldBlock
+                })
             }
         }
 
-        impl<Pin> Rx<$USARTX, Pin, DMA> {
-            pub fn disable_dma(self) -> Rx<$USARTX, Pin, NoDMA> {
+        impl Rx<$USARTX, DMA> {
+            pub fn disable_dma(self) -> Rx<$USARTX, NoDMA> {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3();
@@ -257,13 +230,13 @@ macro_rules! uart_shared {
 
                 Rx {
                     pin: self.pin,
-                    _usart: PhantomData,
+                    usart: self.usart,
                     _dma: PhantomData,
                 }
             }
         }
 
-        impl<Pin> embedded_hal_old::serial::Read<u8> for Rx<$USARTX, Pin, NoDMA> {
+        impl embedded_hal_old::serial::Read<u8> for Rx<$USARTX, NoDMA> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -272,7 +245,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX> embedded_hal_old::serial::Read<u8> for Serial<$USARTX, TX, RX> {
+        impl<Otype> embedded_hal_old::serial::Read<u8> for Serial<$USARTX, Otype> {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
@@ -280,7 +253,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin, Dma> Tx<$USARTX, Pin, Dma> {
+        impl<Dma, Otype> Tx<$USARTX, Dma, Otype> {
             /// Starts listening for an interrupt event
             pub fn listen(&mut self) {
                 let usart = unsafe { &(*$USARTX::ptr()) };
@@ -306,8 +279,8 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> Tx<$USARTX, Pin, NoDMA> {
-            pub fn enable_dma(self) -> Tx<$USARTX, Pin, DMA> {
+        impl<Otype> Tx<$USARTX, NoDMA, Otype> {
+            pub fn enable_dma(self) -> Tx<$USARTX, DMA, Otype> {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3();
@@ -322,8 +295,8 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> Tx<$USARTX, Pin, DMA> {
-            pub fn disable_dma(self) -> Tx<$USARTX, Pin, NoDMA> {
+        impl<Otype> Tx<$USARTX, DMA, Otype> {
+            pub fn disable_dma(self) -> Tx<$USARTX, NoDMA, Otype> {
                 // NOTE(unsafe) critical section prevents races
                 interrupt::free(|_| unsafe {
                     let cr3 = &(*$USARTX::ptr()).cr3();
@@ -338,7 +311,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> embedded_hal_old::serial::Write<u8> for Tx<$USARTX, Pin, NoDMA> {
+        impl<Otype> embedded_hal_old::serial::Write<u8> for Tx<$USARTX, NoDMA, Otype> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -361,7 +334,7 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX> embedded_hal_old::serial::Write<u8> for Serial<$USARTX, TX, RX> {
+        impl<Otype> embedded_hal_old::serial::Write<u8> for Serial<$USARTX, Otype> {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
@@ -373,25 +346,28 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> embedded_io::ErrorType for Tx<$USARTX, Pin, NoDMA> {
+        impl<Otype> embedded_io::ErrorType for Tx<$USARTX, NoDMA, Otype> {
             type Error = Error;
         }
-        impl<Pin> WriteReady for Tx<$USARTX, Pin, NoDMA> {
+        impl<Otype> WriteReady for Tx<$USARTX, NoDMA, Otype> {
             fn write_ready(&mut self) -> Result<bool, Self::Error> {
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 Ok(usart.isr().read().txe().bit_is_set())
             }
         }
         // writes until fifo (or tdr) is full
-        impl<Pin> embedded_io::Write for Tx<$USARTX, Pin, NoDMA> {
+        impl<Otype> embedded_io::Write for Tx<$USARTX, NoDMA, Otype> {
             fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
-                if buf.len() == 0 { return Ok(0) }
+                if buf.len() == 0 {
+                    return Ok(0);
+                }
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 while !self.write_ready()? {
                     core::hint::spin_loop()
                 }
                 // can't know fifo capacity in advance
-                let count = buf.into_iter()
+                let count = buf
+                    .into_iter()
                     .take_while(|_| usart.isr().read().txe().bit_is_set())
                     .map(|b| usart.tdr().write(|w| unsafe { w.tdr().bits(*b as u16) }))
                     .count();
@@ -403,10 +379,10 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<Pin> embedded_io::ErrorType for Rx<$USARTX, Pin, NoDMA> {
+        impl embedded_io::ErrorType for Rx<$USARTX, NoDMA> {
             type Error = Error;
         }
-        impl<Pin> ReadReady for Rx<$USARTX, Pin, NoDMA> {
+        impl ReadReady for Rx<$USARTX, NoDMA> {
             fn read_ready(&mut self) -> Result<bool, Self::Error> {
                 match self.data_ready() {
                     Ok(()) => Ok(true),
@@ -415,9 +391,11 @@ macro_rules! uart_shared {
                 }
             }
         }
-        impl<Pin> embedded_io::Read for Rx<$USARTX, Pin, NoDMA> {
+        impl embedded_io::Read for Rx<$USARTX, NoDMA> {
             fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
-                if buf.len() == 0 { return Ok(0) }
+                if buf.len() == 0 {
+                    return Ok(0);
+                }
                 let usart = unsafe { &(*$USARTX::ptr()) };
                 let mut count = 0;
 
@@ -432,15 +410,15 @@ macro_rules! uart_shared {
             }
         }
 
-        impl<TX, RX> embedded_io::ErrorType for Serial<$USARTX, TX, RX> {
+        impl<Otype> embedded_io::ErrorType for Serial<$USARTX, Otype> {
             type Error = Error;
         }
-        impl<TX, RX> WriteReady for Serial<$USARTX, TX, RX> {
+        impl<Otype> WriteReady for Serial<$USARTX, Otype> {
             fn write_ready(&mut self) -> Result<bool, Self::Error> {
                 self.tx.write_ready()
             }
         }
-        impl<TX, RX> embedded_io::Write for Serial<$USARTX, TX, RX> {
+        impl<Otype> embedded_io::Write for Serial<$USARTX, Otype> {
             fn write(&mut self, buf: &[u8]) -> Result<usize, Self::Error> {
                 embedded_io::Write::write(&mut self.tx, buf)
             }
@@ -448,22 +426,21 @@ macro_rules! uart_shared {
                 embedded_io::Write::flush(&mut self.tx)
             }
         }
-        impl<TX, RX> ReadReady for Serial<$USARTX, TX, RX> {
+        impl<Otype> ReadReady for Serial<$USARTX, Otype> {
             fn read_ready(&mut self) -> Result<bool, Self::Error> {
                 self.rx.read_ready()
             }
         }
-        impl<TX, RX> embedded_io::Read for Serial<$USARTX, TX, RX> {
+        impl<Otype> embedded_io::Read for Serial<$USARTX, Otype> {
             fn read(&mut self, buf: &mut [u8]) -> Result<usize, Self::Error> {
                 embedded_io::Read::read(&mut self.rx, buf)
             }
         }
 
-        impl<TX, RX> Serial<$USARTX, TX, RX> {
-
+        impl<Otype> Serial<$USARTX, Otype> {
             /// Separates the serial struct into separate channel objects for sending (Tx) and
             /// receiving (Rx)
-            pub fn split(self) -> (Tx<$USARTX, TX, NoDMA>, Rx<$USARTX, RX, NoDMA>) {
+            pub fn split(self) -> (Tx<$USARTX, NoDMA, Otype>, Rx<$USARTX, NoDMA>) {
                 (self.tx, self.rx)
             }
 
@@ -471,14 +448,8 @@ macro_rules! uart_shared {
             ///
             /// This function can be used in combination with `release()` to deinitialize the
             /// peripheral after it has been split.
-            pub fn join(
-                tx: Tx<$USARTX, TX, NoDMA>,
-                rx: Rx<$USARTX, RX, NoDMA>,
-            ) -> Self {
-                Serial{
-                    tx,
-                    rx,
-                }
+            pub fn join(tx: Tx<$USARTX, NoDMA, Otype>, rx: Rx<$USARTX, NoDMA>) -> Self {
+                Serial { tx, rx }
             }
 
             /// Disables the USART and returns the peripheral as well the pins.
@@ -486,7 +457,13 @@ macro_rules! uart_shared {
             /// This function makes the components available for further use. For example, the
             /// USART can later be reinitialized with a different baud rate or other configuration
             /// changes.
-            pub fn release(self) -> ($USARTX, TX, RX) {
+            pub fn release(
+                self,
+            ) -> (
+                $USARTX,
+                <$USARTX as CommonPins>::Tx<Otype>,
+                <$USARTX as CommonPins>::Rx<PushPull>,
+            ) {
                 // Disable the UART as well as its clock.
                 self.tx.usart.cr1().modify(|_, w| w.ue().clear_bit());
                 unsafe {
@@ -496,7 +473,7 @@ macro_rules! uart_shared {
             }
         }
 
-        unsafe impl<Pin> TargetAddress<MemoryToPeripheral> for Tx<$USARTX, Pin, DMA> {
+        unsafe impl<Otype> TargetAddress<MemoryToPeripheral> for Tx<$USARTX, DMA, Otype> {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Tx part accesses the Tx register
@@ -508,7 +485,7 @@ macro_rules! uart_shared {
             const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::$dmamux_tx as u8);
         }
 
-        unsafe impl<Pin> TargetAddress<PeripheralToMemory> for Rx<$USARTX, Pin, DMA> {
+        unsafe impl TargetAddress<PeripheralToMemory> for Rx<$USARTX, DMA> {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Rx part accesses the Rx register
@@ -519,41 +496,36 @@ macro_rules! uart_shared {
 
             const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::$dmamux_rx as u8);
         }
-    }
+    };
 }
 
 macro_rules! uart_lp {
     ($USARTX:ident,
         $usartX:ident, $clk_mul:expr
     ) => {
-        impl SerialExt<$USARTX, LowPowerConfig> for $USARTX {
-            fn usart<TX, RX>(
+        impl SerialExt<LowPowerConfig> for $USARTX {
+            fn usart<Otype>(
                 self,
-                tx: TX,
-                rx: RX,
-                config: LowPowerConfig,
+                pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
+                config: impl Into<LowPowerConfig>,
                 rcc: &mut Rcc,
-            ) -> Result<Serial<$USARTX, TX, RX>, InvalidConfig>
-            where
-                TX: TxPin<$USARTX>,
-                RX: RxPin<$USARTX>,
-            {
-                Serial::$usartX(self, tx, rx, config, rcc)
+            ) -> Result<Serial<Self, Otype>, InvalidConfig> {
+                Serial::$usartX(self, pins, config, rcc)
             }
         }
 
-        impl<TX, RX> Serial<$USARTX, TX, RX>
-        where
-            TX: TxPin<$USARTX>,
-            RX: RxPin<$USARTX>,
-        {
+        impl<Otype> Serial<$USARTX, Otype> {
             pub fn $usartX(
                 usart: $USARTX,
-                tx: TX,
-                rx: RX,
-                config: LowPowerConfig,
+                pins: (
+                    impl Into<<$USARTX as CommonPins>::Tx<Otype>>,
+                    impl Into<<$USARTX as CommonPins>::Rx<PushPull>>,
+                ),
+                config: impl Into<LowPowerConfig>,
                 rcc: &mut Rcc,
             ) -> Result<Self, InvalidConfig> {
+                let config = config.into();
+
                 // Enable clock for USART
                 $USARTX::enable(rcc);
                 $USARTX::reset(rcc);
@@ -577,56 +549,40 @@ macro_rules! uart_lp {
                 usart.cr3().reset();
 
                 usart.cr2().write(|w| unsafe {
-                    w.stop()
-                        .bits(config.stopbits.bits())
-                        .swap()
-                        .bit(config.swap)
-                        .txinv()
-                        .bit(config.tx_invert)
-                        .rxinv()
-                        .bit(config.rx_invert)
+                    w.stop().bits(config.stopbits.bits());
+                    w.swap().bit(config.swap);
+                    w.txinv().bit(config.tx_invert);
+                    w.rxinv().bit(config.rx_invert)
                 });
 
                 usart.cr3().write(|w| unsafe {
-                    w.txftcfg()
-                        .bits(config.tx_fifo_threshold.bits())
-                        .rxftcfg()
-                        .bits(config.rx_fifo_threshold.bits())
-                        .txftie()
-                        .bit(config.tx_fifo_interrupt)
-                        .rxftie()
-                        .bit(config.rx_fifo_interrupt)
+                    w.txftcfg().bits(config.tx_fifo_threshold.bits());
+                    w.rxftcfg().bits(config.rx_fifo_threshold.bits());
+                    w.txftie().bit(config.tx_fifo_interrupt);
+                    w.rxftie().bit(config.rx_fifo_interrupt)
                 });
 
                 // Enable the UART and perform remaining configuration.
                 usart.cr1().write(|w| {
-                    w.ue()
-                        .set_bit()
-                        .te()
-                        .set_bit()
-                        .re()
-                        .set_bit()
-                        .m1()
-                        .bit(config.wordlength == WordLength::DataBits7)
-                        .m0()
-                        .bit(config.wordlength == WordLength::DataBits9)
-                        .pce()
-                        .bit(config.parity != Parity::ParityNone)
-                        .ps()
-                        .bit(config.parity == Parity::ParityOdd)
-                        .fifoen()
-                        .bit(config.fifo_enable)
+                    w.ue().set_bit();
+                    w.te().set_bit();
+                    w.re().set_bit();
+                    w.m1().bit(config.wordlength == WordLength::DataBits9);
+                    w.m0().bit(config.wordlength == WordLength::DataBits7);
+                    w.pce().bit(config.parity != Parity::ParityNone);
+                    w.ps().bit(config.parity == Parity::ParityOdd);
+                    w.fifoen().bit(config.fifo_enable)
                 });
 
                 Ok(Serial {
                     tx: Tx {
-                        pin: tx,
+                        pin: pins.0.into(),
                         usart,
                         _dma: PhantomData,
                     },
                     rx: Rx {
-                        pin: rx,
-                        _usart: PhantomData,
+                        pin: pins.1.into(),
+                        usart: unsafe { $USARTX::steal() },
                         _dma: PhantomData,
                     },
                 })
@@ -674,34 +630,29 @@ macro_rules! uart_full {
     ($USARTX:ident,
         $usartX:ident
     ) => {
-        impl SerialExt<$USARTX, FullConfig> for $USARTX {
-            fn usart<TX, RX>(
+        impl SerialExt<FullConfig> for $USARTX {
+            fn usart<Otype>(
                 self,
-                tx: TX,
-                rx: RX,
-                config: FullConfig,
+                pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
+                config: impl Into<FullConfig>,
                 rcc: &mut Rcc,
-            ) -> Result<Serial<$USARTX, TX, RX>, InvalidConfig>
-            where
-                TX: TxPin<$USARTX>,
-                RX: RxPin<$USARTX>,
-            {
-                Serial::$usartX(self, tx, rx, config, rcc)
+            ) -> Result<Serial<Self, Otype>, InvalidConfig> {
+                Serial::$usartX(self, pins, config, rcc)
             }
         }
 
-        impl<TX, RX> Serial<$USARTX, TX, RX>
-        where
-            TX: TxPin<$USARTX>,
-            RX: RxPin<$USARTX>,
-        {
+        impl<Otype> Serial<$USARTX, Otype> {
             pub fn $usartX(
                 usart: $USARTX,
-                tx: TX,
-                rx: RX,
-                config: FullConfig,
+                pins: (
+                    impl Into<<$USARTX as CommonPins>::Tx<Otype>>,
+                    impl Into<<$USARTX as CommonPins>::Rx<PushPull>>,
+                ),
+                config: impl Into<FullConfig>,
                 rcc: &mut Rcc,
             ) -> Result<Self, InvalidConfig> {
+                let config = config.into();
+
                 // Enable clock for USART
                 $USARTX::enable(rcc);
                 $USARTX::reset(rcc);
@@ -726,14 +677,10 @@ macro_rules! uart_full {
                 usart.cr3().reset();
 
                 usart.cr2().write(|w| unsafe {
-                    w.stop()
-                        .bits(config.stopbits.bits())
-                        .swap()
-                        .bit(config.swap)
-                        .txinv()
-                        .bit(config.tx_invert)
-                        .rxinv()
-                        .bit(config.rx_invert)
+                    w.stop().bits(config.stopbits.bits());
+                    w.swap().bit(config.swap);
+                    w.txinv().bit(config.tx_invert);
+                    w.rxinv().bit(config.rx_invert)
                 });
 
                 if let Some(timeout) = config.receiver_timeout {
@@ -743,45 +690,33 @@ macro_rules! uart_full {
                 }
 
                 usart.cr3().write(|w| unsafe {
-                    w.txftcfg()
-                        .bits(config.tx_fifo_threshold.bits())
-                        .rxftcfg()
-                        .bits(config.rx_fifo_threshold.bits())
-                        .txftie()
-                        .bit(config.tx_fifo_interrupt)
-                        .rxftie()
-                        .bit(config.rx_fifo_interrupt)
+                    w.txftcfg().bits(config.tx_fifo_threshold.bits());
+                    w.rxftcfg().bits(config.rx_fifo_threshold.bits());
+                    w.txftie().bit(config.tx_fifo_interrupt);
+                    w.rxftie().bit(config.rx_fifo_interrupt)
                 });
 
                 // Enable the UART and perform remaining configuration.
                 usart.cr1().modify(|_, w| {
-                    w.ue()
-                        .set_bit()
-                        .te()
-                        .set_bit()
-                        .re()
-                        .set_bit()
-                        .m1()
-                        .bit(config.wordlength == WordLength::DataBits7)
-                        .m0()
-                        .bit(config.wordlength == WordLength::DataBits9)
-                        .pce()
-                        .bit(config.parity != Parity::ParityNone)
-                        .ps()
-                        .bit(config.parity == Parity::ParityOdd)
-                        .fifoen()
-                        .bit(config.fifo_enable)
+                    w.ue().set_bit();
+                    w.te().set_bit();
+                    w.re().set_bit();
+                    w.m1().bit(config.wordlength == WordLength::DataBits7);
+                    w.m0().bit(config.wordlength == WordLength::DataBits9);
+                    w.pce().bit(config.parity != Parity::ParityNone);
+                    w.ps().bit(config.parity == Parity::ParityOdd);
+                    w.fifoen().bit(config.fifo_enable)
                 });
 
                 Ok(Serial {
                     tx: Tx {
-                        pin: tx,
+                        pin: pins.0.into(),
                         usart,
                         _dma: PhantomData,
                     },
                     rx: Rx {
-                        pin: rx,
-                        _usart: PhantomData,
+                        pin: pins.1.into(),
+                        usart: unsafe { $USARTX::steal() },
                         _dma: PhantomData,
                     },
                 })
@@ -823,7 +758,7 @@ macro_rules! uart_full {
             }
         }
 
-        impl<Pin, Dma> Rx<$USARTX, Pin, Dma> {
+        impl<Dma> Rx<$USARTX, Dma> {
             /// Check if receiver timeout has lapsed
             /// Returns the current state of the ISR RTOF bit
             pub fn timeout_lapsed(&self) -> bool {
@@ -840,88 +775,18 @@ macro_rules! uart_full {
     };
 }
 
-uart_shared!(USART1, USART1_RX, USART1_TX,
-tx: [
-    (PA9, AF7),
-    (PB6, AF7),
-    (PC4, AF7),
-    (PE0, AF7),
-    #[cfg(any(feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
-    (PG9, AF7),
-],
-rx: [
-    (PA10, AF7),
-    (PB7, AF7),
-    (PC5, AF7),
-    (PE1, AF7),
-]);
+uart_shared!(USART1, USART1_RX, USART1_TX);
 
-uart_shared!(USART2, USART2_RX, USART2_TX,
-    tx: [
-        (PA2, AF7),
-        (PA14, AF7),
-        (PB3, AF7),
-        (PD5, AF7),
-    ],
-    rx: [
-        (PA3, AF7),
-        (PA15, AF7),
-        (PB4, AF7),
-        (PD6, AF7),
-    ]
-);
+uart_shared!(USART2, USART2_RX, USART2_TX);
 
-uart_shared!(USART3, USART3_RX, USART3_TX,
-    tx: [
-        (PB9, AF7),
-        (PB10, AF7),
-        (PC10, AF7),
-        (PD8, AF7),
-    ],
-    rx: [
-        (PB8, AF7),
-        (PB11, AF7),
-        (PC11, AF7),
-        (PD9, AF7),
-        (PE15, AF7),
-    ]
-);
+uart_shared!(USART3, USART3_RX, USART3_TX);
 
-uart_shared!(UART4, USART4_RX, USART4_TX,
-    tx: [
-        (PC10, AF5),
-    ],
-    rx: [
-        (PC11, AF5),
-    ]
-);
+uart_shared!(UART4, USART4_RX, USART4_TX);
 
 #[cfg(not(any(feature = "stm32g431", feature = "stm32g441")))]
-uart_shared!(UART5, USART5_RX, USART5_TX,
-    tx: [
-        (PC12, AF5),
-    ],
-    rx: [
-        (PD2, AF5),
-    ]
-);
+uart_shared!(UART5, USART5_RX, USART5_TX);
 
-uart_shared!(LPUART1, LPUART1_RX, LPUART1_TX,
-    tx: [
-        (PA2, AF12),
-        (PB11, AF8),
-        (PC1, AF8),
-        #[cfg(any(feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
-        (PG7, AF8),
-    ],
-    rx: [
-        (PA3, AF12),
-        (PB10, AF8),
-        (PC0, AF8),
-        #[cfg(any(feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
-        (PG8, AF8),
-    ]
-);
+uart_shared!(LPUART1, LPUART1_RX, LPUART1_TX);
 
 uart_full!(USART1, usart1);
 uart_full!(USART2, usart2);

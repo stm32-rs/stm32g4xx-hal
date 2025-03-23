@@ -3,18 +3,15 @@ use crate::stm32::i2c1;
 use embedded_hal::i2c::{ErrorKind, Operation, SevenBitAddress, TenBitAddress};
 use embedded_hal_old::blocking::i2c::{Read, Write, WriteRead};
 
-use crate::gpio::{self, OpenDrain};
-use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
+use crate::gpio::alt::I2cCommon;
+use crate::rcc::Rcc;
+#[cfg(feature = "i2c4")]
 use crate::stm32::I2C4;
 use crate::stm32::{I2C1, I2C2, I2C3};
 use crate::time::Hertz;
-use core::{cmp, convert::TryInto, ops::Deref};
+use core::cmp;
+use core::convert::TryInto;
+use core::ops::Deref;
 
 /// I2C bus configuration.
 #[derive(Debug, Clone, Copy)]
@@ -109,16 +106,11 @@ impl From<Hertz> for Config {
 }
 
 /// I2C abstraction
-pub struct I2c<I2C, SDA, SCL> {
+pub struct I2c<I2C: Instance> {
     i2c: I2C,
-    pins: (SDA, SCL),
+    sda: I2C::Sda,
+    scl: I2C::Scl,
 }
-
-/// I2C SDA pin
-pub trait SDAPin<I2C> {}
-
-/// I2C SCL pin
-pub trait SCLPin<I2C> {}
 
 /// I2C error
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -144,16 +136,14 @@ impl embedded_hal::i2c::Error for Error {
     }
 }
 
-pub trait I2cExt<I2C> {
-    fn i2c<SDA, SCL>(
+pub trait I2cExt: Instance + Sized {
+    fn i2c(
         self,
-        pins: (SDA, SCL),
+        sda: impl Into<Self::Sda>,
+        scl: impl Into<Self::Scl>,
         config: impl Into<Config>,
         rcc: &mut Rcc,
-    ) -> I2c<I2C, SDA, SCL>
-    where
-        SDA: SDAPin<I2C>,
-        SCL: SCLPin<I2C>;
+    ) -> I2c<Self>;
 }
 
 /// Sequence to flush the TXDR register. This resets the TXIS and TXE flags
@@ -198,40 +188,37 @@ macro_rules! busy_wait {
 }
 
 pub trait Instance:
-    crate::Sealed + Deref<Target = i2c1::RegisterBlock> + Enable + Reset + GetBusFreq
+    crate::Sealed + crate::rcc::Instance + I2cCommon + Deref<Target = crate::pac::i2c1::RegisterBlock>
 {
 }
 
-macro_rules! i2c {
-    ($I2CX:ident,
-        sda: [ $($( #[ $pmetasda:meta ] )* $PSDA:ident<$AFDA:ident>,)+ ],
-        scl: [ $($( #[ $pmetascl:meta ] )* $PSCL:ident<$AFCL:ident>,)+ ],
-    ) => {
-        $(
-            $( #[ $pmetasda ] )*
-            impl SDAPin<$I2CX> for gpio::$PSDA<gpio::$AFDA<OpenDrain>> {}
-        )+
+impl Instance for I2C1 {}
+impl Instance for I2C2 {}
+impl Instance for I2C3 {}
+#[cfg(feature = "i2c4")]
+impl Instance for I2C4 {}
 
-        $(
-            $( #[ $pmetascl ] )*
-            impl SCLPin<$I2CX> for gpio::$PSCL<gpio::$AFCL<OpenDrain>> {}
-        )+
-
-        impl Instance for $I2CX {}
+impl<I2C: Instance> I2cExt for I2C {
+    fn i2c(
+        self,
+        sda: impl Into<Self::Sda>,
+        scl: impl Into<Self::Scl>,
+        config: impl Into<Config>,
+        rcc: &mut Rcc,
+    ) -> I2c<Self> {
+        I2c::new(self, sda, scl, config, rcc)
     }
 }
 
-impl<I2C: Instance> I2cExt<I2C> for I2C {
-    fn i2c<SDA, SCL>(
-        self,
-        pins: (SDA, SCL),
+impl<I2C: Instance> I2c<I2C> {
+    /// Initializes the I2C peripheral.
+    pub fn new(
+        i2c: I2C,
+        sda: impl Into<I2C::Sda>,
+        scl: impl Into<I2C::Scl>,
         config: impl Into<Config>,
         rcc: &mut Rcc,
-    ) -> I2c<I2C, SDA, SCL>
-    where
-        SDA: SDAPin<I2C>,
-        SCL: SCLPin<I2C>,
-    {
+    ) -> Self {
         let config = config.into();
 
         // Enable and reset I2C
@@ -239,41 +226,35 @@ impl<I2C: Instance> I2cExt<I2C> for I2C {
         I2C::reset(rcc);
 
         // Make sure the I2C unit is disabled so we can configure it
-        self.cr1().modify(|_, w| w.pe().clear_bit());
+        i2c.cr1().modify(|_, w| w.pe().clear_bit());
 
         // Setup protocol timings
-        self.timingr()
+        i2c.timingr()
             .write(|w| config.timing_bits(I2C::get_frequency(&rcc.clocks), w));
 
         // Enable the I2C processing
-        self.cr1().modify(|_, w| {
-            w.pe()
-                .set_bit()
-                .dnf()
-                .set(config.digital_filter)
-                .anfoff()
-                .bit(!config.analog_filter)
+        i2c.cr1().modify(|_, w| {
+            w.pe().set_bit();
+            w.dnf().set(config.digital_filter);
+            w.anfoff().bit(!config.analog_filter)
         });
 
-        I2c { i2c: self, pins }
+        I2c {
+            i2c,
+            sda: sda.into(),
+            scl: scl.into(),
+        }
     }
-}
 
-impl<SDA, SCL, I2C> I2c<I2C, SDA, SCL>
-where
-    I2C: Instance,
-    SDA: SDAPin<I2C>,
-    SCL: SCLPin<I2C>,
-{
     /// Disables I2C and releases the peripheral as well as the pins.
-    pub fn release(self) -> (I2C, (SDA, SCL)) {
+    pub fn release(self) -> (I2C, I2C::Sda, I2C::Scl) {
         // Disable I2C.
         unsafe {
             I2C::reset_unchecked();
             I2C::disable_unchecked();
         }
 
-        (self.i2c, self.pins)
+        (self.i2c, self.sda, self.scl)
     }
 
     // copied from f3 hal
@@ -383,17 +364,12 @@ where
     }
 }
 
-impl<I2C, SDA, SCL> embedded_hal::i2c::ErrorType for I2c<I2C, SDA, SCL> {
+impl<I2C: Instance> embedded_hal::i2c::ErrorType for I2c<I2C> {
     type Error = Error;
 }
 
 // TODO: custom read/write/read_write impl with hardware stop logic
-impl<I2C, SDA, SCL> embedded_hal::i2c::I2c for I2c<I2C, SDA, SCL>
-where
-    I2C: Instance,
-    SDA: SDAPin<I2C>,
-    SCL: SCLPin<I2C>,
-{
+impl<I2C: Instance> embedded_hal::i2c::I2c for I2c<I2C> {
     fn transaction(
         &mut self,
         address: SevenBitAddress,
@@ -411,12 +387,7 @@ where
         Ok(())
     }
 }
-impl<I2C, SDA, SCL> embedded_hal::i2c::I2c<TenBitAddress> for I2c<I2C, SDA, SCL>
-where
-    I2C: Instance,
-    SDA: SDAPin<I2C>,
-    SCL: SCLPin<I2C>,
-{
+impl<I2C: Instance> embedded_hal::i2c::I2c<TenBitAddress> for I2c<I2C> {
     fn transaction(
         &mut self,
         address: TenBitAddress,
@@ -435,12 +406,7 @@ where
     }
 }
 
-impl<I2C, SDA, SCL> WriteRead for I2c<I2C, SDA, SCL>
-where
-    I2C: Instance,
-    SDA: SDAPin<I2C>,
-    SCL: SCLPin<I2C>,
-{
+impl<I2C: Instance> WriteRead for I2c<I2C> {
     type Error = Error;
 
     fn write_read(&mut self, addr: u8, bytes: &[u8], buffer: &mut [u8]) -> Result<(), Self::Error> {
@@ -450,12 +416,7 @@ where
     }
 }
 
-impl<I2C, SDA, SCL> Write for I2c<I2C, SDA, SCL>
-where
-    I2C: Instance,
-    SDA: SDAPin<I2C>,
-    SCL: SCLPin<I2C>,
-{
+impl<I2C: Instance> Write for I2c<I2C> {
     type Error = Error;
 
     fn write(&mut self, addr: u8, bytes: &[u8]) -> Result<(), Self::Error> {
@@ -464,12 +425,7 @@ where
     }
 }
 
-impl<I2C, SDA, SCL> Read for I2c<I2C, SDA, SCL>
-where
-    I2C: Instance,
-    SDA: SDAPin<I2C>,
-    SCL: SCLPin<I2C>,
-{
+impl<I2C: Instance> Read for I2c<I2C> {
     type Error = Error;
 
     fn read(&mut self, addr: u8, bytes: &mut [u8]) -> Result<(), Self::Error> {
@@ -477,99 +433,3 @@ where
         Ok(())
     }
 }
-
-i2c!(
-    I2C1,
-    sda: [
-        PA14<AF4>,
-        PB7<AF4>,
-        PB9<AF4>,
-    ],
-    scl: [
-        PA13<AF4>,
-        PA15<AF4>,
-        PB8<AF4>,
-    ],
-);
-
-i2c!(
-    I2C2,
-    sda: [
-        PA8<AF4>,
-        PF0<AF4>,
-    ],
-    scl: [
-        PA9<AF4>,
-        PC4<AF4>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PF6<AF4>,
-    ],
-);
-
-i2c!(
-    I2C3,
-    sda: [
-        PB5<AF8>,
-        PC11<AF8>,
-        PC9<AF8>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PF4<AF4>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PG8<AF4>,
-    ],
-    scl: [
-        PA8<AF2>,
-        PC8<AF8>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PF3<AF4>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PG7<AF4>,
-    ],
-);
-
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
-i2c!(
-    I2C4,
-    sda: [
-        PB7<AF3>,
-        PC7<AF8>,
-        PF15<AF4>,
-        PG4<AF4>,
-    ],
-    scl: [
-        PA13<AF3>,
-        PC6<AF8>,
-        PF14<AF4>,
-        PG3<AF4>,
-    ],
-);

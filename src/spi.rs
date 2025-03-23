@@ -1,14 +1,9 @@
 use crate::dma::mux::DmaMuxResources;
 use crate::dma::traits::TargetAddress;
 use crate::dma::MemoryToPeripheral;
-use crate::gpio;
-use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
+use crate::gpio::alt::SpiCommon;
+use crate::rcc::Rcc;
+#[cfg(feature = "spi4")]
 use crate::stm32::SPI4;
 use crate::stm32::{spi1, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
@@ -38,40 +33,30 @@ impl embedded_hal::spi::Error for Error {
     }
 }
 
-/// A filler type for when the SCK pin is unnecessary
-pub struct NoSck;
-/// A filler type for when the Miso pin is unnecessary
-pub struct NoMiso;
-/// A filler type for when the Mosi pin is unnecessary
-pub struct NoMosi;
-
-pub trait Pins<SPI> {}
-
-pub trait PinSck<SPI> {}
-
-pub trait PinMiso<SPI> {}
-
-pub trait PinMosi<SPI> {}
-
-impl<SPI, SCK, MISO, MOSI> Pins<SPI> for (SCK, MISO, MOSI)
-where
-    SCK: PinSck<SPI>,
-    MISO: PinMiso<SPI>,
-    MOSI: PinMosi<SPI>,
-{
-}
-
 #[derive(Debug)]
-pub struct Spi<SPI, PINS> {
+pub struct Spi<SPI: Instance> {
     spi: SPI,
-    pins: PINS,
+    #[allow(clippy::type_complexity)]
+    pins: (Option<SPI::Sck>, Option<SPI::Miso>, Option<SPI::Mosi>),
 }
 
-pub trait SpiExt<SPI>: Sized {
-    fn spi<PINS, T>(self, pins: PINS, mode: Mode, freq: T, rcc: &mut Rcc) -> Spi<SPI, PINS>
-    where
-        PINS: Pins<SPI>,
-        T: Into<Hertz>;
+#[allow(non_upper_case_globals)]
+pub trait SpiExt: Instance + Sized {
+    const NoSck: Option<Self::Sck> = None;
+    const NoMiso: Option<Self::Miso> = None;
+    const NoMosi: Option<Self::Mosi> = None;
+    const NoNss: Option<Self::Nss> = None;
+    fn spi(
+        self,
+        pins: (
+            Option<impl Into<Self::Sck>>,
+            Option<impl Into<Self::Miso>>,
+            Option<impl Into<Self::Mosi>>,
+        ),
+        mode: Mode,
+        freq: Hertz,
+        rcc: &mut Rcc,
+    ) -> Spi<Self>;
 }
 
 pub trait FrameSize: Copy + Default {
@@ -86,12 +71,13 @@ impl FrameSize for u16 {
 }
 
 pub trait Instance:
-    crate::Sealed + Deref<Target = spi1::RegisterBlock> + Enable + Reset + GetBusFreq
+    crate::Sealed + crate::rcc::Instance + SpiCommon + Deref<Target = crate::pac::spi1::RegisterBlock>
 {
     const DMA_MUX_RESOURCE: DmaMuxResources;
+    fn ptr() -> *const crate::pac::spi1::RegisterBlock;
 }
 
-unsafe impl<SPI: Instance, PINS> TargetAddress<MemoryToPeripheral> for Spi<SPI, PINS> {
+unsafe impl<SPI: Instance> TargetAddress<MemoryToPeripheral> for Spi<SPI> {
     #[inline(always)]
     fn address(&self) -> u32 {
         self.spi.dr() as *const _ as u32
@@ -101,42 +87,29 @@ unsafe impl<SPI: Instance, PINS> TargetAddress<MemoryToPeripheral> for Spi<SPI, 
 }
 
 macro_rules! spi {
-    ($SPIX:ident, $spiX:ident,
-        sck: [ $($( #[ $pmetasck:meta ] )* $SCK:ident<$ASCK:ident>,)+ ],
-        miso: [ $($( #[ $pmetamiso:meta ] )* $MISO:ident<$AMISO:ident>,)+ ],
-        mosi: [ $($( #[ $pmetamosi:meta ] )* $MOSI:ident<$AMOSI:ident>,)+ ],
-        $mux:expr,
-    ) => {
-        impl PinSck<$SPIX> for NoSck {}
-        impl PinMiso<$SPIX> for NoMiso {}
-        impl PinMosi<$SPIX> for NoMosi {}
-
-        $(
-            $( #[ $pmetasck ] )*
-            impl PinSck<$SPIX> for gpio::$SCK<gpio::$ASCK> {}
-        )*
-        $(
-            $( #[ $pmetamiso ] )*
-            impl PinMiso<$SPIX> for gpio::$MISO<gpio::$AMISO> {}
-        )*
-        $(
-            $( #[ $pmetamosi ] )*
-            impl PinMosi<$SPIX> for gpio::$MOSI<gpio::$AMOSI> {}
-        )*
-
+    ($SPIX:ident, $mux:expr) => {
         impl Instance for $SPIX {
             const DMA_MUX_RESOURCE: DmaMuxResources = $mux;
+            fn ptr() -> *const crate::pac::spi1::RegisterBlock {
+                Self::ptr()
+            }
         }
-    }
+    };
 }
 
-impl<SPI: Instance, PINS> Spi<SPI, PINS> {
-    pub fn release(self) -> (SPI, PINS) {
+impl<SPI: Instance> Spi<SPI> {
+    #[allow(clippy::type_complexity)]
+    pub fn release(
+        self,
+    ) -> (
+        SPI,
+        (Option<SPI::Sck>, Option<SPI::Miso>, Option<SPI::Mosi>),
+    ) {
         (self.spi, self.pins)
     }
 
-    pub fn enable_tx_dma(self) -> Spi<SPI, PINS> {
-        self.spi.cr2().modify(|_, w| w.txdmaen().set_bit());
+    pub fn enable_tx_dma(self) -> Spi<SPI> {
+        self.spi.cr2().modify(|_, w| w.txdmaen().enabled());
         Spi {
             spi: self.spi,
             pins: self.pins,
@@ -283,28 +256,41 @@ fn setup_spi_regs(regs: &spi1::RegisterBlock, spi_freq: u32, bus_freq: u32, mode
     });
 }
 
-impl<SPI: Instance> SpiExt<SPI> for SPI {
-    fn spi<PINS, T>(self, pins: PINS, mode: Mode, freq: T, rcc: &mut Rcc) -> Spi<SPI, PINS>
-    where
-        PINS: Pins<SPI>,
-        T: Into<Hertz>,
-    {
+impl<SPI: Instance> SpiExt for SPI {
+    fn spi(
+        self,
+        pins: (
+            Option<impl Into<Self::Sck>>,
+            Option<impl Into<Self::Miso>>,
+            Option<impl Into<Self::Mosi>>,
+        ),
+        mode: Mode,
+        freq: Hertz,
+        rcc: &mut Rcc,
+    ) -> Spi<Self> {
         Self::enable(rcc);
         Self::reset(rcc);
 
-        let spi_freq = freq.into().raw();
+        let spi_freq = freq.raw();
         let bus_freq = SPI::get_frequency(&rcc.clocks).raw();
         setup_spi_regs(&self, spi_freq, bus_freq, mode);
 
-        Spi { spi: self, pins }
+        Spi {
+            spi: self,
+            pins: (
+                pins.0.map(Into::into),
+                pins.1.map(Into::into),
+                pins.2.map(Into::into),
+            ),
+        }
     }
 }
 
-impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::ErrorType for Spi<SPI, PINS> {
+impl<SPI: Instance> embedded_hal::spi::ErrorType for Spi<SPI> {
     type Error = Error;
 }
 
-impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, PINS> {
+impl<SPI: Instance> embedded_hal::spi::SpiBus<u8> for Spi<SPI> {
     fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
         let len = words.len();
         if len == 0 {
@@ -479,7 +465,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
         self.flush_inner()
     }
 }
-impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI, PINS> {
+impl<SPI: Instance> embedded_hal::spi::SpiBus<u16> for Spi<SPI> {
     fn read(&mut self, words: &mut [u16]) -> Result<(), Self::Error> {
         let len = words.len();
         if len == 0 {
@@ -579,7 +565,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
     }
 }
 
-impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal_old::spi::FullDuplex<u8> for Spi<SPI, PINS> {
+impl<SPI: Instance> embedded_hal_old::spi::FullDuplex<u8> for Spi<SPI> {
     type Error = Error;
 
     fn read(&mut self) -> nb::Result<u8, Error> {
@@ -591,120 +577,15 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal_old::spi::FullDuplex<u8> for S
     }
 }
 
-impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal_old::blocking::spi::transfer::Default<u8>
-    for Spi<SPI, PINS>
-{
-}
+impl<SPI: Instance> embedded_hal_old::blocking::spi::transfer::Default<u8> for Spi<SPI> {}
 
-impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal_old::blocking::spi::write::Default<u8>
-    for Spi<SPI, PINS>
-{
-}
+impl<SPI: Instance> embedded_hal_old::blocking::spi::write::Default<u8> for Spi<SPI> {}
 
-spi!(
-    SPI1,
-    spi1,
-    sck: [
-        PA5<AF5>,
-        PB3<AF5>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PG2<AF5>,
-    ],
-    miso: [
-        PA6<AF5>,
-        PB4<AF5>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PG3<AF5>,
-    ],
-    mosi: [
-        PA7<AF5>,
-        PB5<AF5>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PG4<AF5>,
-    ],
-    DmaMuxResources::SPI1_TX,
-);
+spi!(SPI1, DmaMuxResources::SPI1_TX);
 
-spi!(
-    SPI2,
-    spi2,
-    sck: [
-        PF1<AF5>,
-        PF9<AF5>,
-        PF10<AF5>,
-        PB13<AF5>,
-    ],
-    miso: [
-        PA10<AF5>,
-        PB14<AF5>,
-    ],
-    mosi: [
-        PA11<AF5>,
-        PB15<AF5>,
-    ],
-    DmaMuxResources::SPI2_TX,
-);
+spi!(SPI2, DmaMuxResources::SPI2_TX);
 
-spi!(
-    SPI3,
-    spi3,
-    sck: [
-        PB3<AF6>,
-        PC10<AF6>,
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g474",
-            feature = "stm32g483",
-            feature = "stm32g484"
-        ))]
-        PG9<AF6>,
-    ],
-    miso: [
-        PB4<AF6>,
-        PC11<AF6>,
-    ],
-    mosi: [
-        PB5<AF6>,
-        PC12<AF6>,
-    ],
-    DmaMuxResources::SPI3_TX,
-);
+spi!(SPI3, DmaMuxResources::SPI3_TX);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
-spi!(
-    SPI4,
-    spi4,
-    sck: [
-        PE2<AF5>,
-        PE12<AF5>,
-    ],
-    miso: [
-        PE5<AF5>,
-        PE13<AF5>,
-    ],
-    mosi: [
-        PE6<AF5>,
-        PE14<AF5>,
-    ],
-    DmaMuxResources::SPI4_TX,
-);
+#[cfg(feature = "spi4")]
+spi!(SPI4, DmaMuxResources::SPI4_TX);

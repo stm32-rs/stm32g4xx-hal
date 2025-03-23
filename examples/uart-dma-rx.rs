@@ -43,14 +43,13 @@ fn main() -> ! {
     //let rx = gpioa.pa3.into_alternate();
     let gpioc = dp.GPIOC.split(&mut rcc);
     let tx = gpioc.pc10.into_alternate();
-    let rx = gpioc.pc11.into_alternate();
+    let rx = gpioc.pc11;
 
     let usart = dp
         //.USART2
         .USART3
         .usart(
-            tx,
-            rx,
+            (tx, rx),
             FullConfig::default()
                 .baudrate(115200.bps())
                 .receiver_timeout_us(1000), // Timeout after 1ms

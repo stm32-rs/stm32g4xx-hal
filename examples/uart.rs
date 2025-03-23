@@ -41,7 +41,7 @@ fn main() -> ! {
     let rx = gpioc.pc5.into_alternate();
     let mut usart = dp
         .USART1
-        .usart(tx, rx, FullConfig::default(), &mut rcc)
+        .usart((tx, rx), FullConfig::default(), &mut rcc)
         .unwrap();*/
 
     let gpioc = dp.GPIOC.split(&mut rcc);
@@ -49,7 +49,7 @@ fn main() -> ! {
     let rx = gpioc.pc11.into_alternate();
     let mut usart = dp
         .USART3
-        .usart(tx, rx, FullConfig::default(), &mut rcc)
+        .usart((tx, rx), FullConfig::default(), &mut rcc)
         .unwrap();
 
     writeln!(usart, "Hello USART3, yay!!\r\n").unwrap();
