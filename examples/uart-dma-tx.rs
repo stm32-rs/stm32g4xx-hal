@@ -10,7 +10,6 @@ use core::fmt::Write;
 use hal::dma::{channel::DMAExt, config::DmaConfig, TransferExt};
 use hal::prelude::*;
 use hal::pwr::PwrExt;
-use hal::serial::*;
 use hal::time::ExtU32;
 use hal::{rcc, stm32};
 use stm32g4xx_hal as hal;
@@ -41,16 +40,8 @@ fn main() -> ! {
     info!("Init UART");
     let gpioa = dp.GPIOA.split(&mut rcc);
     let tx = gpioa.pa2.into_alternate();
-    let rx = gpioa.pa3.into_alternate();
-    let mut usart = dp
-        .USART2
-        .usart(
-            tx,
-            rx,
-            FullConfig::default().baudrate(115200.bps()),
-            &mut rcc,
-        )
-        .unwrap();
+    let rx = gpioa.pa3;
+    let mut usart = dp.USART2.usart((tx, rx), 115200.bps(), &mut rcc).unwrap();
 
     let mut delay_syst = cp.SYST.delay(&rcc.clocks);
     let mut led = gpioa.pa5.into_push_pull_output();
