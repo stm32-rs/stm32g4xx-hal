@@ -52,9 +52,9 @@ fn main() -> ! {
     let mut received_byte: u8;
 
     loop {
-        for byte in message {
+        for &byte in message {
             cs.set_low();
-            spi.send(*byte as u8).unwrap();
+            spi.send(byte).unwrap();
             received_byte = nb::block!(FullDuplex::read(&mut spi)).unwrap();
             cs.set_high();
 

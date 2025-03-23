@@ -153,6 +153,7 @@ pub mod fdcan2 {
 }
 
 #[cfg(feature = "gpio-g47x")]
+#[cfg(not(feature = "stm32g471"))]
 pub mod fdcan3 {
     use super::*;
 

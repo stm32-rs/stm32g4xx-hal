@@ -1,11 +1,6 @@
 {
   "rust-analyzer.check.allTargets": false,
-  "rust-analyzer.check.extraArgs": [
-    "--examples",
-  ],
+  "rust-analyzer.check.extraArgs": ["--examples"],
   "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
-  "rust-analyzer.cargo.features": [
-    "stm32g473",
-    "defmt",
-  ]
+  "rust-analyzer.cargo.features": ["stm32g473", "defmt"]
 }

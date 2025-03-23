@@ -13,7 +13,6 @@ use crate::gpio::{
     gpioa::{PA0, PA1, PA11, PA12, PA2, PA3, PA4, PA5, PA6, PA7},
     gpiob::{PB0, PB1, PB14, PB15, PB2, PB6, PB7, PB8, PB9},
     gpioc::PC2,
-    gpiof::PF4,
     Analog, OpenDrain, Output, PushPull, SignalEdge,
 };
 
@@ -28,6 +27,7 @@ use crate::gpio::{
     gpiob::{PB10, PB11, PB12, PB13},
     gpioc::{PC6, PC7, PC8},
     gpiod::{PD10, PD11, PD12, PD13, PD14, PD15},
+    gpiof::PF4,
 };
 
 use crate::gpio::gpioc::{PC0, PC1};
@@ -610,7 +610,6 @@ output_pin! {
     COMP1: PA6,  8,
     COMP1: PA11, 8,
     COMP1: PB8,  8,
-    COMP1: PF4,  2,
 
     COMP2: PA2,  8,
     COMP2: PA7,  8,
@@ -633,6 +632,8 @@ output_pin! {
     feature = "stm32g484",
 ))]
 output_pin! {
+    COMP1: PF4,  2,
+
     COMP5: PA9,  8,
     COMP5: PC7,  7,
 

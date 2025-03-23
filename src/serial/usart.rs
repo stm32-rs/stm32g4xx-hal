@@ -4,8 +4,7 @@ use core::marker::PhantomData;
 use crate::dma::{
     mux::DmaMuxResources, traits::TargetAddress, MemoryToPeripheral, PeripheralToMemory,
 };
-use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*};
-use crate::gpio::{OpenDrain, AF12, AF5, AF7, AF8};
+use crate::gpio::{self, OpenDrain, AF12, AF5, AF7, AF8};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::*;
 
@@ -164,15 +163,16 @@ macro_rules! uart_shared {
 
         $(
             $( #[ $pmeta1 ] )*
-            impl TxPin<$USARTX> for $PTX<$TAF> {
+            impl TxPin<$USARTX> for gpio::$PTX<$TAF> {
             }
-            impl TxPin<$USARTX> for $PTX<$TAF<OpenDrain>> {
+            $( #[ $pmeta1 ] )*
+            impl TxPin<$USARTX> for gpio::$PTX<$TAF<OpenDrain>> {
             }
         )+
 
         $(
             $( #[ $pmeta2 ] )*
-            impl RxPin<$USARTX> for $PRX<$RAF> {
+            impl RxPin<$USARTX> for gpio::$PRX<$RAF> {
             }
         )+
 
