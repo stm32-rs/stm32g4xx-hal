@@ -105,3 +105,9 @@ pub mod timer;
 pub mod independent_watchdog;
 #[cfg(feature = "usb")]
 pub mod usb;
+
+fn stripped_type_name<T>() -> &'static str {
+    let s = core::any::type_name::<T>();
+    let p = s.split("::");
+    p.last().unwrap()
+}

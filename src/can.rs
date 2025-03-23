@@ -54,11 +54,11 @@ macro_rules! pins {
          rx: [ $($( #[ $pmetarx:meta ] )* $rx:ident<$rxaf:ident>),+ $(,)? ])) => {
         $(
             $( #[ $pmetatx ] )*
-            impl sealed::Tx<$PER> for $tx<crate::gpio::Alternate<$txaf>> {}
+            impl sealed::Tx<$PER> for $tx<$txaf> {}
         )+
         $(
             $( #[ $pmetarx ] )*
-            impl sealed::Rx<$PER> for $rx<crate::gpio::Alternate<$rxaf>> {}
+            impl sealed::Rx<$PER> for $rx<$rxaf> {}
         )+
     };
 }

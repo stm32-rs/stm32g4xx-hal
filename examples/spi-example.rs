@@ -7,11 +7,7 @@
 
 use hal::{
     delay::DelayFromCountDownTimer,
-    gpio::gpioa::PA5,
-    gpio::gpioa::PA6,
-    gpio::gpioa::PA7,
-    gpio::Alternate,
-    gpio::AF5,
+    gpio::{AF5, PA5, PA6, PA7},
     hal_02::spi::FullDuplex,
     prelude::*,
     pwr::PwrExt,
@@ -41,26 +37,26 @@ fn main() -> ! {
     let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.millis()));
 
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let sclk: PA5<Alternate<AF5>> = gpioa.pa5.into_alternate();
-    let miso: PA6<Alternate<AF5>> = gpioa.pa6.into_alternate();
-    let mosi: PA7<Alternate<AF5>> = gpioa.pa7.into_alternate();
+    let sclk: PA5<AF5> = gpioa.pa5.into_alternate();
+    let miso: PA6<AF5> = gpioa.pa6.into_alternate();
+    let mosi: PA7<AF5> = gpioa.pa7.into_alternate();
 
     let mut spi = dp
         .SPI1
         .spi((sclk, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
     let mut cs = gpioa.pa8.into_push_pull_output();
-    cs.set_high().unwrap();
+    cs.set_high();
 
     // "Hello world!"
-    let message: [char; 12] = ['H', 'e', 'l', 'l', 'o', ' ', 'w', 'o', 'r', 'l', 'd', '!'];
+    let message = b"Hello world!";
     let mut received_byte: u8;
 
     loop {
-        for byte in message.iter() {
-            cs.set_low().unwrap();
+        for byte in message {
+            cs.set_low();
             spi.send(*byte as u8).unwrap();
             received_byte = nb::block!(FullDuplex::read(&mut spi)).unwrap();
-            cs.set_high().unwrap();
+            cs.set_high();
 
             info!("{}", received_byte as char);
         }

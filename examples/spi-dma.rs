@@ -6,11 +6,7 @@
 
 use crate::hal::{
     delay::DelayFromCountDownTimer,
-    gpio::gpioa::PA5,
-    gpio::gpioa::PA6,
-    gpio::gpioa::PA7,
-    gpio::Alternate,
-    gpio::AF5,
+    gpio::{AF5, PA5, PA6, PA7},
     prelude::*,
     pwr::PwrExt,
     rcc::Config,
@@ -44,9 +40,9 @@ fn main() -> ! {
     let mut delay_tim2 = DelayFromCountDownTimer::new(timer2.start_count_down(100.millis()));
 
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let sclk: PA5<Alternate<AF5>> = gpioa.pa5.into_alternate();
-    let miso: PA6<Alternate<AF5>> = gpioa.pa6.into_alternate();
-    let mosi: PA7<Alternate<AF5>> = gpioa.pa7.into_alternate();
+    let sclk: PA5<AF5> = gpioa.pa5.into_alternate();
+    let miso: PA6<AF5> = gpioa.pa6.into_alternate();
+    let mosi: PA7<AF5> = gpioa.pa7.into_alternate();
 
     let spi = dp
         .SPI1

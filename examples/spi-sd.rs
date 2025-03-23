@@ -9,7 +9,6 @@ use fugit::RateExtU32;
 use hal::gpio::gpiob::PB14;
 use hal::gpio::gpiob::PB15;
 use hal::gpio::gpiof::PF9;
-use hal::gpio::Alternate;
 use hal::gpio::AF5;
 use hal::prelude::*;
 use hal::pwr::PwrExt;
@@ -39,13 +38,13 @@ fn main() -> ! {
 
     let cs = {
         let mut cs = gpiof.pf8.into_push_pull_output();
-        cs.set_high().unwrap();
+        cs.set_high();
         cs
     };
 
-    let sck: PF9<Alternate<AF5>> = gpiof.pf9.into_alternate();
-    let miso: PB14<Alternate<AF5>> = gpiob.pb14.into_alternate();
-    let mosi: PB15<Alternate<AF5>> = gpiob.pb15.into_alternate();
+    let sck: PF9<AF5> = gpiof.pf9.into_alternate();
+    let miso: PB14<AF5> = gpiob.pb14.into_alternate();
+    let mosi: PB15<AF5> = gpiob.pb15.into_alternate();
 
     let spi = dp
         .SPI2

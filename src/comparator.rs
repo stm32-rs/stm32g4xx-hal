@@ -14,7 +14,7 @@ use crate::gpio::{
     gpiob::{PB0, PB1, PB14, PB15, PB2, PB6, PB7, PB8, PB9},
     gpioc::PC2,
     gpiof::PF4,
-    Analog, OpenDrain, Output, PushPull, SignalEdge, AF2, AF3, AF8,
+    Analog, OpenDrain, Output, PushPull, SignalEdge,
 };
 
 #[cfg(any(
@@ -28,7 +28,6 @@ use crate::gpio::{
     gpiob::{PB10, PB11, PB12, PB13},
     gpioc::{PC6, PC7, PC8},
     gpiod::{PD10, PD11, PD12, PD13, PD14, PD15},
-    AF7,
 };
 
 use crate::gpio::gpioc::{PC0, PC1};
@@ -593,38 +592,38 @@ pub trait OutputPin<COMP> {
 
 #[allow(unused_macros)] // TODO: add support for more devices
 macro_rules! output_pin {
-    ($COMP:ident, $pin:ident, $AF:ident, $mode_t:ident, $into:ident) => {
+    ($COMP:ident, $pin:ident, $AF:literal, $mode_t:ident, $into:ident) => {
         impl OutputPin<$COMP> for $pin<Output<$mode_t>> {
             fn setup(self) {
                 self.$into::<$AF>();
             }
         }
     };
-    ($($COMP:ident: $pin:ident, $AF:ident,)+) => {$(
+    ($($COMP:ident: $pin:ident, $AF:literal,)+) => {$(
         output_pin!($COMP, $pin, $AF, PushPull, into_alternate);
         output_pin!($COMP, $pin, $AF, OpenDrain, into_alternate_open_drain);
     )+};
 }
 
 output_pin! {
-    COMP1: PA0,  AF8,
-    COMP1: PA6,  AF8,
-    COMP1: PA11, AF8,
-    COMP1: PB8,  AF8,
-    COMP1: PF4,  AF2,
+    COMP1: PA0,  8,
+    COMP1: PA6,  8,
+    COMP1: PA11, 8,
+    COMP1: PB8,  8,
+    COMP1: PF4,  2,
 
-    COMP2: PA2,  AF8,
-    COMP2: PA7,  AF8,
-    COMP2: PA12, AF8,
-    COMP2: PB9,  AF8,
+    COMP2: PA2,  8,
+    COMP2: PA7,  8,
+    COMP2: PA12, 8,
+    COMP2: PB9,  8,
 
-    COMP3: PB7,  AF8,
-    COMP3: PB15, AF3,
-    COMP3: PC2,  AF3,
+    COMP3: PB7,  8,
+    COMP3: PB15, 3,
+    COMP3: PC2,  3,
 
-    COMP4: PB1,  AF8,
-    COMP4: PB6,  AF8,
-    COMP4: PB14, AF8,
+    COMP4: PB1,  8,
+    COMP4: PB6,  8,
+    COMP4: PB14, 8,
 }
 
 #[cfg(any(
@@ -634,12 +633,12 @@ output_pin! {
     feature = "stm32g484",
 ))]
 output_pin! {
-    COMP5: PA9,  AF8,
-    COMP5: PC7,  AF7,
+    COMP5: PA9,  8,
+    COMP5: PC7,  7,
 
-    COMP6: PA10, AF8,
-    COMP6: PC6,  AF7,
+    COMP6: PA10, 8,
+    COMP6: PC6,  7,
 
-    COMP7: PA8, AF8,
-    COMP7: PC8, AF7,
+    COMP7: PA8, 8,
+    COMP7: PC8, 7,
 }

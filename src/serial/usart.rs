@@ -5,7 +5,7 @@ use crate::dma::{
     mux::DmaMuxResources, traits::TargetAddress, MemoryToPeripheral, PeripheralToMemory,
 };
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiog::*};
-use crate::gpio::{Alternate, AlternateOD, AF12, AF5, AF7, AF8};
+use crate::gpio::{OpenDrain, AF12, AF5, AF7, AF8};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::*;
 
@@ -159,20 +159,20 @@ where
 
 macro_rules! uart_shared {
     ($USARTX:ident, $dmamux_rx:ident, $dmamux_tx:ident,
-        tx: [ $($( #[ $pmeta1:meta ] )* ($PTX:ident, $TAF:expr),)+ ],
-        rx: [ $($( #[ $pmeta2:meta ] )* ($PRX:ident, $RAF:expr),)+ ]) => {
+        tx: [ $($( #[ $pmeta1:meta ] )* ($PTX:ident, $TAF:ident),)+ ],
+        rx: [ $($( #[ $pmeta2:meta ] )* ($PRX:ident, $RAF:ident),)+ ]) => {
 
         $(
             $( #[ $pmeta1 ] )*
-            impl TxPin<$USARTX> for $PTX<Alternate<$TAF>> {
+            impl TxPin<$USARTX> for $PTX<$TAF> {
             }
-            impl TxPin<$USARTX> for $PTX<AlternateOD<$TAF>> {
+            impl TxPin<$USARTX> for $PTX<$TAF<OpenDrain>> {
             }
         )+
 
         $(
             $( #[ $pmeta2 ] )*
-            impl RxPin<$USARTX> for $PRX<Alternate<$RAF>> {
+            impl RxPin<$USARTX> for $PRX<$RAF> {
             }
         )+
 

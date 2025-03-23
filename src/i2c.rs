@@ -12,7 +12,7 @@ use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*};
     feature = "stm32g484"
 ))]
 use crate::gpio::{gpiog::*, AF3};
-use crate::gpio::{AlternateOD, AF2, AF4, AF8};
+use crate::gpio::{OpenDrain, AF2, AF4, AF8};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 #[cfg(any(
     feature = "stm32g471",
@@ -465,14 +465,14 @@ i2c!(
     I2C1,
     i2c1,
     sda: [
-        PA14<AlternateOD<AF4>>,
-        PB7<AlternateOD<AF4>>,
-        PB9<AlternateOD<AF4>>,
+        PA14<AF4<OpenDrain>>,
+        PB7<AF4<OpenDrain>>,
+        PB9<AF4<OpenDrain>>,
     ],
     scl: [
-        PA13<AlternateOD<AF4>>,
-        PA15<AlternateOD<AF4>>,
-        PB8<AlternateOD<AF4>>,
+        PA13<AF4<OpenDrain>>,
+        PA15<AF4<OpenDrain>>,
+        PB8<AF4<OpenDrain>>,
     ],
 );
 
@@ -480,12 +480,12 @@ i2c!(
     I2C2,
     i2c2,
     sda: [
-        PA8<AlternateOD<AF4>>,
-        PF0<AlternateOD<AF4>>,
+        PA8<AF4<OpenDrain>>,
+        PF0<AF4<OpenDrain>>,
     ],
     scl: [
-        PA9<AlternateOD<AF4>>,
-        PC4<AlternateOD<AF4>>,
+        PA9<AF4<OpenDrain>>,
+        PC4<AF4<OpenDrain>>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -493,7 +493,7 @@ i2c!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PF6<AlternateOD<AF4>>,
+        PF6<AF4<OpenDrain>>,
     ],
 );
 
@@ -501,9 +501,9 @@ i2c!(
     I2C3,
     i2c3,
     sda: [
-        PB5<AlternateOD<AF8>>,
-        PC11<AlternateOD<AF8>>,
-        PC9<AlternateOD<AF8>>,
+        PB5<AF8<OpenDrain>>,
+        PC11<AF8<OpenDrain>>,
+        PC9<AF8<OpenDrain>>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -511,7 +511,7 @@ i2c!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PF4<AlternateOD<AF4>>,
+        PF4<AF4<OpenDrain>>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -519,11 +519,11 @@ i2c!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG8<AlternateOD<AF4>>,
+        PG8<AF4<OpenDrain>>,
     ],
     scl: [
-        PA8<AlternateOD<AF2>>,
-        PC8<AlternateOD<AF8>>,
+        PA8<AF2<OpenDrain>>,
+        PC8<AF8<OpenDrain>>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -531,7 +531,7 @@ i2c!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PF3<AlternateOD<AF4>>,
+        PF3<AF4<OpenDrain>>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -539,7 +539,7 @@ i2c!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG7<AlternateOD<AF4>>,
+        PG7<AF4<OpenDrain>>,
     ],
 );
 
@@ -554,15 +554,15 @@ i2c!(
     I2C4,
     i2c4,
     sda: [
-        PB7<AlternateOD<AF3>>,
-        PC7<AlternateOD<AF8>>,
-        PF15<AlternateOD<AF4>>,
-        PG4<AlternateOD<AF4>>,
+        PB7<AF3<OpenDrain>>,
+        PC7<AF8<OpenDrain>>,
+        PF15<AF4<OpenDrain>>,
+        PG4<AF4<OpenDrain>>,
     ],
     scl: [
-        PA13<AlternateOD<AF3>>,
-        PC6<AlternateOD<AF8>>,
-        PF14<AlternateOD<AF4>>,
-        PG3<AlternateOD<AF4>>,
+        PA13<AF3<OpenDrain>>,
+        PC6<AF8<OpenDrain>>,
+        PF14<AF4<OpenDrain>>,
+        PG3<AF4<OpenDrain>>,
     ],
 );
