@@ -58,6 +58,7 @@ use core::marker::PhantomData;
 
 use crate::pac;
 use crate::rcc::Rcc;
+pub mod alt;
 mod convert;
 pub use convert::PinMode;
 mod partially_erased;
@@ -172,6 +173,8 @@ pub(crate) mod marker {
     /// Marker trait for active pin modes
     pub trait Active {}
     /// Marker trait for all pin modes except alternate
+    pub trait NotAlt {}
+    /// Marker trait for pins with alternate function `A` mapping
     pub trait IntoAf<const A: u8> {}
 }
 
@@ -186,6 +189,9 @@ impl<Otype> marker::OutputSpeed for Output<Otype> {}
 impl<const A: u8, Otype> marker::OutputSpeed for Alternate<A, Otype> {}
 impl<Otype> marker::Active for Output<Otype> {}
 impl<const A: u8, Otype> marker::Active for Alternate<A, Otype> {}
+impl marker::NotAlt for Input {}
+impl<Otype> marker::NotAlt for Output<Otype> {}
+impl marker::NotAlt for Analog {}
 
 /// GPIO Pin speed selection
 #[cfg_attr(feature = "defmt", derive(defmt::Format))]
@@ -623,9 +629,13 @@ const fn gpiox<const P: char>() -> *const crate::pac::gpioa::RegisterBlock {
         'A' => crate::pac::GPIOA::ptr(),
         'B' => crate::pac::GPIOB::ptr() as _,
         'C' => crate::pac::GPIOC::ptr() as _,
+        #[cfg(feature = "gpiod")]
         'D' => crate::pac::GPIOD::ptr() as _,
+        #[cfg(feature = "gpioe")]
         'E' => crate::pac::GPIOE::ptr() as _,
+        #[cfg(feature = "gpiof")]
         'F' => crate::pac::GPIOF::ptr() as _,
+        #[cfg(feature = "gpiog")]
         'G' => crate::pac::GPIOG::ptr() as _,
         _ => panic!("Unknown GPIO port"),
     }
