@@ -288,14 +288,14 @@ impl<const SECTOR_SZ_KB: u32> FlashWriter<'_, SECTOR_SZ_KB> {
                 word2 = (tmp_dword >> 32) as u32;
             } else {
                 word1 = (data[idx] as u32)
-                    | (data[idx + 1] as u32) << 8
-                    | (data[idx + 2] as u32) << 16
-                    | (data[idx + 3] as u32) << 24;
+                    | ((data[idx + 1] as u32) << 8)
+                    | ((data[idx + 2] as u32) << 16)
+                    | ((data[idx + 3] as u32) << 24);
 
                 word2 = (data[idx + 4] as u32)
-                    | (data[idx + 5] as u32) << 8
-                    | (data[idx + 6] as u32) << 16
-                    | (data[idx + 7] as u32) << 24;
+                    | ((data[idx + 5] as u32) << 8)
+                    | ((data[idx + 6] as u32) << 16)
+                    | ((data[idx + 7] as u32) << 24);
             }
 
             // Set Page Programming to 1

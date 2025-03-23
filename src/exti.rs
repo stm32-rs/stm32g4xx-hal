@@ -109,10 +109,10 @@ impl ExtiExt for EXTI {
         match ev as u8 {
             line if line < 32 => self
                 .imr1()
-                .modify(|r, w| unsafe { w.bits(r.bits() | 1 << line) }),
+                .modify(|r, w| unsafe { w.bits(r.bits() | (1 << line)) }),
             line => self
                 .imr2()
-                .modify(|r, w| unsafe { w.bits(r.bits() | 1 << (line - 32)) }),
+                .modify(|r, w| unsafe { w.bits(r.bits() | (1 << (line - 32))) }),
         };
     }
 
