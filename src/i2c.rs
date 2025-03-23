@@ -1,4 +1,5 @@
 //! I2C
+use crate::stm32::i2c1;
 use embedded_hal::i2c::{ErrorKind, Operation, SevenBitAddress, TenBitAddress};
 use embedded_hal_old::blocking::i2c::{Read, Write, WriteRead};
 
@@ -24,8 +25,11 @@ use crate::stm32::I2C4;
 use crate::stm32::{I2C1, I2C2, I2C3, RCC};
 use crate::time::Hertz;
 use core::cmp;
+use core::convert::TryInto;
 
 /// I2C bus configuration.
+#[derive(Debug, Clone, Copy)]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 pub struct Config {
     speed: Option<Hertz>,
     timing: Option<u32>,
@@ -79,9 +83,13 @@ impl Config {
         self
     }
 
-    fn timing_bits(&self, i2c_clk: Hertz) -> u32 {
+    fn timing_bits(
+        self,
+        i2c_clk: Hertz,
+        reg: &mut stm32g4::raw::W<i2c1::timingr::TIMINGRrs>,
+    ) -> &mut stm32g4::raw::W<i2c1::timingr::TIMINGRrs> {
         if let Some(bits) = self.timing {
-            return bits;
+            return unsafe { reg.bits(bits) };
         }
         let speed = self.speed.unwrap();
         let (psc, scll, sclh, sdadel, scldel) = if speed.raw() <= 100_000 {
@@ -99,7 +107,17 @@ impl Config {
             let scldel = 3;
             (psc, scll, sclh, sdadel, scldel)
         };
-        psc << 28 | scldel << 20 | sdadel << 16 | sclh << 8 | scll
+
+        reg.presc()
+            .set(psc.try_into().unwrap())
+            .scldel()
+            .set(scldel)
+            .sdadel()
+            .set(sdadel)
+            .sclh()
+            .set(sclh.try_into().unwrap())
+            .scll()
+            .set(scll.try_into().unwrap())
     }
 }
 
@@ -172,14 +190,13 @@ macro_rules! busy_wait {
             if isr.$flag().$variant() {
                 break;
             } else if isr.berr().bit_is_set() {
-                $i2c.icr().write(|w| w.berrcf().set_bit());
+                $i2c.icr().write(|w| w.berrcf().clear());
                 return Err(Error::BusError);
             } else if isr.arlo().bit_is_set() {
-                $i2c.icr().write(|w| w.arlocf().set_bit());
+                $i2c.icr().write(|w| w.arlocf().clear());
                 return Err(Error::ArbitrationLost);
             } else if isr.nackf().bit_is_set() {
-                $i2c.icr()
-                    .write(|w| w.stopcf().set_bit().nackcf().set_bit());
+                $i2c.icr().write(|w| w.stopcf().clear().nackcf().clear());
                 flush_txdr!($i2c);
                 return Err(Error::Nack);
             } else {
@@ -241,20 +258,17 @@ macro_rules! i2c {
                 i2c.cr1().modify(|_, w| w.pe().clear_bit());
 
                 // Setup protocol timings
-                let timing_bits = config.timing_bits(<$I2CX as RccBus>::Bus::get_frequency(&rcc.clocks));
-                i2c.timingr().write(|w| unsafe { w.bits(timing_bits) });
+                i2c.timingr().write(|w| config.timing_bits(<$I2CX as RccBus>::Bus::get_frequency(&rcc.clocks), w));
 
                 // Enable the I2C processing
-                unsafe {
-                    i2c.cr1().modify(|_, w| {
-                        w.pe()
-                            .set_bit()
-                            .dnf()
-                            .bits(config.digital_filter)
-                            .anfoff()
-                            .bit(!config.analog_filter)
-                    });
-                }
+                i2c.cr1().modify(|_, w| {
+                    w.pe()
+                        .set_bit()
+                        .dnf()
+                        .set(config.digital_filter)
+                        .anfoff()
+                        .bit(!config.analog_filter)
+                });
 
                 I2c { i2c, sda, scl }
             }
