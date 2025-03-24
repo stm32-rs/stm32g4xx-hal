@@ -1,15 +1,7 @@
 use crate::dma::mux::DmaMuxResources;
 use crate::dma::traits::TargetAddress;
 use crate::dma::MemoryToPeripheral;
-use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, AF5, AF6};
-#[cfg(any(
-    feature = "stm32g471",
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
-use crate::gpio::{gpioe::*, gpiog::*};
+use crate::gpio::{self, AF5, AF6};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 #[cfg(any(
     feature = "stm32g471",
@@ -379,8 +371,8 @@ spi!(
     SPI1,
     spi1,
     sck: [
-        PA5<AF5>,
-        PB3<AF5>,
+        gpio::PA5<AF5>,
+        gpio::PB3<AF5>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -388,11 +380,11 @@ spi!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG2<AF5>,
+        gpio::PG2<AF5>,
     ],
     miso: [
-        PA6<AF5>,
-        PB4<AF5>,
+        gpio::PA6<AF5>,
+        gpio::PB4<AF5>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -400,11 +392,11 @@ spi!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG3<AF5>,
+        gpio::PG3<AF5>,
     ],
     mosi: [
-        PA7<AF5>,
-        PB5<AF5>,
+        gpio::PA7<AF5>,
+        gpio::PB5<AF5>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -412,7 +404,7 @@ spi!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG4<AF5>,
+        gpio::PG4<AF5>,
     ],
     DmaMuxResources::SPI1_TX,
 );
@@ -421,18 +413,18 @@ spi!(
     SPI2,
     spi2,
     sck: [
-        PF1<AF5>,
-        PF9<AF5>,
-        PF10<AF5>,
-        PB13<AF5>,
+        gpio::PF1<AF5>,
+        gpio::PF9<AF5>,
+        gpio::PF10<AF5>,
+        gpio::PB13<AF5>,
     ],
     miso: [
-        PA10<AF5>,
-        PB14<AF5>,
+        gpio::PA10<AF5>,
+        gpio::PB14<AF5>,
     ],
     mosi: [
-        PA11<AF5>,
-        PB15<AF5>,
+        gpio::PA11<AF5>,
+        gpio::PB15<AF5>,
     ],
     DmaMuxResources::SPI2_TX,
 );
@@ -441,8 +433,8 @@ spi!(
     SPI3,
     spi3,
     sck: [
-        PB3<AF6>,
-        PC10<AF6>,
+        gpio::PB3<AF6>,
+        gpio::PC10<AF6>,
         #[cfg(any(
             feature = "stm32g471",
             feature = "stm32g473",
@@ -450,15 +442,15 @@ spi!(
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG9<AF6>,
+        gpio::PG9<AF6>,
     ],
     miso: [
-        PB4<AF6>,
-        PC11<AF6>,
+        gpio::PB4<AF6>,
+        gpio::PC11<AF6>,
     ],
     mosi: [
-        PB5<AF6>,
-        PC12<AF6>,
+        gpio::PB5<AF6>,
+        gpio::PC12<AF6>,
     ],
     DmaMuxResources::SPI3_TX,
 );
@@ -474,16 +466,16 @@ spi!(
     SPI4,
     spi4,
     sck: [
-        PE2<AF5>,
-        PE12<AF5>,
+        gpio::PE2<AF5>,
+        gpio::PE12<AF5>,
     ],
     miso: [
-        PE5<AF5>,
-        PE13<AF5>,
+        gpio::PE5<AF5>,
+        gpio::PE13<AF5>,
     ],
     mosi: [
-        PE6<AF5>,
-        PE14<AF5>,
+        gpio::PE6<AF5>,
+        gpio::PE14<AF5>,
     ],
     DmaMuxResources::SPI4_TX,
 );

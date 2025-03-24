@@ -9,30 +9,8 @@ use core::marker::PhantomData;
 
 use crate::dac;
 use crate::exti::{Event as ExtiEvent, ExtiExt};
-use crate::gpio::{
-    gpioa::{PA0, PA1, PA11, PA12, PA2, PA3, PA4, PA5, PA6, PA7},
-    gpiob::{PB0, PB1, PB14, PB15, PB2, PB6, PB7, PB8, PB9},
-    gpioc::PC2,
-    Analog, OpenDrain, Output, PushPull, SignalEdge,
-};
+use crate::gpio::{self, Analog, OpenDrain, Output, PushPull, SignalEdge};
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
-use crate::gpio::{
-    gpioa::{PA10, PA8, PA9},
-    gpiob::{PB10, PB11, PB12, PB13},
-    gpioc::{PC6, PC7, PC8},
-    gpiod::{PD10, PD11, PD12, PD13, PD14, PD15},
-    gpiof::PF4,
-};
-
-use crate::gpio::gpioc::{PC0, PC1};
-use crate::gpio::gpioe::{PE7, PE8};
-use crate::gpio::gpiof::PF1;
 use crate::rcc::{Clocks, Rcc};
 use crate::stm32::{COMP, EXTI};
 
@@ -159,13 +137,13 @@ pub trait NegativeInput<C> {
 
 macro_rules! positive_input_pin {
     ($COMP:ident, $pin_0:ident, $pin_1:ident) => {
-        impl PositiveInput<$COMP> for &$pin_0<Analog> {
+        impl PositiveInput<$COMP> for &gpio::$pin_0<Analog> {
             fn setup(&self, comp: &$COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(false));
             }
         }
 
-        impl PositiveInput<$COMP> for &$pin_1<Analog> {
+        impl PositiveInput<$COMP> for &gpio::$pin_1<Analog> {
             fn setup(&self, comp: &$COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(true));
             }
@@ -226,10 +204,10 @@ macro_rules! negative_input_pin {
 }
 
 negative_input_pin! {
-    COMP1: PA4<Analog>, PA0<Analog>,
-    COMP2: PA5<Analog>, PA2<Analog>,
-    COMP3: PF1<Analog>, PC0<Analog>,
-    COMP4: PE8<Analog>, PB2<Analog>,
+    COMP1: gpio::PA4<Analog>, gpio::PA0<Analog>,
+    COMP2: gpio::PA5<Analog>, gpio::PA2<Analog>,
+    COMP3: gpio::PF1<Analog>, gpio::PC0<Analog>,
+    COMP4: gpio::PE8<Analog>, gpio::PB2<Analog>,
 }
 
 #[cfg(any(
@@ -239,9 +217,9 @@ negative_input_pin! {
     feature = "stm32g484"
 ))]
 negative_input_pin! {
-    COMP5: PB10<Analog>, PD13<Analog>,
-    COMP6: PD10<Analog>, PB15<Analog>,
-    COMP7: PD15<Analog>, PB12<Analog>,
+    COMP5: gpio::PB10<Analog>, gpio::PD13<Analog>,
+    COMP6: gpio::PD10<Analog>, gpio::PB15<Analog>,
+    COMP7: gpio::PD15<Analog>, gpio::PB12<Analog>,
 }
 
 #[derive(Copy, Clone, Eq, PartialEq)]
@@ -593,7 +571,7 @@ pub trait OutputPin<COMP> {
 #[allow(unused_macros)] // TODO: add support for more devices
 macro_rules! output_pin {
     ($COMP:ident, $pin:ident, $AF:literal, $mode_t:ident, $into:ident) => {
-        impl OutputPin<$COMP> for $pin<Output<$mode_t>> {
+        impl OutputPin<$COMP> for gpio::$pin<Output<$mode_t>> {
             fn setup(self) {
                 self.$into::<$AF>();
             }

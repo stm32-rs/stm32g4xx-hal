@@ -5,7 +5,7 @@
 pub use stm32_usbd::UsbBus;
 
 use crate::gpio;
-use crate::gpio::gpioa::{PA11, PA12};
+use crate::gpio::{PA11, PA12};
 use crate::rcc::{Enable, Reset};
 use crate::stm32::{RCC, USB};
 use core::fmt;

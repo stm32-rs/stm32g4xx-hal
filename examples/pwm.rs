@@ -3,8 +3,7 @@
 #![no_std]
 
 use cortex_m_rt::entry;
-use hal::gpio::gpioa::PA8;
-use hal::gpio::AF6;
+use hal::gpio::{AF6, PA8};
 use hal::prelude::*;
 use hal::stm32;
 use hal::time::RateExtU32;

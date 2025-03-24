@@ -6,10 +6,7 @@
 extern crate embedded_sdmmc;
 
 use fugit::RateExtU32;
-use hal::gpio::gpiob::PB14;
-use hal::gpio::gpiob::PB15;
-use hal::gpio::gpiof::PF9;
-use hal::gpio::AF5;
+use hal::gpio::{AF5, PB14, PB15, PF9};
 use hal::prelude::*;
 use hal::pwr::PwrExt;
 use hal::rcc::Config;
