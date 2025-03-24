@@ -381,7 +381,7 @@ impl<I2C: Instance> embedded_hal::i2c::I2c for I2c<I2C> {
         address: SevenBitAddress,
         operation: &mut [Operation<'_>],
     ) -> Result<(), Self::Error> {
-        Ok(for op in operation {
+        for op in operation {
             // Wait for any operation on the bus to finish
             // for example in the case of another bus master having claimed the bus
             while self.i2c.isr().read().busy().bit_is_set() {}
@@ -389,7 +389,8 @@ impl<I2C: Instance> embedded_hal::i2c::I2c for I2c<I2C> {
                 Operation::Read(data) => self.read_inner(address as u16, false, data)?,
                 Operation::Write(data) => self.write_inner(address as u16, false, data)?,
             }
-        })
+        }
+        Ok(())
     }
 }
 impl<I2C: Instance> embedded_hal::i2c::I2c<TenBitAddress> for I2c<I2C> {
@@ -398,7 +399,7 @@ impl<I2C: Instance> embedded_hal::i2c::I2c<TenBitAddress> for I2c<I2C> {
         address: TenBitAddress,
         operation: &mut [Operation<'_>],
     ) -> Result<(), Self::Error> {
-        Ok(for op in operation {
+        for op in operation {
             // Wait for any operation on the bus to finish
             // for example in the case of another bus master having claimed the bus
             while self.i2c.isr().read().busy().bit_is_set() {}
@@ -406,7 +407,8 @@ impl<I2C: Instance> embedded_hal::i2c::I2c<TenBitAddress> for I2c<I2C> {
                 Operation::Read(data) => self.read_inner(address, true, data)?,
                 Operation::Write(data) => self.write_inner(address, true, data)?,
             }
-        })
+        }
+        Ok(())
     }
 }
 

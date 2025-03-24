@@ -174,6 +174,7 @@ impl<SPI: Instance> Spi<SPI> {
         }
     }
 
+    #[allow(clippy::type_complexity)]
     pub fn release(self) -> (SPI, (SPI::Sck, SPI::Miso, SPI::Mosi)) {
         (self.spi, self.pins)
     }
@@ -239,7 +240,7 @@ impl<SPI: Instance> embedded_hal::spi::ErrorType for Spi<SPI> {
 
 impl<SPI: Instance> embedded_hal::spi::SpiBus<u8> for Spi<SPI> {
     fn read(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        if words.len() == 0 {
+        if words.is_empty() {
             return Ok(());
         }
         // clear tx-only status in the case the previous operation was a write
@@ -260,15 +261,16 @@ impl<SPI: Instance> embedded_hal::spi::SpiBus<u8> for Spi<SPI> {
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
         self.set_tx_only();
-        Ok(for w in words {
-            nb::block!(self.nb_write(*w))?
-        })
+        for w in words {
+            nb::block!(self.nb_write(*w))?;
+        }
+        Ok(())
     }
 
     fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        if read.len() == 0 {
+        if read.is_empty() {
             return self.write(write);
-        } else if write.len() == 0 {
+        } else if write.is_empty() {
             return self.read(read);
         }
 
@@ -279,7 +281,7 @@ impl<SPI: Instance> embedded_hal::spi::SpiBus<u8> for Spi<SPI> {
         // take 1 less because write skips the first element
         let zipped = read
             .iter_mut()
-            .zip(write.into_iter().skip(1))
+            .zip(write.iter().skip(1))
             .take(common_len - 1);
         for (r, w) in zipped {
             nb::block!(self.nb_write(*w))?;
@@ -294,7 +296,7 @@ impl<SPI: Instance> embedded_hal::spi::SpiBus<u8> for Spi<SPI> {
         }
     }
     fn transfer_in_place(&mut self, words: &mut [u8]) -> Result<(), Self::Error> {
-        if words.len() == 0 {
+        if words.is_empty() {
             return Ok(());
         }
         self.set_bidi();
@@ -319,15 +321,15 @@ impl<SPI: Instance> embedded_hal::spi::SpiBus<u8> for Spi<SPI> {
             core::hint::spin_loop()
         }
         // drain rx fifo
-        Ok(
-            while match self.nb_read::<u8>() {
-                Ok(_) => true,
-                Err(nb::Error::WouldBlock) => false,
-                Err(nb::Error::Other(e)) => return Err(e),
-            } {
-                core::hint::spin_loop()
-            },
-        )
+
+        while match self.nb_read::<u8>() {
+            Ok(_) => true,
+            Err(nb::Error::WouldBlock) => false,
+            Err(nb::Error::Other(e)) => return Err(e),
+        } {
+            core::hint::spin_loop();
+        }
+        Ok(())
     }
 }
 
