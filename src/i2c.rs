@@ -91,16 +91,11 @@ impl Config {
             (psc, scll, sclh, sdadel, scldel)
         };
 
-        reg.presc()
-            .set(psc.try_into().unwrap())
-            .scldel()
-            .set(scldel)
-            .sdadel()
-            .set(sdadel)
-            .sclh()
-            .set(sclh.try_into().unwrap())
-            .scll()
-            .set(scll.try_into().unwrap())
+        reg.presc().set(psc.try_into().unwrap());
+        reg.scldel().set(scldel);
+        reg.sdadel().set(sdadel);
+        reg.sclh().set(sclh.try_into().unwrap());
+        reg.scll().set(scll.try_into().unwrap())
     }
 }
 
@@ -241,12 +236,9 @@ impl<I2C: Instance> I2c<I2C> {
 
         // Enable the I2C processing
         i2c.cr1().modify(|_, w| {
-            w.pe()
-                .set_bit()
-                .dnf()
-                .set(config.digital_filter)
-                .anfoff()
-                .bit(!config.analog_filter)
+            w.pe().set_bit();
+            w.dnf().set(config.digital_filter);
+            w.anfoff().bit(!config.analog_filter)
         });
 
         I2c {
