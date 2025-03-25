@@ -119,17 +119,12 @@ impl DelayMs<u8> for SystDelay {
 }
 
 pub trait DelayExt {
-    fn delay<T>(&mut self, delay: T)
-    where
-        T: Into<MicroSecond>;
+    fn delay(&mut self, delay: MicroSecond);
 }
 
 impl DelayExt for SystDelay {
-    fn delay<T>(&mut self, delay: T)
-    where
-        T: Into<MicroSecond>,
-    {
-        self.0.delay_us(delay.into().ticks())
+    fn delay(&mut self, delay: MicroSecond) {
+        self.0.delay_us(delay.ticks())
     }
 }
 
