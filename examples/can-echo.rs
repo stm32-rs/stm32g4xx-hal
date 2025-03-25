@@ -57,8 +57,8 @@ fn main() -> ! {
 
     let can1 = {
         info!("Init CAN 1");
-        let rx = gpiob.pb8.into_alternate().set_speed(Speed::VeryHigh);
-        let tx = gpiob.pb9.into_alternate().set_speed(Speed::VeryHigh);
+        let rx = gpiob.pb8.into_alternate().speed(Speed::VeryHigh);
+        let tx = gpiob.pb9.into_alternate().speed(Speed::VeryHigh);
 
         info!("-- Create CAN 1 instance");
         let mut can = dp.FDCAN1.fdcan(tx, rx, &rcc);
@@ -82,8 +82,8 @@ fn main() -> ! {
 
     // let can2 = {
     //     info!("Init CAN 2");
-    //     let rx = gpiob.pb5.into_alternate().set_speed(Speed::VeryHigh);
-    //     let tx = gpiob.pb13.into_alternate().set_speed(Speed::VeryHigh);
+    //     let rx = gpiob.pb5.into_alternate().speed(Speed::VeryHigh);
+    //     let tx = gpiob.pb13.into_alternate().speed(Speed::VeryHigh);
 
     //     info!("-- Create CAN 2 instance");
     //     let mut can = dp.FDCAN2.fdcan(tx, rx, &rcc);

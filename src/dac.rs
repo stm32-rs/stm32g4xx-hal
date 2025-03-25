@@ -8,8 +8,8 @@
 use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
-use crate::gpio::gpioa::{PA4, PA5, PA6};
 use crate::gpio::DefaultMode;
+use crate::gpio::{PA4, PA5, PA6};
 use crate::rcc::{self, *};
 use crate::stm32::{DAC1, DAC2, DAC3, DAC4, RCC};
 use embedded_hal::delay::DelayNs;

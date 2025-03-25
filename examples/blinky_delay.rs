@@ -40,11 +40,11 @@ fn main() -> ! {
 
     loop {
         info!("Toggle");
-        led.toggle().unwrap();
+        led.toggle();
         info!("SYST delay");
         delay_syst.delay(1000.millis());
         info!("Toggle");
-        led.toggle().unwrap();
+        led.toggle();
         info!("TIM2 delay");
         delay_tim2.delay_ms(1000);
     }

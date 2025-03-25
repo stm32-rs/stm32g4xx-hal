@@ -818,7 +818,8 @@ where
         };
 
         let can = self.registers();
-        can.cccr().modify(|_, w| w.fdoe().bit(fdoe).brse().bit(brse));
+        can.cccr()
+            .modify(|_, w| w.fdoe().bit(fdoe).brse().bit(brse));
 
         self.control.config.frame_transmit = fts;
     }
@@ -1001,7 +1002,8 @@ where
         let can = self.registers();
 
         //SAFE: state has all possible values, and this can only occur in TestMode
-        can.test().modify(|_, w| unsafe { w.tx().bits(state as u8) });
+        can.test()
+            .modify(|_, w| unsafe { w.tx().bits(state as u8) });
     }
 }
 
@@ -1657,8 +1659,8 @@ mod impls {
     /// Implements sealed::{Tx,Rx} for pins associated with a CAN peripheral
     macro_rules! pins {
         ($PER:ident =>
-            (tx: [ $($( #[ $pmetatx:meta ] )* $tx:ident<$txaf:ident>),+ $(,)? ],
-             rx: [ $($( #[ $pmetarx:meta ] )* $rx:ident<$rxaf:ident>),+ $(,)? ])) => {
+            (tx: [ $($( #[ $pmetatx:meta ] )* crate::gpio::$tx:ident<crate::gpio::$txaf:ident>),+ $(,)? ],
+             rx: [ $($( #[ $pmetarx:meta ] )* crate::gpio::$rx:ident<crate::gpio::$rxaf:ident>),+ $(,)? ])) => {
             $(
                 $( #[ $pmetatx ] )*
                 impl super::sealed::Tx<$PER> for $tx<crate::gpio::Alternate<$txaf>> {}
@@ -1673,12 +1675,6 @@ mod impls {
     mod fdcan1 {
         use crate::fdcan;
         use crate::fdcan::message_ram;
-        use crate::gpio::{
-            gpioa::{PA11, PA12},
-            gpiob::{PB8, PB9},
-            gpiod::{PD0, PD1},
-            AF9,
-        };
         use crate::stm32;
         use crate::stm32::FDCAN1;
 
@@ -1718,10 +1714,6 @@ mod impls {
     mod fdcan2 {
         use crate::fdcan;
         use crate::fdcan::message_ram;
-        use crate::gpio::{
-            gpiob::{PB12, PB13, PB5, PB6},
-            AF9,
-        };
         use crate::stm32::{self, FDCAN2};
 
         pins! {
@@ -1754,11 +1746,6 @@ mod impls {
     mod fdcan3 {
         use crate::fdcan;
         use crate::fdcan::message_ram;
-        use crate::gpio::{
-            gpioa::{PA15, PA8},
-            gpiob::{PB3, PB4},
-            AF11,
-        };
         use crate::stm32::{self, FDCAN3};
 
         pins! {

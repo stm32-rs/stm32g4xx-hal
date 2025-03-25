@@ -2,10 +2,10 @@ use crate::gpio::*;
 use crate::rcc::*;
 use crate::stm32::RCC;
 
-pub type LscoPin = gpioa::PA2<DefaultMode>;
+pub type LscoPin = gpioa::PA2<Analog>;
 
 pub struct Lsco {
-    pin: gpioa::PA2<Alternate<AF0>>,
+    pin: gpioa::PA2<AF0>,
 }
 
 impl Lsco {
@@ -20,7 +20,7 @@ impl Lsco {
     }
 
     pub fn release(self) -> LscoPin {
-        self.pin.into_floating_input()
+        self.pin.into_analog()
     }
 }
 
@@ -43,7 +43,7 @@ impl LSCOExt for LscoPin {
         };
         rcc.rb.bdcr().modify(|_, w| w.lscosel().bit(src_select_bit));
         Lsco {
-            pin: self.into_alternate(),
+            pin: self.into_mode(),
         }
     }
 }
@@ -77,8 +77,8 @@ pub trait MCOExt<PIN> {
 macro_rules! mco {
     ($($PIN:ident),+) => {
         $(
-            impl MCOExt<$PIN<Alternate<AF0>>> for $PIN<DefaultMode> {
-                fn mco(self, src: MCOSrc, psc: Prescaler, rcc: &mut Rcc) -> Mco<$PIN<Alternate<AF0>>> {
+            impl MCOExt<crate::gpio::$PIN<AF0>> for crate::gpio::$PIN<DefaultMode> {
+                fn mco(self, src: MCOSrc, psc: Prescaler, rcc: &mut Rcc) -> Mco<crate::gpio::$PIN<AF0>> {
                     let psc_bits = match psc {
                         Prescaler::NotDivided => 0b000,
                         Prescaler::Div2 => 0b001,
@@ -119,8 +119,5 @@ macro_rules! mco {
         )+
     };
 }
-
-use crate::gpio::gpioa::PA8;
-use crate::gpio::gpiog::PG10;
 
 mco!(PA8, PG10);
