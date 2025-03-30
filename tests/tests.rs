@@ -4,27 +4,51 @@
 #[path = "../examples/utils/mod.rs"]
 mod utils;
 
-use utils::logger::println;
+use utils::logger::debug;
 
 use core::ops::FnMut;
 use core::result::Result;
-use fugit::{ExtU32, MicrosDurationU32};
-use hal::delay::{DelayExt, SystDelay};
+use fugit::{ExtU32, HertzU32, MicrosDurationU32};
+use hal::delay::DelayExt;
 use hal::stm32;
 use stm32g4xx_hal as hal;
+
+pub const F_SYS: HertzU32 = HertzU32::MHz(16);
+pub const CYCLES_PER_US: u32 = F_SYS.raw() / 1_000_000;
+
+pub fn enable_timer(cp: &mut stm32::CorePeripherals) {
+    cp.DCB.enable_trace();
+    cp.DWT.enable_cycle_counter();
+}
+
+pub fn now() -> MicrosDurationU32 {
+    (stm32::DWT::cycle_count() / CYCLES_PER_US).micros()
+}
 
 #[defmt_test::tests]
 mod tests {
     use embedded_hal::{
+        delay::DelayNs,
         digital::{InputPin, OutputPin},
         pwm::SetDutyCycle,
     };
+    use fixed::types::I1F15;
     use fugit::RateExtU32;
     use stm32g4xx_hal::{
+        adc::{self, AdcClaim, Temperature, Vref},
+        cordic::{
+            op::{dynamic::Mode, Magnitude, SinCos, Sqrt},
+            prec::P60,
+            scale::N0,
+            types::{Q15, Q31},
+            Ext,
+        },
+        dac::{DacExt, DacOut},
         delay::SYSTDelayExt,
         gpio::{GpioExt, AF6},
         pwm::PwmExt,
         rcc::RccExt,
+        signature::{VrefCal, VDDA_CALIB},
         stm32::GPIOA,
     };
 
@@ -37,6 +61,7 @@ mod tests {
         let dp = unsafe { stm32::Peripherals::steal() };
         let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
+        defmt::dbg!(rcc.clocks.sys_clk);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
         let mut pin = gpioa.pa8.into_push_pull_output();
@@ -46,7 +71,7 @@ mod tests {
         assert!(pin.is_high().unwrap());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(!is_pa8_low(gpioa));
+            assert!(!is_pax_low(gpioa, 8));
         }
 
         pin.set_low().unwrap();
@@ -54,7 +79,7 @@ mod tests {
         assert!(pin.is_low().unwrap());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(is_pa8_low(gpioa));
+            assert!(is_pax_low(gpioa, 8));
         }
     }
 
@@ -82,7 +107,7 @@ mod tests {
         assert!(pin.is_high().unwrap());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(!is_pa8_low(gpioa));
+            assert!(!is_pax_low(gpioa, 8));
         }
 
         pin.set_low().unwrap();
@@ -90,7 +115,7 @@ mod tests {
         assert!(pin.is_low().unwrap());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(is_pa8_low(gpioa));
+            assert!(is_pax_low(gpioa, 8));
         }
     }
 
@@ -99,10 +124,12 @@ mod tests {
         use super::*;
 
         // TODO: Is it ok to steal these?
-        let cp = unsafe { stm32::CorePeripherals::steal() };
+        let mut cp = unsafe { stm32::CorePeripherals::steal() };
         let dp = unsafe { stm32::Peripherals::steal() };
+        enable_timer(&mut cp);
+
         let mut rcc = dp.RCC.constrain();
-        let mut delay = cp.SYST.delay(&rcc.clocks);
+        assert_eq!(rcc.clocks.sys_clk, F_SYS);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
         let pin: stm32g4xx_hal::gpio::gpioa::PA8<stm32g4xx_hal::gpio::Alternate<AF6>> =
@@ -115,44 +142,163 @@ mod tests {
 
         let gpioa = unsafe { &*GPIOA::PTR };
 
-        //let get_pin_state = || unsafe {  (0x4800_0004 as *const u32).read_volatile() };
-
-        // TODO: This is a very bad way to measure time
-        let min: MicrosDurationU32 = 490u32.micros(); // Some extra on min for cpu overhead
+        let min: MicrosDurationU32 = 495u32.micros();
         let max: MicrosDurationU32 = 505u32.micros();
 
-        {
-            println!("Awaiting first rising edge...");
-            let duration_until_lo = await_lo(&gpioa, &mut delay, max).unwrap();
-            println!("Low..., Waited ~{} until low", duration_until_lo);
-            let lo_duration = await_hi(&gpioa, &mut delay, max).unwrap();
-            println!("High..., Low half period: {}", lo_duration);
-        }
+        debug!("Awaiting first rising edge...");
+        let duration_until_lo = await_lo(&gpioa, max).unwrap();
+        let first_lo_duration = await_hi(&gpioa, max).unwrap();
+
+        let mut hi_duration = 0.micros();
+        let mut lo_duration = 0.micros();
 
         for _ in 0..10 {
-            // Make sure the timer half periods are within 490-505us
+            // Make sure the timer half periods are within 495-505us
 
-            let hi_duration = await_lo(&gpioa, &mut delay, max).unwrap();
-            println!("Low..., High half period: {}", hi_duration);
-            assert!(hi_duration > min, "{} > {}", hi_duration, min);
+            hi_duration = await_lo(&gpioa, max).unwrap();
+            assert!(
+                hi_duration > min && hi_duration < max,
+                "hi: {} < {} < {}",
+                min,
+                hi_duration,
+                max
+            );
 
-            let lo_duration = await_hi(&gpioa, &mut delay, max).unwrap();
-            println!("High..., Low half period: {}", lo_duration);
-            assert!(lo_duration > min, "{} > {}", lo_duration, min);
+            lo_duration = await_hi(&gpioa, max).unwrap();
+            assert!(
+                lo_duration > min && lo_duration < max,
+                "lo: {} < {} < {}",
+                min,
+                lo_duration,
+                max
+            );
         }
 
-        println!("Done!");
-        for i in (0..5).rev() {
-            println!("{}", i);
-            delay.delay(1000.millis());
-        }
+        // Prints deferred until here to not mess up timing
+        debug!("Waited ~{} until low", duration_until_lo);
+        debug!("First low half period: {}", first_lo_duration);
+
+        debug!("High half period: {}", hi_duration);
+        debug!("Low half period: {}", lo_duration);
+
+        debug!("Done!");
 
         pwm.disable();
     }
+
+    #[test]
+    fn cordic() {
+        fn is_almost_equals(a: f32, b: f32) -> bool {
+            (a - b).abs() < 0.001
+        }
+
+        use super::*;
+
+        let dp = unsafe { stm32::Peripherals::steal() };
+        let mut rcc = dp.RCC.constrain();
+
+        let mut cordic = dp
+            .CORDIC
+            .constrain(&mut rcc)
+            .freeze::<Q15, Q31, P60, SinCos>(); // 16 bit arguments, 32 bit results, compute sine and cosine, 60 iterations
+
+        // static operation (zero overhead)
+
+        cordic.start(I1F15::from_num(-0.25 /* -45 degreees */));
+
+        let (sin, cos) = cordic.result();
+
+        debug!("sin: {}, cos: {}", sin.to_num::<f32>(), cos.to_num::<f32>());
+        assert!(is_almost_equals(sin.to_num::<f32>(), -0.707));
+        assert!(is_almost_equals(cos.to_num::<f32>(), 0.707));
+
+        // dynamic operation
+
+        let mut cordic = cordic.into_dynamic();
+
+        let sqrt = cordic.run::<Sqrt<N0>>(I1F15::from_num(0.25));
+        debug!("sqrt: {}", sqrt.to_num::<f32>());
+        assert!(is_almost_equals(sqrt.to_num::<f32>(), 0.5));
+        let magnitude = cordic.run::<Magnitude>((I1F15::from_num(0.25), I1F15::from_num(0.5)));
+        debug!("magnitude: {}", magnitude.to_num::<f32>());
+        assert!(is_almost_equals(magnitude.to_num::<f32>(), 0.559));
+    }
+
+    #[test]
+    fn adc() {
+        use super::*;
+
+        // TODO: Is it ok to steal these?
+        let cp = unsafe { stm32::CorePeripherals::steal() };
+        let dp = unsafe { stm32::Peripherals::steal() };
+        let rcc = dp.RCC.constrain();
+        let mut delay = cp.SYST.delay(&rcc.clocks);
+
+        let mut adc = dp
+            .ADC1
+            .claim(adc::ClockSource::SystemClock, &rcc, &mut delay, true);
+
+        adc.enable_temperature(&dp.ADC12_COMMON);
+        adc.enable_vref(&dp.ADC12_COMMON);
+        let sample_time = adc::config::SampleTime::Cycles_640_5;
+
+        let vref = adc.convert(&Vref, sample_time);
+        let vref_cal = VrefCal::get().read();
+        let vdda = VDDA_CALIB * vref_cal as u32 / vref as u32;
+        debug!("vdda: {}mV", vdda);
+        assert!((3200..3400).contains(&vdda));
+
+        let vref = Vref::sample_to_millivolts_ext(vref, vdda, adc::config::Resolution::Twelve);
+        debug!("vref: {}mV", vref);
+        assert!((1182..1232).contains(&vref)); // From G474 datasheet
+
+        let temperature_reading = adc.convert(&Temperature, sample_time);
+        let temp = Temperature::temperature_to_degrees_centigrade(
+            temperature_reading,
+            vdda as f32 / 1000.,
+            adc::config::Resolution::Twelve,
+        );
+        debug!("temp: {}°C", temp);
+        assert!((20.0..30.0).contains(&temp), "20.0 < {} < 30.0", temp);
+    }
+
+    // TODO: This does not seem to work
+    #[test]
+    fn dac() {
+        use super::*;
+
+        // TODO: Is it ok to steal these?
+        let cp = unsafe { stm32::CorePeripherals::steal() };
+        let dp = unsafe { stm32::Peripherals::steal() };
+        let mut rcc = dp.RCC.constrain();
+        let mut delay = cp.SYST.delay(&rcc.clocks);
+
+        let gpioa = dp.GPIOA.split(&mut rcc);
+        let dac1ch1 = dp.DAC1.constrain(gpioa.pa4, &mut rcc);
+
+        let gpioa = unsafe { &*GPIOA::PTR };
+
+        // dac_manual will have its value set manually
+        let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable();
+
+        dac.set_value(0);
+        delay.delay_ms(100);
+        assert!(is_pax_low(&gpioa, 4));
+
+        /*for i in (0..=4095).step_by(10) {
+            dac.set_value(i);
+            delay.delay_ms(1);
+            defmt::println!("i: {}, is_pax_low: {}", i, gpioa.idr().read().bits());
+        }
+
+        delay.delay_ms(100);
+        assert!(!is_pax_low(&gpioa, 4)); // TODO: <---- Why does this not work?
+        */
+    }
 }
 
-fn is_pa8_low(gpioa: &stm32::gpioa::RegisterBlock) -> bool {
-    gpioa.idr().read().idr(8).is_low()
+fn is_pax_low(gpioa: &stm32::gpioa::RegisterBlock, x: u8) -> bool {
+    gpioa.idr().read().idr(x).is_low()
 }
 
 #[derive(Debug, defmt::Format)]
@@ -160,30 +306,31 @@ struct ErrorTimedOut;
 
 fn await_lo(
     gpioa: &stm32::gpioa::RegisterBlock,
-    delay: &mut SystDelay,
     timeout: MicrosDurationU32,
 ) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    await_p(|| is_pa8_low(gpioa), delay, timeout)
+    await_p(|| is_pax_low(gpioa, 8), timeout)
 }
 
 fn await_hi(
     gpioa: &stm32::gpioa::RegisterBlock,
-    delay: &mut SystDelay,
     timeout: MicrosDurationU32,
 ) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    await_p(|| !is_pa8_low(gpioa), delay, timeout)
+    await_p(|| !is_pax_low(gpioa, 8), timeout)
 }
 
 fn await_p(
     mut p: impl FnMut() -> bool,
-    delay: &mut SystDelay,
     timeout: MicrosDurationU32,
 ) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    for i in 0..timeout.ticks() {
+    let before = now();
+
+    loop {
+        let passed_time = now() - before;
         if p() {
-            return Ok(i.micros());
+            return Ok(passed_time);
         }
-        delay.delay(1_u32.micros());
+        if passed_time > timeout {
+            return Err(ErrorTimedOut);
+        }
     }
-    Err(ErrorTimedOut)
 }
