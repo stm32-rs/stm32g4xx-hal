@@ -261,7 +261,7 @@ mod tests {
         debug!("temp: {}°C", temp);
         assert!((20.0..30.0).contains(&temp), "20.0 < {} < 30.0", temp);
     }
-    
+
     #[test]
     fn dac() {
         use super::*;
