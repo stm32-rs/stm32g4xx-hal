@@ -261,8 +261,7 @@ mod tests {
         debug!("temp: {}°C", temp);
         assert!((20.0..30.0).contains(&temp), "20.0 < {} < 30.0", temp);
     }
-
-    // TODO: This does not seem to work
+    
     #[test]
     fn dac() {
         use super::*;
@@ -274,7 +273,8 @@ mod tests {
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
-        let dac1ch1 = dp.DAC1.constrain(gpioa.pa4, &mut rcc);
+        let pa4 = gpioa.pa4.into_floating_input();
+        let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
 
         let gpioa = unsafe { &*GPIOA::PTR };
 
@@ -282,18 +282,12 @@ mod tests {
         let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable();
 
         dac.set_value(0);
-        delay.delay_ms(100);
+        delay.delay_ms(1);
         assert!(is_pax_low(&gpioa, 4));
 
-        /*for i in (0..=4095).step_by(10) {
-            dac.set_value(i);
-            delay.delay_ms(1);
-            defmt::println!("i: {}, is_pax_low: {}", i, gpioa.idr().read().bits());
-        }
-
-        delay.delay_ms(100);
-        assert!(!is_pax_low(&gpioa, 4)); // TODO: <---- Why does this not work?
-        */
+        dac.set_value(4095);
+        delay.delay_ms(1);
+        assert!(!is_pax_low(&gpioa, 4));
     }
 }
 
