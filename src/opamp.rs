@@ -813,7 +813,7 @@ macro_rules! opamps {
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput>
                 {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::Pga, true)
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::Pga, false)
                 }
 
                 #[allow(private_bounds)]
@@ -827,7 +827,7 @@ macro_rules! opamps {
                     _output: InternalOutput,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput> {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalFilter, true)
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalFilter, false)
                 }
 
                 #[allow(private_bounds)]
@@ -841,7 +841,7 @@ macro_rules! opamps {
                     _output: InternalOutput,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput> {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBias, true)
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBias, false)
                 }
 
                 #[allow(private_bounds)]
@@ -857,7 +857,7 @@ macro_rules! opamps {
                     _output: InternalOutput,
                     gain: Gain,
                 ) -> Pga<$opamp, $non_inverting, InternalOutput> {
-                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBiasAndFilter, true)
+                    $opamp::configure_pga(InternalOutput, gain, PgaMode::PgaExternalBiasAndFilter, false)
                 }
             }
         }
