@@ -19,6 +19,7 @@ fugit = "0.3.7"
 stm32-usbd = { version = "0.7.0", optional = true }
 fixed = { version = "1.28.0", optional = true }
 embedded-io = "0.6"
+stm32-hrtim = { git = "https://github.com/usbalbin/stm32-hrtim", branch = "dont_depend_on_hal", optional = true }
 
 [dependencies.cortex-m]
 version = "0.7.7"
@@ -81,9 +82,9 @@ usb = ["dep:stm32-usbd"]
 stm32g431 = ["stm32g4/stm32g431", "cat2"]
 stm32g441 = ["stm32g4/stm32g441", "cat2"]
 stm32g473 = ["stm32g4/stm32g473", "cat3", "adc3", "adc4", "adc5"]
-stm32g474 = ["stm32g4/stm32g474", "cat3", "adc3", "adc4", "adc5"]
+stm32g474 = ["stm32g4/stm32g474", "cat3", "adc3", "adc4", "adc5", "stm32-hrtim/stm32g474"]
 stm32g483 = ["stm32g4/stm32g483", "cat3", "adc3", "adc4", "adc5"]
-stm32g484 = ["stm32g4/stm32g484", "cat3", "adc3", "adc4", "adc5"]
+stm32g484 = ["stm32g4/stm32g484", "cat3", "adc3", "adc4", "adc5", "stm32-hrtim/stm32g484"]
 stm32g491 = ["stm32g4/stm32g491", "cat4", "adc3"]
 stm32g4a1 = ["stm32g4/stm32g4a1", "cat4", "adc3"]
 log-itm = ["cortex-m-log/itm"]
@@ -107,6 +108,7 @@ cat3 = []
 cat4 = []
 
 can = ["dep:fdcan"]
+hrtim = ["dep:stm32-hrtim"]
 
 [profile.dev]
 codegen-units = 1
