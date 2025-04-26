@@ -1,6 +1,7 @@
 pub mod adc_trigger;
 pub mod external_event;
 pub mod fault;
+pub mod capture;
 
 use core::mem::MaybeUninit;
 
