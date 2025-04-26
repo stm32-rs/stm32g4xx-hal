@@ -1,4 +1,4 @@
-use core::fmt;
+use core::fmt::{self, Debug};
 use core::marker::PhantomData;
 
 use crate::dma::{
@@ -139,20 +139,26 @@ pub trait SerialExt<USART, Config> {
 
 impl<USART, TX, RX> fmt::Write for Serial<USART, TX, RX>
 where
-    Serial<USART, TX, RX>: embedded_hal_old::serial::Write<u8>,
+    Self: embedded_hal_old::serial::Write<u8>,
+    <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
+        for c in s.as_bytes() {
+            block!(self.write(*c)).unwrap(); // self.write does not fail
+        }
         Ok(())
     }
 }
 
 impl<USART, Pin, Dma> fmt::Write for Tx<USART, Pin, Dma>
 where
-    Tx<USART, Pin, Dma>: embedded_hal_old::serial::Write<u8>,
+    Self: embedded_hal_old::serial::Write<u8>,
+    <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
-        let _ = s.as_bytes().iter().map(|c| block!(self.write(*c))).last();
+        for c in s.as_bytes() {
+            block!(self.write(*c)).unwrap(); // self.write does not fail
+        }
         Ok(())
     }
 }
