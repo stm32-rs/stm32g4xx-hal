@@ -1840,7 +1840,7 @@ macro_rules! adc {
                     self.config.difsel = df;
 
                     self.adc_reg.difsel().modify(|_, w| {
-                        for i in 0..18 {
+                        for i in 0..19 {
                             w.difsel(i).bit(df.get_channel(i).into());
                         }
                         w

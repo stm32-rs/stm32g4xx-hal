@@ -139,7 +139,7 @@ macro_rules! spi {
                 }
 
                 // disable SS output
-                spi.cr2().write(|w| w.ssoe().clear_bit());
+                spi.cr2().write(|w| w.ssoe().disabled());
 
                 let spi_freq = speed.into().raw();
                 let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).raw();
@@ -155,8 +155,8 @@ macro_rules! spi {
                     _ => 0b111,
                 };
 
-                spi.cr2().write(|w| unsafe {
-                    w.frxth().set_bit().ds().bits(0b111).ssoe().clear_bit()
+                spi.cr2().write(|w| {
+                    w.frxth().quarter().ds().eight_bit().ssoe().disabled()
                 });
 
                 spi.cr1().write(|w| unsafe {
@@ -165,25 +165,23 @@ macro_rules! spi {
                         .cpol()
                         .bit(mode.polarity == Polarity::IdleHigh)
                         .mstr()
-                        .set_bit()
+                        .master()
                         .br()
                         .bits(br)
                         .lsbfirst()
-                        .clear_bit()
+                        .msbfirst()
                         .ssm()
-                        .set_bit()
+                        .enabled()
                         .ssi()
-                        .set_bit()
+                        .slave_not_selected()
                         .rxonly()
-                        .clear_bit()
-                        .dff()
-                        .clear_bit()
+                        .full_duplex()
+                        .crcl()
+                        .eight_bit()
                         .bidimode()
-                        .clear_bit()
-                        .ssi()
-                        .set_bit()
+                        .unidirectional()
                         .spe()
-                        .set_bit()
+                        .enabled()
                 });
 
                 Spi { spi, pins }
@@ -194,7 +192,7 @@ macro_rules! spi {
             }
 
             pub fn enable_tx_dma(self) -> Spi<$SPIX, PINS> {
-                self.spi.cr2().modify(|_, w| w.txdmaen().set_bit());
+                self.spi.cr2().modify(|_, w| w.txdmaen().enabled());
                 Spi {
                     spi: self.spi,
                     pins: self.pins,
@@ -238,15 +236,17 @@ macro_rules! spi {
                     nb::Error::WouldBlock
                 })
             }
+
             fn set_tx_only(&mut self) {
                 self.spi
                     .cr1()
-                    .modify(|_, w| w.bidimode().set_bit().bidioe().set_bit());
+                    .modify(|_, w| w.bidimode().bidirectional().bidioe().output_enabled());
             }
+
             fn set_bidi(&mut self) {
                 self.spi
                     .cr1()
-                    .modify(|_, w| w.bidimode().clear_bit().bidioe().clear_bit());
+                    .modify(|_, w| w.bidimode().unidirectional().bidioe().output_disabled());
             }
         }
 
@@ -335,7 +335,7 @@ macro_rules! spi {
                 // stop receiving data
                 self.set_tx_only();
                 // wait for tx fifo to be drained by the peripheral
-                while self.spi.sr().read().ftlvl() != 0 { core::hint::spin_loop() };
+                while self.spi.sr().read().ftlvl().is_empty() { core::hint::spin_loop() };
                 // drain rx fifo
                 Ok(while match self.nb_read::<u8>() {
                     Ok(_) => true,
