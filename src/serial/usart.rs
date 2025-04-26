@@ -140,12 +140,12 @@ pub trait SerialExt<USART, Config> {
 impl<USART, TX, RX> fmt::Write for Serial<USART, TX, RX>
 where
     Self: embedded_hal_old::serial::Write<u8>,
-    <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug
+    <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.as_bytes() {
             block!(self.write(*c)).unwrap(); // self.write does not fail
-        };
+        }
         Ok(())
     }
 }
@@ -153,12 +153,12 @@ where
 impl<USART, Pin, Dma> fmt::Write for Tx<USART, Pin, Dma>
 where
     Self: embedded_hal_old::serial::Write<u8>,
-    <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug
+    <Self as embedded_hal_old::serial::Write<u8>>::Error: Debug,
 {
     fn write_str(&mut self, s: &str) -> fmt::Result {
         for c in s.as_bytes() {
-            block!(self.write(*c)).unwrap();// self.write does not fail
-        };
+            block!(self.write(*c)).unwrap(); // self.write does not fail
+        }
         Ok(())
     }
 }
