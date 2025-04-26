@@ -335,7 +335,7 @@ macro_rules! spi {
                 // stop receiving data
                 self.set_tx_only();
                 // wait for tx fifo to be drained by the peripheral
-                while self.spi.sr().read().ftlvl().is_empty() { core::hint::spin_loop() };
+                while !self.spi.sr().read().ftlvl().is_empty() { core::hint::spin_loop() };
                 // drain rx fifo
                 Ok(while match self.nb_read::<u8>() {
                     Ok(_) => true,

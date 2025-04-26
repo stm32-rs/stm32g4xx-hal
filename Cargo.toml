@@ -98,7 +98,13 @@ stm32g4a1 = ["stm32g4/stm32g4a1"]
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
-defmt = ["dep:defmt", "fugit/defmt", "nb/defmt-0-3", "embedded-hal/defmt-03", "embedded-io/defmt-03"]
+defmt = [
+    "dep:defmt",
+    "fugit/defmt",
+    "nb/defmt-0-3",
+    "embedded-hal/defmt-03",
+    "embedded-io/defmt-03",
+]
 cordic = ["dep:fixed"]
 
 [profile.dev]
