@@ -7,10 +7,23 @@ use cortex_m_rt::entry;
 use fugit::ExtU32 as _;
 use panic_probe as _;
 use stm32_hrtim::{
-    compare_register::HrCompareRegister, fault::{FaultAction, FaultMonitor}, output::HrOutput, timer::HrTimer, HrParts, HrPwmAdvExt, Polarity, Pscl4
+    compare_register::HrCompareRegister,
+    fault::{FaultAction, FaultMonitor},
+    output::HrOutput,
+    timer::HrTimer,
+    HrParts, HrPwmAdvExt, Polarity, Pscl4,
 };
 use stm32g4xx_hal::{
-    self as hal, adc::AdcClaim, comparator::{self, ComparatorExt, ComparatorSplit}, dac::{Dac3IntSig1, DacExt, DacOut}, delay::{DelayExt as _, SYSTDelayExt}, gpio::GpioExt, hrtim::{fault::FaultInput, HrControltExt, HrPwmBuilderExt}, pwr::PwrExt, rcc::{self, RccExt}, stm32::{CorePeripherals, Peripherals}
+    self as hal,
+    adc::AdcClaim,
+    comparator::{self, ComparatorExt, ComparatorSplit},
+    dac::{Dac3IntSig1, DacExt, DacOut},
+    delay::{DelayExt as _, SYSTDelayExt},
+    gpio::GpioExt,
+    hrtim::{fault::FaultInput, HrControltExt, HrPwmBuilderExt},
+    pwr::PwrExt,
+    rcc::{self, RccExt},
+    stm32::{CorePeripherals, Peripherals},
 };
 
 #[entry]
