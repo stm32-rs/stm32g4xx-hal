@@ -13,7 +13,12 @@ use stm32_hrtim::{
     HrParts, HrPwmAdvExt, Pscl128,
 };
 use stm32g4xx_hal::{
-    dma::{channel::DMAExt, config::DmaConfig, TransferExt}, gpio::GpioExt, hrtim::{external_event::EevInputExt, HrControltExt, HrPwmBuilderExt}, pwr::PwrExt, rcc::{self, RccExt}, stm32::Peripherals
+    dma::{channel::DMAExt, config::DmaConfig, TransferExt},
+    gpio::GpioExt,
+    hrtim::{external_event::EevInputExt, HrControltExt, HrPwmBuilderExt},
+    pwr::PwrExt,
+    rcc::{self, RccExt},
+    stm32::Peripherals,
 };
 
 #[entry]

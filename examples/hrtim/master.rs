@@ -10,7 +10,13 @@ use stm32_hrtim::{
     HrParts, HrPwmAdvExt, HrTimerMode, MasterPreloadSource, PreloadSource, Pscl4,
 };
 use stm32g4xx_hal::{
-    delay::{DelayExt, SYSTDelayExt}, gpio::GpioExt, hrtim::{HrControltExt, HrPwmBuilderExt}, pwr::PwrExt, rcc::{self, RccExt}, stm32::{CorePeripherals, Peripherals}, time::ExtU32
+    delay::{DelayExt, SYSTDelayExt},
+    gpio::GpioExt,
+    hrtim::{HrControltExt, HrPwmBuilderExt},
+    pwr::PwrExt,
+    rcc::{self, RccExt},
+    stm32::{CorePeripherals, Peripherals},
+    time::ExtU32,
 };
 
 #[entry]
