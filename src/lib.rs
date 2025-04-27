@@ -36,11 +36,6 @@ pub use embedded_hal as hal;
 pub use embedded_hal_old as hal_02;
 pub use nb::block;
 
-mod sealed {
-    pub trait Sealed {}
-}
-pub(crate) use sealed::Sealed;
-
 #[cfg(feature = "stm32g431")]
 pub use stm32g4::stm32g431 as stm32;
 
@@ -69,6 +64,7 @@ pub use stm32g4::stm32g491 as stm32;
 pub use stm32g4::stm32g4a1 as stm32;
 
 pub use stm32 as pac;
+use stm32g4::Periph;
 
 #[cfg(feature = "rt")]
 pub use crate::stm32::interrupt;
@@ -105,3 +101,24 @@ pub mod timer;
 pub mod independent_watchdog;
 #[cfg(feature = "usb")]
 pub mod usb;
+
+mod sealed {
+    pub trait Sealed {}
+}
+pub(crate) use sealed::Sealed;
+
+impl<RB, const A: usize> Sealed for Periph<RB, A> {}
+
+pub trait Ptr: Sealed {
+    /// RegisterBlock structure
+    type RB;
+    /// Return the pointer to the register block
+    fn ptr() -> *const Self::RB;
+}
+
+impl<RB, const A: usize> Ptr for Periph<RB, A> {
+    type RB = RB;
+    fn ptr() -> *const Self::RB {
+        Self::ptr()
+    }
+}

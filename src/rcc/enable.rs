@@ -46,7 +46,6 @@ macro_rules! bus_reset {
 macro_rules! bus {
     ($($PER:ident => ($busX:ty, $bit:literal),)+) => {
         $(
-            impl crate::Sealed for crate::stm32::$PER {}
             impl RccBus for crate::stm32::$PER {
                 type Bus = $busX;
             }
