@@ -88,14 +88,18 @@ impl ExtiExt for EXTI {
         let mask = 1 << line;
         match edge {
             SignalEdge::Rising => {
-                self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                self.rtsr1()
+                    .modify(|r, w| unsafe { w.bits(r.bits() | mask) });
             }
             SignalEdge::Falling => {
-                self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                self.ftsr1()
+                    .modify(|r, w| unsafe { w.bits(r.bits() | mask) });
             }
             SignalEdge::RisingFalling => {
-                self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
-                self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                self.rtsr1()
+                    .modify(|r, w| unsafe { w.bits(r.bits() | mask) });
+                self.ftsr1()
+                    .modify(|r, w| unsafe { w.bits(r.bits() | mask) });
             }
         }
         self.wakeup(ev);
@@ -104,12 +108,12 @@ impl ExtiExt for EXTI {
     fn wakeup(&self, ev: Event) {
         match ev as u8 {
             line if line < 32 => self
-                .imr1
-                .modify(|r, w| unsafe { w.bits(r.bits() | 1 << line) }),
+                .imr1()
+                .modify(|r, w| unsafe { w.bits(r.bits() | (1 << line)) }),
             line => self
-                .imr2
-                .modify(|r, w| unsafe { w.bits(r.bits() | 1 << (line - 32)) }),
-        }
+                .imr2()
+                .modify(|r, w| unsafe { w.bits(r.bits() | (1 << (line - 32))) }),
+        };
     }
 
     fn unlisten(&self, ev: Event) {
@@ -117,15 +121,19 @@ impl ExtiExt for EXTI {
         match ev as u8 {
             line if line < 32 => {
                 let mask = !(1 << line);
-                self.imr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
+                self.imr1()
+                    .modify(|r, w| unsafe { w.bits(r.bits() & mask) });
                 if line <= 18 {
-                    self.rtsr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
-                    self.ftsr1.modify(|r, w| unsafe { w.bits(r.bits() & mask) });
+                    self.rtsr1()
+                        .modify(|r, w| unsafe { w.bits(r.bits() & mask) });
+                    self.ftsr1()
+                        .modify(|r, w| unsafe { w.bits(r.bits() & mask) });
                 }
             }
             line => {
                 let mask = !(1 << (line - 32));
-                self.imr2.modify(|r, w| unsafe { w.bits(r.bits() & mask) })
+                self.imr2()
+                    .modify(|r, w| unsafe { w.bits(r.bits() & mask) });
             }
         }
     }
@@ -136,13 +144,13 @@ impl ExtiExt for EXTI {
             return false;
         }
         let mask = 1 << line;
-        self.pr1.read().bits() & mask != 0
+        self.pr1().read().bits() & mask != 0
     }
 
     fn unpend(&self, ev: Event) {
         let line = ev as u8;
         if line <= 18 {
-            self.pr1.modify(|_, w| unsafe { w.bits(1 << line) });
+            self.pr1().modify(|_, w| unsafe { w.bits(1 << line) });
         }
     }
 }

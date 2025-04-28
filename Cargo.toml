@@ -13,7 +13,7 @@ version = "0.0.2"
 
 [dependencies]
 nb = "1"
-stm32g4 = "0.15.1"
+stm32g4 = { version = "0.22.0", package = "stm32g4-staging" }
 paste = "1.0"
 bitflags = "1.2"
 vcell = "0.1"
@@ -65,6 +65,7 @@ optional = true
 [dev-dependencies]
 cortex-m-rt = "0.7.2"
 defmt-rtt = "0.4.0"
+defmt-test = "0.3.2"
 cortex-m-rtic = "1.1.4"
 cortex-m-semihosting = "0.3.5"
 panic-probe = { version = "0.3.0", features = ["print-defmt"] }
@@ -98,7 +99,13 @@ stm32g4a1 = ["stm32g4/stm32g4a1"]
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
-defmt = ["dep:defmt", "fugit/defmt", "nb/defmt-0-3", "embedded-hal/defmt-03", "embedded-io/defmt-03"]
+defmt = [
+    "dep:defmt",
+    "fugit/defmt",
+    "nb/defmt-0-3",
+    "embedded-hal/defmt-03",
+    "embedded-io/defmt-03",
+]
 cordic = ["dep:fixed"]
 
 [profile.dev]
@@ -109,6 +116,13 @@ lto = false
 
 [profile.release]
 debug = false
+codegen-units = 1
+incremental = false
+lto = true
+
+[profile.test]
+opt-level = "s"
+debug = true
 codegen-units = 1
 incremental = false
 lto = true
@@ -124,3 +138,10 @@ required-features = ["usb"]
 [[example]]
 name = "cordic"
 required-features = ["cordic"]
+
+[[test]]
+name = "tests"
+harness = false
+
+[lib]
+test = false

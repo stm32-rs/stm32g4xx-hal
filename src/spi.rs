@@ -21,7 +21,6 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 use crate::stm32::SPI4;
 use crate::stm32::{RCC, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
-use core::cell::UnsafeCell;
 use core::ptr;
 
 use embedded_hal::spi::ErrorKind;
@@ -140,7 +139,7 @@ macro_rules! spi {
                 }
 
                 // disable SS output
-                spi.cr2.write(|w| w.ssoe().clear_bit());
+                spi.cr2().write(|w| w.ssoe().disabled());
 
                 let spi_freq = speed.into().raw();
                 let bus_freq = <$SPIX as RccBus>::Bus::get_frequency(&rcc.clocks).raw();
@@ -156,35 +155,33 @@ macro_rules! spi {
                     _ => 0b111,
                 };
 
-                spi.cr2.write(|w| unsafe {
-                    w.frxth().set_bit().ds().bits(0b111).ssoe().clear_bit()
+                spi.cr2().write(|w| {
+                    w.frxth().quarter().ds().eight_bit().ssoe().disabled()
                 });
 
-                spi.cr1.write(|w| unsafe {
+                spi.cr1().write(|w| unsafe {
                     w.cpha()
                         .bit(mode.phase == Phase::CaptureOnSecondTransition)
                         .cpol()
                         .bit(mode.polarity == Polarity::IdleHigh)
                         .mstr()
-                        .set_bit()
+                        .master()
                         .br()
                         .bits(br)
                         .lsbfirst()
-                        .clear_bit()
+                        .msbfirst()
                         .ssm()
-                        .set_bit()
+                        .enabled()
                         .ssi()
-                        .set_bit()
+                        .slave_not_selected()
                         .rxonly()
-                        .clear_bit()
-                        .dff()
-                        .clear_bit()
+                        .full_duplex()
+                        .crcl()
+                        .eight_bit()
                         .bidimode()
-                        .clear_bit()
-                        .ssi()
-                        .set_bit()
+                        .unidirectional()
                         .spe()
-                        .set_bit()
+                        .enabled()
                 });
 
                 Spi { spi, pins }
@@ -195,7 +192,7 @@ macro_rules! spi {
             }
 
             pub fn enable_tx_dma(self) -> Spi<$SPIX, PINS> {
-                self.spi.cr2.modify(|_, w| w.txdmaen().set_bit());
+                self.spi.cr2().modify(|_, w| w.txdmaen().enabled());
                 Spi {
                     spi: self.spi,
                     pins: self.pins,
@@ -205,7 +202,7 @@ macro_rules! spi {
 
         impl<PINS> Spi<$SPIX, PINS> {
             fn nb_read<W: FrameSize>(&mut self) -> nb::Result<W, Error> {
-                let sr = self.spi.sr.read();
+                let sr = self.spi.sr().read();
                 Err(if sr.ovr().bit_is_set() {
                     nb::Error::Other(Error::Overrun)
                 } else if sr.modf().bit_is_set() {
@@ -216,14 +213,14 @@ macro_rules! spi {
                     // NOTE(read_volatile) read only 1 byte (the svd2rust API only allows
                     // reading a half-word)
                     return Ok(unsafe {
-                        ptr::read_volatile(&self.spi.dr as *const _ as *const W)
+                        ptr::read_volatile(&self.spi.dr() as *const _ as *const W)
                     });
                 } else {
                     nb::Error::WouldBlock
                 })
             }
             fn nb_write<W: FrameSize>(&mut self, word: W) -> nb::Result<(), Error> {
-                let sr = self.spi.sr.read();
+                let sr = self.spi.sr().read();
                 Err(if sr.ovr().bit_is_set() {
                     nb::Error::Other(Error::Overrun)
                 } else if sr.modf().bit_is_set() {
@@ -231,23 +228,25 @@ macro_rules! spi {
                 } else if sr.crcerr().bit_is_set() {
                     nb::Error::Other(Error::Crc)
                 } else if sr.txe().bit_is_set() {
-                    let dr = &self.spi.dr as *const _ as *const UnsafeCell<W>;
+                    let dr = self.spi.dr().as_ptr() as *mut W;
                     // NOTE(write_volatile) see note above
-                    unsafe { ptr::write_volatile(UnsafeCell::raw_get(dr), word) };
+                    unsafe { ptr::write_volatile(dr, word) };
                     return Ok(());
                 } else {
                     nb::Error::WouldBlock
                 })
             }
+
             fn set_tx_only(&mut self) {
                 self.spi
-                    .cr1
-                    .modify(|_, w| w.bidimode().set_bit().bidioe().set_bit());
+                    .cr1()
+                    .modify(|_, w| w.bidimode().bidirectional().bidioe().output_enabled());
             }
+
             fn set_bidi(&mut self) {
                 self.spi
-                    .cr1
-                    .modify(|_, w| w.bidimode().clear_bit().bidioe().clear_bit());
+                    .cr1()
+                    .modify(|_, w| w.bidimode().unidirectional().bidioe().output_disabled());
             }
         }
 
@@ -336,7 +335,7 @@ macro_rules! spi {
                 // stop receiving data
                 self.set_tx_only();
                 // wait for tx fifo to be drained by the peripheral
-                while self.spi.sr.read().ftlvl() != 0 { core::hint::spin_loop() };
+                while !self.spi.sr().read().ftlvl().is_empty() { core::hint::spin_loop() };
                 // drain rx fifo
                 Ok(while match self.nb_read::<u8>() {
                     Ok(_) => true,
@@ -361,7 +360,7 @@ macro_rules! spi {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Tx part accesses the Tx register
-                &unsafe { &*<$SPIX>::ptr() }.dr as *const _ as u32
+                &unsafe { &*<$SPIX>::ptr() }.dr() as *const _ as u32
             }
 
             type MemSize = u8;

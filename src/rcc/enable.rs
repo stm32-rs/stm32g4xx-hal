@@ -46,7 +46,6 @@ macro_rules! bus_reset {
 macro_rules! bus {
     ($($PER:ident => ($busX:ty, $bit:literal),)+) => {
         $(
-            impl crate::Sealed for crate::stm32::$PER {}
             impl RccBus for crate::stm32::$PER {
                 type Bus = $busX;
             }
@@ -89,7 +88,9 @@ bus! {
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
-    feature = "stm32g484"
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
 ))]
 bus! {
     ADC3 => (AHB2, 14),
@@ -159,6 +160,16 @@ bus! {
 }
 
 #[cfg(any(
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+))]
+bus! {
+    FDCAN3 => (APB1_1, 25),
+}
+
+#[cfg(any(
     feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
@@ -167,8 +178,20 @@ bus! {
 ))]
 bus! {
     TIM5 => (APB1_1, 3),
-    UART5 => (APB1_1, 20),
     I2C4 => (APB1_2, 1),
+}
+
+#[cfg(any(
+    feature = "stm32g471",
+    feature = "stm32g473",
+    feature = "stm32g474",
+    feature = "stm32g483",
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
+))]
+bus! {
+    UART5 => (APB1_1, 20),
 }
 
 bus! {
@@ -198,10 +221,11 @@ bus! {
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
-    feature = "stm32g484"
+    feature = "stm32g484",
+    feature = "stm32g491",
+    feature = "stm32g4a1",
 ))]
 bus! {
-    FDCAN3 => (APB1_1, 25),
     TIM20 => (APB2, 20),
 }
 
@@ -213,4 +237,9 @@ bus! {
     HRTIM_TIMD => (APB2, 26),
     HRTIM_TIME => (APB2, 26),
     HRTIM_TIMF => (APB2, 26),
+}
+
+#[cfg(any(feature = "stm32g474", feature = "stm32g484"))]
+bus! {
+    HRTIM_COMMON => (APB2, 26),
 }

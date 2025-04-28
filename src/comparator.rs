@@ -55,26 +55,26 @@ impl EnabledState for Enabled {}
 impl EnabledState for Locked {}
 
 macro_rules! impl_comp {
-    ($($t:ident: $reg_t:ident, $reg:ident,)+) => {$(
+    ($($t:ident: $reg:ident,)+) => {$(
         pub struct $t {
             _rb: PhantomData<()>,
         }
 
         impl $t {
-            pub fn csr(&self) -> &$crate::stm32::comp::$reg_t {
+            pub fn csr(&self) -> &$crate::stm32::comp::CCSR {
                 // SAFETY: The COMP1 type is only constructed with logical ownership of
                 // these registers.
-                &unsafe { &*COMP::ptr() }.$reg
+                &unsafe { &*COMP::ptr() }.$reg()
             }
         }
     )+};
 }
 
 impl_comp! {
-    COMP1: C1CSR, c1csr,
-    COMP2: C2CSR, c2csr,
-    COMP3: C3CSR, c3csr,
-    COMP4: C4CSR, c4csr,
+    COMP1: c1csr,
+    COMP2: c2csr,
+    COMP3: c3csr,
+    COMP4: c4csr,
 }
 #[cfg(any(
     feature = "stm32g473",
@@ -83,9 +83,9 @@ impl_comp! {
     feature = "stm32g484"
 ))]
 impl_comp! {
-    COMP5: C5CSR, c5csr,
-    COMP6: C6CSR, c6csr,
-    COMP7: C7CSR, c7csr,
+    COMP5: c5csr,
+    COMP6: c6csr,
+    COMP7: c7csr,
 }
 
 // TODO: Split COMP in PAC
@@ -162,13 +162,13 @@ macro_rules! positive_input_pin {
     ($COMP:ident, $pin_0:ident, $pin_1:ident) => {
         impl PositiveInput<$COMP> for &$pin_0<Analog> {
             fn setup(&self, comp: &$COMP) {
-                comp.csr().modify(|_, w| w.inpsel().bit(false))
+                comp.csr().modify(|_, w| w.inpsel().bit(false));
             }
         }
 
         impl PositiveInput<$COMP> for &$pin_1<Analog> {
             fn setup(&self, comp: &$COMP) {
-                comp.csr().modify(|_, w| w.inpsel().bit(true))
+                comp.csr().modify(|_, w| w.inpsel().bit(true));
             }
         }
     };
@@ -213,7 +213,7 @@ macro_rules! negative_input_pin_helper {
             }
 
             fn setup(&self, comp: &$COMP) {
-                comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) })
+                comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) });
             }
         }
     };
@@ -268,7 +268,7 @@ macro_rules! refint_input {
 
             fn setup(&self, comp: &$COMP) {
                 comp.csr()
-                    .modify(|_, w| unsafe { w.inmsel().bits(*self as u8) })
+                    .modify(|_, w| unsafe { w.inmsel().bits(*self as u8) });
             }
         }
     )+};
@@ -294,7 +294,7 @@ macro_rules! dac_input_helper {
             }
 
             fn setup(&self, comp: &$COMP) {
-                comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) })
+                comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) });
             }
         }
     };
@@ -541,11 +541,11 @@ type Comparators = (COMP1, COMP2, COMP3, COMP4, COMP5, COMP6, COMP7);
 /// Enables the comparator peripheral, and splits the [`COMP`] into independent [`COMP1`] and [`COMP2`]
 pub fn split(_comp: COMP, rcc: &mut Rcc) -> Comparators {
     // Enable COMP, SYSCFG, VREFBUF clocks
-    rcc.rb.apb2enr.modify(|_, w| w.syscfgen().set_bit());
+    rcc.rb.apb2enr().modify(|_, w| w.syscfgen().set_bit());
 
     // Reset COMP, SYSCFG, VREFBUF
-    rcc.rb.apb2rstr.modify(|_, w| w.syscfgrst().set_bit());
-    rcc.rb.apb2rstr.modify(|_, w| w.syscfgrst().clear_bit());
+    rcc.rb.apb2rstr().modify(|_, w| w.syscfgrst().set_bit());
+    rcc.rb.apb2rstr().modify(|_, w| w.syscfgrst().clear_bit());
 
     (
         COMP1 { _rb: PhantomData },

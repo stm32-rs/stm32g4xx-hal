@@ -1,6 +1,6 @@
 #![allow(unsafe_code)]
 cfg_if::cfg_if! {
-    if #[cfg(all(feature = "log-rtt", feature = "defmt"))] {
+    if #[cfg(feature = "defmt")] {
         #[allow(unused_imports)]
         pub use defmt::{info, trace, warn, debug, error};
 
@@ -55,7 +55,7 @@ cfg_if::cfg_if! {
         }
 
     }
-    else if #[cfg(all(feature = "log-rtt"/*, feature = "defmt"*/))] {
+    else if #[cfg(feature = "defmt")] {
         use defmt_rtt as _; // global logger
         use panic_probe as _;
         #[allow(unused_imports)]
@@ -65,9 +65,6 @@ cfg_if::cfg_if! {
 
         #[allow(dead_code)]
         pub fn init() {}
-    }
-    else if #[cfg(all(feature = "log-rtt", not(feature = "defmt")))] {
-        // TODO
     }
     else if #[cfg(feature = "log-semihost")] {
         use panic_semihosting as _;

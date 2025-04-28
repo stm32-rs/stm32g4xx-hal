@@ -190,7 +190,7 @@ impl Rcc {
 
         Self::configure_wait_states(&pwr_cfg, sys_freq);
 
-        self.rb.cfgr.modify(|_, w| unsafe {
+        self.rb.cfgr().modify(|_, w| unsafe {
             w.hpre()
                 .bits(ahb_psc_bits)
                 .ppre1()
@@ -201,7 +201,7 @@ impl Rcc {
                 .bits(sw_bits)
         });
 
-        while self.rb.cfgr.read().sws().bits() != sw_bits {}
+        while self.rb.cfgr().read().sws().bits() != sw_bits {}
 
         // From RM:
         // The timer clock frequencies are automatically defined by hardware. There are two cases:
@@ -219,7 +219,7 @@ impl Rcc {
         };
 
         // Configure FDCAN clock source.
-        self.rb.ccipr.modify(|_, w| unsafe {
+        self.rb.ccipr().modify(|_, w| unsafe {
             // This is sound, as `FdCanClockSource` only contains valid values for this field.
             w.fdcansel().bits(rcc_cfg.fdcansel as u8)
         });
@@ -240,15 +240,15 @@ impl Rcc {
     }
 
     pub fn unlock_rtc(&mut self) {
-        self.rb.apb1enr1.modify(|_, w| w.pwren().set_bit());
+        self.rb.apb1enr1().modify(|_, w| w.pwren().set_bit());
         let pwr = unsafe { &(*PWR::ptr()) };
-        pwr.cr1.modify(|_, w| w.dbp().set_bit());
+        pwr.cr1().modify(|_, w| w.dbp().set_bit());
     }
 
     fn config_pll(&self, pll_cfg: PllConfig) -> PLLClocks {
         // Disable PLL
-        self.rb.cr.modify(|_, w| w.pllon().clear_bit());
-        while self.rb.cr.read().pllrdy().bit_is_set() {}
+        self.rb.cr().modify(|_, w| w.pllon().clear_bit());
+        while self.rb.cr().read().pllrdy().bit_is_set() {}
 
         // Enable the input clock feeding the PLL
         let (pll_input_freq, pll_src_bits) = match pll_cfg.mux {
@@ -283,7 +283,7 @@ impl Rcc {
             .map(|r| ((pll_freq / r.divisor()).Hz(), r.register_setting()));
 
         // Set the M input divider, the N multiplier for the PLL, and the PLL source.
-        self.rb.pllcfgr.modify(|_, w| unsafe {
+        self.rb.pllcfgr().modify(|_, w| unsafe {
             // Set N, M, and source
             let w = w
                 .plln()
@@ -317,8 +317,8 @@ impl Rcc {
         });
 
         // Enable PLL
-        self.rb.cr.modify(|_, w| w.pllon().set_bit());
-        while self.rb.cr.read().pllrdy().bit_is_clear() {}
+        self.rb.cr().modify(|_, w| w.pllon().set_bit());
+        while self.rb.cr().read().pllrdy().bit_is_clear() {}
 
         PLLClocks {
             r: r.map(|r| r.0),
@@ -370,7 +370,7 @@ impl Rcc {
         unsafe {
             // Adjust flash wait states
             let flash = &(*FLASH::ptr());
-            flash.acr.modify(|_, w| w.latency().bits(latency))
+            flash.acr().modify(|_, w| w.latency().bits(latency));
         }
     }
 
@@ -387,11 +387,11 @@ impl Rcc {
         // The sequence to switch from Range11 normal mode to Range1 boost mode is:
         // 1. The system clock must be divided by 2 using the AHB prescaler before switching to a
         // higher system frequency.
-        let half_apb = (self.rb.cfgr.read().hpre().bits() + 1).clamp(0b1000, 0b1111);
+        let half_apb = (self.rb.cfgr().read().hpre().bits() + 1).clamp(0b1000, 0b1111);
         self.rb
-            .cfgr
+            .cfgr()
             .modify(|_r, w| unsafe { w.hpre().bits(half_apb) });
-        while self.rb.cfgr.read().hpre().bits() != half_apb {}
+        while self.rb.cfgr().read().hpre().bits() != half_apb {}
 
         // 2. Clear the R1MODE bit is in the PWR_CR5 register.
         unsafe { pwr::set_boost(true) };
@@ -400,7 +400,7 @@ impl Rcc {
         Self::configure_wait_states(pwr_cfg, sys_freq);
 
         // 4. Configure and switch to new system frequency.
-        self.rb.cfgr.modify(|_, w| unsafe {
+        self.rb.cfgr().modify(|_, w| unsafe {
             w.ppre1()
                 .bits(apb1_psc_bits)
                 .ppre2()
@@ -409,7 +409,7 @@ impl Rcc {
                 .bits(sw_bits)
         });
 
-        while self.rb.cfgr.read().sws().bits() != sw_bits {}
+        while self.rb.cfgr().read().sws().bits() != sw_bits {}
 
         // 5. Wait for at least 1us and then reconfigure the AHB prescaler to get the needed HCLK
         // clock frequency.
@@ -420,44 +420,44 @@ impl Rcc {
         cortex_m::asm::delay(delay_cycles);
 
         self.rb
-            .cfgr
+            .cfgr()
             .modify(|_, w| unsafe { w.hpre().bits(ahb_psc_bits) });
     }
 
     pub(crate) fn enable_hsi(&self) {
-        self.rb.cr.modify(|_, w| w.hsion().set_bit());
-        while self.rb.cr.read().hsirdy().bit_is_clear() {}
+        self.rb.cr().modify(|_, w| w.hsion().set_bit());
+        while self.rb.cr().read().hsirdy().bit_is_clear() {}
     }
 
     pub(crate) fn enable_hse(&self, bypass: bool) {
         self.rb
-            .cr
+            .cr()
             .modify(|_, w| w.hseon().set_bit().hsebyp().bit(bypass));
-        while self.rb.cr.read().hserdy().bit_is_clear() {}
+        while self.rb.cr().read().hserdy().bit_is_clear() {}
     }
 
     pub(crate) fn enable_lse(&self, bypass: bool) {
         self.rb
-            .bdcr
+            .bdcr()
             .modify(|_, w| w.lseon().set_bit().lsebyp().bit(bypass));
-        while self.rb.bdcr.read().lserdy().bit_is_clear() {}
+        while self.rb.bdcr().read().lserdy().bit_is_clear() {}
     }
 
     pub(crate) fn enable_lsi(&self) {
-        self.rb.csr.modify(|_, w| w.lsion().set_bit());
-        while self.rb.csr.read().lsirdy().bit_is_clear() {}
+        self.rb.csr().modify(|_, w| w.lsion().set_bit());
+        while self.rb.csr().read().lsirdy().bit_is_clear() {}
     }
 
     pub fn enable_hsi48(&self) {
-        self.rb.crrcr.modify(|_, w| w.hsi48on().set_bit());
-        while self.rb.crrcr.read().hsi48rdy().bit_is_clear() {}
+        self.rb.crrcr().modify(|_, w| w.hsi48on().set_bit());
+        while self.rb.crrcr().read().hsi48rdy().bit_is_clear() {}
     }
 
     pub fn get_reset_reason(&self) -> ResetReason {
-        let csr = self.rb.csr.read();
+        let csr = self.rb.csr().read();
 
         ResetReason {
-            low_power: csr.lpwrstf().bit(),
+            low_power: csr.lpwrrstf().bit(),
             window_watchdog: csr.wwdgrstf().bit(),
             independent_watchdog: csr.iwdgrstf().bit(),
             software: csr.sftrstf().bit(),
@@ -468,7 +468,7 @@ impl Rcc {
     }
 
     pub fn clear_reset_reason(&mut self) {
-        self.rb.csr.modify(|_, w| w.rmvf().set_bit());
+        self.rb.csr().modify(|_, w| w.rmvf().set_bit());
     }
 }
 
@@ -539,16 +539,16 @@ pub struct AHB1 {
 impl AHB1 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::AHB1ENR {
-        &rcc.ahb1enr
+        rcc.ahb1enr()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::AHB1RSTR {
-        &rcc.ahb1rstr
+        rcc.ahb1rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB1SMENR {
-        &rcc.ahb1smenr
+        rcc.ahb1smenr()
     }
 }
 
@@ -558,16 +558,16 @@ pub struct AHB2 {
 impl AHB2 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::AHB2ENR {
-        &rcc.ahb2enr
+        rcc.ahb2enr()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::AHB2RSTR {
-        &rcc.ahb2rstr
+        rcc.ahb2rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB2SMENR {
-        &rcc.ahb2smenr
+        rcc.ahb2smenr()
     }
 }
 
@@ -578,17 +578,17 @@ impl AHB3 {
     #[allow(unused)]
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::AHB3ENR {
-        &rcc.ahb3enr
+        rcc.ahb3enr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::AHB3RSTR {
-        &rcc.ahb3rstr
+        rcc.ahb3rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::AHB3SMENR {
-        &rcc.ahb3smenr
+        rcc.ahb3smenr()
     }
 }
 
@@ -598,16 +598,16 @@ pub struct APB1_1 {
 impl APB1_1 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::APB1ENR1 {
-        &rcc.apb1enr1
+        rcc.apb1enr1()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR1 {
-        &rcc.apb1rstr1
+        rcc.apb1rstr1()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR1 {
-        &rcc.apb1smenr1
+        rcc.apb1smenr1()
     }
 }
 
@@ -617,16 +617,16 @@ pub struct APB1_2 {
 impl APB1_2 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::APB1ENR2 {
-        &rcc.apb1enr2
+        rcc.apb1enr2()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR2 {
-        &rcc.apb1rstr2
+        rcc.apb1rstr2()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR2 {
-        &rcc.apb1smenr2
+        rcc.apb1smenr2()
     }
 }
 
@@ -636,16 +636,16 @@ pub struct APB2 {
 impl APB2 {
     #[inline(always)]
     fn enr(rcc: &RccRB) -> &rcc::APB2ENR {
-        &rcc.apb2enr
+        rcc.apb2enr()
     }
     #[inline(always)]
     fn rstr(rcc: &RccRB) -> &rcc::APB2RSTR {
-        &rcc.apb2rstr
+        rcc.apb2rstr()
     }
     #[allow(unused)]
     #[inline(always)]
     fn smenr(rcc: &RccRB) -> &rcc::APB2SMENR {
-        &rcc.apb2smenr
+        rcc.apb2smenr()
     }
 }
 
