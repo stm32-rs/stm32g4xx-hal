@@ -17,8 +17,28 @@ use crate::stm32::RCC;
 use embedded_hal::delay::DelayNs;
 
 pub trait DacOut<V> {
-    fn set_value(&mut self, val: V);
     fn get_value(&mut self) -> V;
+    fn set_value(&mut self, val: V);
+}
+impl<V, D: DacOutGet<V> + DacOutSet<V>> DacOut<V> for D {
+    fn get_value(&mut self) -> V {
+        DacOutGet::get_value(self)
+    }
+    fn set_value(&mut self, val: V) {
+        DacOutSet::set_value(self, val);
+    }
+}
+pub trait DacOutSet<V> {
+    fn set_value(&mut self, val: V);
+}
+pub trait DacOutGet<V> {
+    fn get_value(&mut self) -> V;
+}
+
+#[derive(Copy, Clone, Debug, PartialEq)]
+pub enum CountingDirection {
+    Decrement = 0,
+    Increment = 1,
 }
 
 pub struct GeneratorConfig {
@@ -34,13 +54,6 @@ impl GeneratorConfig {
         }
     }
 
-    pub fn sawtooth(amplitude: u8) -> Self {
-        Self {
-            mode: 0b11,
-            amp: amplitude,
-        }
-    }
-
     pub fn noise(seed: u8) -> Self {
         Self {
             mode: 0b01,
@@ -49,20 +62,85 @@ impl GeneratorConfig {
     }
 }
 
+/// Used as regular trigger source and sawtooth generator reset trigger source
+pub unsafe trait TriggerSource {
+    const BITS: u8;
+}
+
+/// Used as sawtooth generator inc trigger source
+pub unsafe trait IncTriggerSource {
+    const BITS: u8;
+}
+
+// https://www.youtube.com/watch?v=fUQaHyaXikw&ab_channel=STMicroelectronics
+#[derive(Debug, Clone, Copy)]
+pub struct SawtoothConfig {
+    /// The sawtooth counter initial value (12 bits)
+    reset_value: u16,
+
+    dir: CountingDirection,
+    step_size: u16,
+
+    inc_trigger: u8,
+    reset_trigger: u8,
+}
+
+impl Default for SawtoothConfig {
+    fn default() -> Self {
+        Self::with_slope(CountingDirection::Decrement, 0x10)
+    }
+}
+
+impl SawtoothConfig {
+    /// NOTE: The DAC output is used from 12 MSBs of the sawtooth counter so
+    /// a step_size of 1 will only increment the output by 1 every 16th inc trigger
+    pub const fn with_slope(dir: CountingDirection, step_size: u16) -> Self {
+        Self {
+            reset_value: u16::MAX,
+            dir,
+            step_size,
+            inc_trigger: 0b0000,   // SW trigger using `trigger_inc`-method
+            reset_trigger: 0b0000, // SW trigger using `trigger_reset`-method
+        }
+    }
+
+    /// The sawtooth counter reset value (12 bits)
+    pub const fn reset_value(mut self, reset_value: u16) -> Self {
+        self.reset_value = reset_value;
+        self
+    }
+
+    pub const fn slope(mut self, dir: CountingDirection, step_size: u16) -> Self {
+        self.dir = dir;
+        self.step_size = step_size;
+        self
+    }
+
+    pub fn inc_trigger<T: IncTriggerSource>(mut self, _inc_trigger: T) -> Self {
+        self.inc_trigger = T::BITS;
+        self
+    }
+
+    pub fn reset_trigger<T: TriggerSource>(mut self, _reset_trigger: T) -> Self {
+        self.reset_trigger = T::BITS;
+        self
+    }
+}
+
 /// Enabled DAC (type state)
 pub struct Enabled;
 // / Enabled DAC without output buffer (type state)
 //pub struct EnabledUnbuffered;
-/// Enabled DAC wave generator (type state)
+/// Enabled DAC wave generator for triangle or noise wave form (type state)
 pub struct WaveGenerator;
+/// Enabled DAC wave generator for sawtooth wave form (type state)
+pub struct SawtoothGenerator;
 /// Disabled DAC (type state)
 pub struct Disabled;
 
-pub trait ED {}
-impl ED for Enabled {}
-//impl ED for EnabledUnbuffered {}
-impl ED for WaveGenerator {}
-impl ED for Disabled {}
+pub trait Generator {}
+impl Generator for WaveGenerator {}
+impl Generator for SawtoothConfig {}
 
 pub trait Instance:
     rcc::Enable
@@ -177,7 +255,8 @@ impl_pin_for_dac!(
 impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS, Disabled> {
     /// TODO: The DAC does not seem to work unless `calibrate_buffer` has been callen
     /// even when only using dac output internally
-    pub fn enable(self) -> DacCh<DAC, CH, MODE_BITS, Enabled> {
+    pub fn enable(self, _rcc: &mut Rcc) -> DacCh<DAC, CH, MODE_BITS, Enabled> {
+        // We require rcc here just to ensure exclusive access to registers common to ch1 and ch2
         let dac = unsafe { &(*DAC::ptr()) };
 
         dac.mcr()
@@ -190,7 +269,9 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS,
     pub fn enable_generator(
         self,
         config: GeneratorConfig,
+        _rcc: &mut Rcc,
     ) -> DacCh<DAC, CH, MODE_BITS, WaveGenerator> {
+        // We require rcc here just to ensure exclusive access to registers common to ch1 and ch2
         let dac = unsafe { &(*DAC::ptr()) };
 
         dac.mcr()
@@ -201,6 +282,45 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS,
             w.mamp(CH).bits(config.amp);
             w.en(CH).set_bit()
         });
+
+        DacCh::new()
+    }
+
+    pub fn enable_sawtooth_generator(
+        self,
+        config: SawtoothConfig,
+        _rcc: &mut Rcc,
+    ) -> DacCh<DAC, CH, MODE_BITS, SawtoothGenerator> {
+        // TODO: We require rcc here just to ensure exclusive access to registers common to ch1 and ch2
+        let dac = unsafe { &(*DAC::ptr()) };
+
+        dac.mcr()
+            .modify(|_, w| unsafe { w.mode(CH).bits(MODE_BITS) });
+
+        unsafe {
+            dac.stmodr().modify(|_, w| {
+                w.stinctrigsel(CH)
+                    .bits(config.inc_trigger)
+                    .strsttrigsel(CH)
+                    .bits(config.reset_trigger)
+            });
+        }
+
+        dac.cr().modify(|_, w| unsafe { w.wave(CH).bits(0b11) });
+
+        unsafe {
+            dac.str(CH as usize).write(|w| {
+                w.stdir()
+                    .bit(config.dir == CountingDirection::Increment)
+                    .stincdata()
+                    .bits(config.step_size)
+                    .strstdata()
+                    .bits(config.reset_value)
+            });
+        }
+
+        dac.cr().modify(|_, w| w.en(CH).set_bit());
+        while dac.sr().read().dacrdy(CH).bit_is_clear() {}
 
         DacCh::new()
     }
@@ -252,18 +372,32 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8, ED> DacCh<DAC, CH, MODE_B
 
 /// DacOut implementation available in any Enabled/Disabled
 /// state
-impl<DAC: Instance, const CH: u8, const MODE_BITS: u8, ED> DacOut<u16>
-    for DacCh<DAC, CH, MODE_BITS, ED>
+impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacOutSet<u16>
+    for DacCh<DAC, CH, MODE_BITS, Enabled>
 {
     fn set_value(&mut self, val: u16) {
         let dac = unsafe { &(*DAC::ptr()) };
         dac.dhr12r(CH as usize)
             .write(|w| unsafe { w.bits(val as u32) });
     }
+}
 
+impl<DAC: Instance, const CH: u8, const MODE_BITS: u8, ED> DacOutGet<u16>
+    for DacCh<DAC, CH, MODE_BITS, ED>
+{
     fn get_value(&mut self) -> u16 {
         let dac = unsafe { &(*DAC::ptr()) };
         dac.dor(CH as usize).read().bits() as u16
+    }
+}
+
+impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacOutSet<u16>
+    for DacCh<DAC, CH, MODE_BITS, SawtoothGenerator>
+{
+    fn set_value(&mut self, reset_value: u16) {
+        let dac = unsafe { &(*<DAC>::ptr()) };
+        dac.str(CH as usize)
+            .modify(|_r, w| unsafe { w.strstdata().bits(reset_value) });
     }
 }
 
@@ -272,6 +406,26 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS,
     pub fn trigger(&mut self) {
         let dac = unsafe { &(*<DAC>::ptr()) };
         dac.swtrgr().write(|w| w.swtrig(CH).set_bit());
+    }
+}
+
+/// Sawtooth generator state implementation
+impl<DAC: Instance, const CH: u8, const MODE_BITS: u8>
+    DacCh<DAC, CH, MODE_BITS, SawtoothGenerator>
+{
+    pub fn trigger_reset(&mut self) {
+        let dac = unsafe { &(*<DAC>::ptr()) };
+        dac.swtrgr().write(|w| w.swtrig(CH).set_bit());
+    }
+
+    pub fn trigger_inc(&mut self) {
+        let dac = unsafe { &(*<DAC>::ptr()) };
+        // TODO: Update once arrayified
+        if CH == 0 {
+            dac.swtrgr().write(|w| w.swtrigb1().set_bit());
+        } else {
+            dac.swtrgr().write(|w| w.swtrigb2().set_bit());
+        }
     }
 }
 

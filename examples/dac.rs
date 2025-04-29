@@ -31,10 +31,10 @@ fn main() -> ! {
     let (dac1ch1, dac1ch2) = dp.DAC1.constrain((gpioa.pa4, gpioa.pa5), &mut rcc);
 
     // dac_manual will have its value set manually
-    let mut dac_manual = dac1ch1.calibrate_buffer(&mut delay).enable();
+    let mut dac_manual = dac1ch1.calibrate_buffer(&mut delay).enable(&mut rcc);
 
     // dac_generator will have its value set automatically from its internal noise generator
-    let mut dac_generator = dac1ch2.enable_generator(GeneratorConfig::noise(11));
+    let mut dac_generator = dac1ch2.enable_generator(GeneratorConfig::noise(11), &mut rcc);
 
     enum Direction {
         Upcounting,
