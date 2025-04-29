@@ -106,7 +106,7 @@ pub(crate) fn current_vos() -> VoltageScale {
     match pwr.cr1().read().vos().bits() {
         0b00 => unreachable!(),
         0b01 => VoltageScale::Range1 {
-            enable_boost: pwr.cr5().read().r1mode().bit(),
+            enable_boost: pwr.cr5().read().r1mode().bit_is_clear(),
         },
         0b10 => VoltageScale::Range2,
         0b11 => unreachable!(),
