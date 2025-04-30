@@ -63,12 +63,21 @@ impl GeneratorConfig {
 }
 
 /// Used as regular trigger source and sawtooth generator reset trigger source
+/// 
+/// # Safety
+/// This trait should only be implemented for valid trigger sources with correct
+/// bit patterns.
 pub unsafe trait TriggerSource {
+    /// See stinctrigsel in reference manual for bit patterns
     const BITS: u8;
 }
 
 /// Used as sawtooth generator inc trigger source
+/// # Safety
+/// This trait should only be implemented for valid trigger sources with correct
+/// bit patterns.
 pub unsafe trait IncTriggerSource {
+    /// See strsttrigsel in reference manual for bit patterns
     const BITS: u8;
 }
 
