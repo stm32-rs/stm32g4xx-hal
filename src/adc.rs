@@ -1863,7 +1863,7 @@ macro_rules! adc {
                 /// Returns the address of the ADC data register. Primarily useful for configuring DMA.
                 #[inline(always)]
                 pub fn data_register_address(&self) -> u32 {
-                    &self.adc_reg.dr() as *const _ as u32
+                    self.adc_reg.dr() as *const _ as u32
                 }
 
                 /// Calibrate the adc for <Input Type>

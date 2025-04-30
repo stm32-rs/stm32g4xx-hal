@@ -213,7 +213,7 @@ macro_rules! spi {
                     // NOTE(read_volatile) read only 1 byte (the svd2rust API only allows
                     // reading a half-word)
                     return Ok(unsafe {
-                        ptr::read_volatile(&self.spi.dr() as *const _ as *const W)
+                        ptr::read_volatile(self.spi.dr() as *const _ as *const W)
                     });
                 } else {
                     nb::Error::WouldBlock
@@ -360,7 +360,7 @@ macro_rules! spi {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Tx part accesses the Tx register
-                &unsafe { &*<$SPIX>::ptr() }.dr() as *const _ as u32
+                unsafe { &*<$SPIX>::ptr() }.dr() as *const _ as u32
             }
 
             type MemSize = u8;

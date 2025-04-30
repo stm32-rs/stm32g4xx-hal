@@ -501,7 +501,7 @@ macro_rules! uart_shared {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Tx part accesses the Tx register
-                &unsafe { &*<$USARTX>::ptr() }.tdr() as *const _ as u32
+                unsafe { &*<$USARTX>::ptr() }.tdr() as *const _ as u32
             }
 
             type MemSize = u8;
@@ -513,7 +513,7 @@ macro_rules! uart_shared {
             #[inline(always)]
             fn address(&self) -> u32 {
                 // unsafe: only the Rx part accesses the Rx register
-                &unsafe { &*<$USARTX>::ptr() }.rdr() as *const _ as u32
+                unsafe { &*<$USARTX>::ptr() }.rdr() as *const _ as u32
             }
 
             type MemSize = u8;
