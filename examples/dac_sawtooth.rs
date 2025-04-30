@@ -14,7 +14,7 @@ use hal::delay::SYSTDelayExt;
 use hal::gpio::GpioExt;
 use hal::rcc::RccExt;
 use stm32g4xx_hal as hal;
-use stm32g4xx_hal::dac::{CountingDirection, DacOut, SawtoothConfig};
+use stm32g4xx_hal::dac::{CountingDirection, SawtoothConfig};
 mod utils;
 extern crate cortex_m_rt as rt;
 
@@ -32,6 +32,32 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let dac1ch1 = dp.DAC1.constrain(gpioa.pa4, &mut rcc);
 
+    // Just like the ADC, the DAC (by default) converts 12bit values between digital
+    // and analog. We will configure the dac to automatically update its output
+    // froms its internal sawtooth generator.
+    //
+    // Internally however, for the sawtooth generation the dac uses a
+    // 16 bit counter where only the 12 msb are sent to the dac output and the 4 msb
+    // are ignored by the output and only used for counting. The counter is reset to
+    // `reset_value << 4` at every `trigger_reset`, meaning the output's 12 bits
+    // will be set to `reset_value`.
+    //
+    // Every trigger_inc this 16 bit counter is incremented/decremented by the specified
+    // step size. Since the 4 msb are not mapped to the output, for example using a step
+    // size of 1 will only produce a change on the output every 2^4=16th trigger_inc.
+    //
+    // We will configure the sawtooth generator with a negative slope. This means that
+    // the generator will subtract the step_size from the counter every trigger_inc.
+    // This produces something like the following waveform.
+    //
+    // \              |\              |\              |\              |
+    //   \            |  \            |  \            |  \            |
+    //     \          |    \          |    \          |    \          |
+    //       \        |      \        |      \        |      \        |
+    //         \      |        \      |        \      |        \      |
+    //           \    |          \    |          \    |          \    |
+    //             \  |            \  |            \  |            \  |
+    //               \|              \|              \|              \|
     let step_size = 16;
     let reset_value = 4000;
     let trigger_count = (reset_value << 4) / step_size;
