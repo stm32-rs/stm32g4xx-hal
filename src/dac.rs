@@ -63,7 +63,7 @@ impl GeneratorConfig {
 }
 
 /// Used as regular trigger source and sawtooth generator reset trigger source
-/// 
+///
 /// # Safety
 /// This trait should only be implemented for valid trigger sources with correct
 /// bit patterns.
