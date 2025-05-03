@@ -141,7 +141,7 @@ pub enum Hysteresis {
 
 /// Comparator positive input
 pub trait PositiveInput<C> {
-    fn setup(comp: &mut C);
+    fn setup(s: impl stasis::EntitlementLock<Resource = Self>, comp: &mut C);
 }
 
 /// Comparator negative input
@@ -156,19 +156,19 @@ pub trait NegativeInput<C> {
     /// This is only relevant for [`RefintInput`] other than [`refint_input::VRefint`]
     const USE_RESISTOR_DIVIDER: bool = false;
 
-    fn setup(comp: &mut C);
+    fn setup(s: impl stasis::EntitlementLock<Resource = Self>, comp: &mut C);
 }
 
 macro_rules! positive_input_pin {
     ($COMP:ident, $pin_0:ident, $pin_1:ident) => {
         impl PositiveInput<$COMP> for $pin_0<Analog> {
-            fn setup(comp: &mut $COMP) {
+            fn setup(_s: impl stasis::EntitlementLock<Resource = Self>, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(false));
             }
         }
 
         impl PositiveInput<$COMP> for $pin_1<Analog> {
-            fn setup(comp: &mut $COMP) {
+            fn setup(_s: impl stasis::EntitlementLock<Resource = Self>, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| w.inpsel().bit(true));
             }
         }
@@ -209,7 +209,7 @@ macro_rules! negative_input_pin_helper {
         impl NegativeInput<$COMP> for $input {
             const USE_VREFINT: bool = false;
 
-            fn setup(comp: &mut $COMP) {
+            fn setup(_s: impl stasis::EntitlementLock<Resource = Self>, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) });
             }
         }
@@ -286,7 +286,7 @@ macro_rules! refint_input {
             const USE_VREFINT: bool = true;
             const USE_RESISTOR_DIVIDER: bool = <REF as RefintInput>::USE_RESISTOR_DIVIDER;
 
-            fn setup(comp: &mut $COMP) {
+            fn setup(_s: impl stasis::EntitlementLock<Resource = Self>, comp: &mut $COMP) {
                 comp.csr()
                     .modify(|_, w| unsafe { w.inmsel().bits(<REF as RefintInput>::BITS) });
             }
@@ -309,7 +309,7 @@ macro_rules! dac_input_helper {
         impl<ED> NegativeInput<$COMP> for dac::$channel<{ dac::$MODE }, ED> {
             const USE_VREFINT: bool = false;
 
-            fn setup(comp: &mut $COMP) {
+            fn setup(_s: impl stasis::EntitlementLock<Resource = Self>, comp: &mut $COMP) {
                 comp.csr().modify(|_, w| unsafe { w.inmsel().bits($bits) });
             }
         }
@@ -406,8 +406,8 @@ macro_rules! impl_comparator {
         impl ComparatorExt<$COMP> for $COMP {
             fn comparator<P, N, PP, NP>(
                 mut self,
-                _positive_input: P, // TODO: Store these
-                _negative_input: N, // TODO: Store these
+                positive_input: P, // TODO: Store these
+                negative_input: N, // TODO: Store these
                 config: Config,
                 clocks: &Clocks,
             ) -> Comparator<$COMP, Disabled>
@@ -417,8 +417,8 @@ macro_rules! impl_comparator {
                 P: stasis::EntitlementLock<Resource = PP>,
                 N: stasis::EntitlementLock<Resource = NP>,
             {
-                PP::setup(&mut self);
-                PP::setup(&mut self);
+                PP::setup(positive_input, &mut self);
+                NP::setup(negative_input, &mut self);
                 // Delay for scaler voltage bridge initialization for certain negative inputs
                 let voltage_scaler_delay = clocks.sys_clk.raw() / (1_000_000 / 200); // 200us
                 cortex_m::asm::delay(voltage_scaler_delay);
