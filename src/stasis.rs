@@ -1,4 +1,4 @@
-// Taken from https://github.com/AdinAck/proto-hal/tree/main
+// Originally taken from https://github.com/AdinAck/proto-hal/tree/main
 
 use core::{
     marker::PhantomData,
@@ -58,6 +58,7 @@ impl<Resource: Freeze, const ENTITLEMENTS: usize> DerefMut for Frozen<Resource, 
 
 impl<Resource: Freeze, const ENTITLEMENTS: usize> Frozen<Resource, ENTITLEMENTS> {
     pub fn release(self, entitlements: [Entitlement<Resource>; ENTITLEMENTS]) -> Resource {
+        #[allow(clippy::drop_non_drop)]
         drop(entitlements);
 
         self.resource
