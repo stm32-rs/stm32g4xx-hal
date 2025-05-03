@@ -535,7 +535,7 @@ macro_rules! opamps {
                         Pga::<$opamp, NonInverting, O> {
                             opamp: PhantomData,
                             non_inverting: self.non_inverting,
-                            output: output,
+                            output,
                         }
                     }
                 }

@@ -5,7 +5,7 @@
 
 use stm32g4xx_hal::adc::AdcClaim;
 use stm32g4xx_hal::adc::ClockSource;
-use stm32g4xx_hal::opamp::{Gain, InternalOutput};
+use stm32g4xx_hal::opamp::Gain;
 use stm32g4xx_hal::prelude::*;
 use stm32g4xx_hal::pwr::PwrExt;
 
