@@ -14,7 +14,6 @@ use stm32g4xx_hal::gpio::{self, GpioExt};
 use stm32g4xx_hal::opamp::{self, Opamp1, OpampEx};
 use stm32g4xx_hal::rcc::{self, RccExt};
 
-use fugit::{ExtU32, HertzU32, MicrosDurationU32};
 use hal::stm32;
 use stm32g4xx_hal as hal;
 
@@ -46,7 +45,7 @@ mod tests {
 
         let sample_time = adc::config::SampleTime::Cycles_640_5;
 
-        // TODO: Seems a can not go lower than 50 with my device, offset error of opamp?
+        // TODO: Seems I can not go lower than 50 with my device, offset error of opamp?
         for setpoint in [50, 100, 500, 1000, 2000, 4095] {
             value_dac.set_value(setpoint);
             delay.delay_ms(1);
@@ -77,7 +76,7 @@ mod tests {
 
         let sample_time = adc::config::SampleTime::Cycles_640_5;
 
-        // TODO: Seems a can not go lower than 50 with my device, offset error of opamp?
+        // TODO: Seems I can not go lower than 50 with my device, offset error of opamp?
         for setpoint in [50, 100, 500, 1000, 2000, 4095] {
             value_dac.set_value(setpoint);
             delay.delay_ms(1);
