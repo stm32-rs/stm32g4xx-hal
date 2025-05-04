@@ -73,6 +73,37 @@ mod tests {
     }
 
     #[test]
+    fn opamp_follower_ext_pin_dac_adc() {
+        let super::Peripherals {
+            opamp,
+            mut value_dac,
+            mut adc,
+            pa1,
+            pa2,
+            mut delay,
+            ..
+        } = super::setup_opamp_comp_dac();
+        let (pa2, [pa2_token]) = pa2.freeze();
+        let _opamp = opamp.follower(pa1).enable_output(pa2_token);
+        delay.delay_ms(10);
+
+        let sample_time = adc::config::SampleTime::Cycles_640_5;
+
+        // TODO: Seems a can not go lower than 50 with my device, offset error of opamp?
+        for setpoint in [50, 100, 500, 1000, 2000, 4095] {
+            value_dac.set_value(setpoint);
+            delay.delay_ms(1);
+            let reading = adc.convert(&pa2, sample_time);
+            assert!(
+                reading.abs_diff(setpoint) < 10,
+                "reading: {}, setpoint {}",
+                reading,
+                setpoint
+            );
+        }
+    }
+
+    #[test]
     fn opamp_pga_dac_adc() {
         let super::Peripherals {
             opamp,
@@ -249,6 +280,7 @@ struct Peripherals {
     ref_dac: dac::Dac3Ch1<{ dac::M_INT_SIG }, dac::Enabled>,
     adc: adc::Adc<stm32::ADC1, adc::Disabled>,
     pa1: gpio::gpioa::PA1<gpio::Analog>,
+    pa2: gpio::gpioa::PA2<gpio::Analog>,
     rcc: rcc::Rcc,
     delay: delay::SystDelay,
 }
@@ -269,6 +301,7 @@ fn setup_opamp_comp_dac() -> Peripherals {
 
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pa1 = gpioa.pa1.into_analog();
+    let pa2 = gpioa.pa2.into_analog();
     let pa4 = gpioa.pa4.into_floating_input();
 
     let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
@@ -288,6 +321,7 @@ fn setup_opamp_comp_dac() -> Peripherals {
         ref_dac,
         adc,
         pa1,
+        pa2,
         rcc,
         delay,
     }
