@@ -64,6 +64,7 @@ mod tests {
         defmt::dbg!(rcc.clocks.sys_clk);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
+        let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let mut pin = gpioa.pa8.into_push_pull_output();
 
         pin.set_high().unwrap();
@@ -94,6 +95,7 @@ mod tests {
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
+        let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let mut pin = gpioa.pa8.into_open_drain_output();
 
         // Enable pull-up resistor
@@ -132,6 +134,7 @@ mod tests {
         assert_eq!(rcc.clocks.sys_clk, F_SYS);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
+        let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let pin: stm32g4xx_hal::gpio::gpioa::PA8<stm32g4xx_hal::gpio::Alternate<AF6>> =
             gpioa.pa8.into_alternate();
 
@@ -273,13 +276,14 @@ mod tests {
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
+        let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let pa4 = gpioa.pa4.into_floating_input();
         let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
 
         let gpioa = unsafe { &*GPIOA::PTR };
 
         // dac_manual will have its value set manually
-        let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable();
+        let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable(&mut rcc);
 
         dac.set_value(0);
         delay.delay_ms(1);

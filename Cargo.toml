@@ -140,7 +140,11 @@ name = "cordic"
 required-features = ["cordic"]
 
 [[test]]
-name = "tests"
+name = "nucleo-g474"
+harness = false
+
+[[test]]
+name = "nucleo-g474_w_jumpers"
 harness = false
 
 [lib]
