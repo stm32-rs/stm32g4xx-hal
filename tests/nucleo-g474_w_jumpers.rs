@@ -18,18 +18,6 @@ use fugit::{ExtU32, HertzU32, MicrosDurationU32};
 use hal::stm32;
 use stm32g4xx_hal as hal;
 
-pub const F_SYS: HertzU32 = HertzU32::MHz(16);
-pub const CYCLES_PER_US: u32 = F_SYS.raw() / 1_000_000;
-
-pub fn enable_timer(cp: &mut stm32::CorePeripherals) {
-    cp.DCB.enable_trace();
-    cp.DWT.enable_cycle_counter();
-}
-
-pub fn now() -> MicrosDurationU32 {
-    (stm32::DWT::cycle_count() / CYCLES_PER_US).micros()
-}
-
 #[defmt_test::tests]
 mod tests {
     use embedded_hal::delay::DelayNs;
