@@ -1674,10 +1674,10 @@ mod impls {
         use crate::fdcan;
         use crate::fdcan::message_ram;
         use crate::gpio::{
-            gpioa::{PA11, PA12},
+            gpioa::{PA9, PA10, PA11, PA12},
             gpiob::{PB8, PB9},
             gpiod::{PD0, PD1},
-            AF9,
+            AF9,AF11
         };
         use crate::stm32;
         use crate::stm32::FDCAN1;
@@ -1686,11 +1686,13 @@ mod impls {
         pins! {
             FDCAN1 => (
                 tx: [
+                    PA10<AF9>,
                     PA12<AF9>,
                     PB9<AF9>,
                     PD1<AF9>,
                 ],
                 rx: [
+                    PA9<AF11>,
                     PA11<AF9>,
                     PB8<AF9>,
                     PD0<AF9>,

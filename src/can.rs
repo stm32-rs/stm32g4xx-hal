@@ -67,10 +67,10 @@ mod fdcan1 {
     use super::sealed;
     use super::{Can, CanExt};
     use crate::gpio::{
-        gpioa::{PA11, PA12},
+        gpioa::{PA10, PA11, PA12, PA9},
         gpiob::{PB8, PB9},
         gpiod::{PD0, PD1},
-        AF9,
+        AF11, AF9,
     };
     use crate::stm32::FDCAN1;
     use fdcan;
@@ -79,11 +79,13 @@ mod fdcan1 {
     pins! {
         FDCAN1 => (
             tx: [
+                PA10<AF9>,
                 PA12<AF9>,
                 PB9<AF9>,
                 PD1<AF9>,
             ],
             rx: [
+                PA9<AF11>,
                 PA11<AF9>,
                 PB8<AF9>,
                 PD0<AF9>,
