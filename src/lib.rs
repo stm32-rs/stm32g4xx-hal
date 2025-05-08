@@ -93,6 +93,7 @@ pub mod rcc;
 pub mod serial;
 pub mod signature;
 pub mod spi;
+pub mod stasis;
 // pub mod stopwatch;
 pub mod syscfg;
 pub mod time;
