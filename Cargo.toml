@@ -22,6 +22,7 @@ fugit = "0.3.7"
 stm32-usbd = { version = "0.7.0", optional = true }
 fixed = { version = "1.28.0", optional = true }
 embedded-io = "0.6"
+stm32-hrtim = { git = "https://github.com/usbalbin/stm32-hrtim", optional = true }
 
 [dependencies.cortex-m]
 version = "0.7.7"
@@ -91,9 +92,9 @@ stm32g431 = ["stm32g4/stm32g431"]
 stm32g441 = ["stm32g4/stm32g441"]
 stm32g471 = ["stm32g4/stm32g471"]
 stm32g473 = ["stm32g4/stm32g473"]
-stm32g474 = ["stm32g4/stm32g474"]
+stm32g474 = ["stm32g4/stm32g474", "stm32-hrtim/stm32g474"]
 stm32g483 = ["stm32g4/stm32g483"]
-stm32g484 = ["stm32g4/stm32g484"]
+stm32g484 = ["stm32g4/stm32g484", "stm32-hrtim/stm32g484"]
 stm32g491 = ["stm32g4/stm32g491"]
 stm32g4a1 = ["stm32g4/stm32g4a1"]
 log-itm = ["cortex-m-log/itm"]
@@ -107,6 +108,7 @@ defmt = [
     "embedded-io/defmt-03",
 ]
 cordic = ["dep:fixed"]
+hrtim = ["dep:stm32-hrtim"]
 
 [profile.dev]
 codegen-units = 1
@@ -127,6 +129,17 @@ codegen-units = 1
 incremental = false
 lto = true
 
+[[test]]
+name = "nucleo-g474"
+harness = false
+
+[[test]]
+name = "nucleo-g474_w_jumpers"
+harness = false
+
+[lib]
+test = false
+
 [[example]]
 name = "flash_with_rtic"
 required-features = ["stm32g474"]
@@ -139,13 +152,47 @@ required-features = ["usb"]
 name = "cordic"
 required-features = ["cordic"]
 
-[[test]]
-name = "nucleo-g474"
-harness = false
+[[example]]
+name = "hrtim-adc-trigger"
+required-features = ["hrtim"]
+path = "examples/hrtim/adc-trigger.rs"
 
-[[test]]
-name = "nucleo-g474_w_jumpers"
-harness = false
+[[example]]
+name = "hrtim-capture"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture.rs"
 
-[lib]
-test = false
+[[example]]
+name = "hrtim-capture-dma"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture-dma.rs"
+
+[[example]]
+name = "hrtim-eev-comp"
+required-features = ["hrtim"]
+path = "examples/hrtim/eev-comp.rs"
+
+[[example]]
+name = "hrtim-eev"
+required-features = ["hrtim"]
+path = "examples/hrtim/eev.rs"
+
+[[example]]
+name = "hrtim-flt-comp"
+required-features = ["hrtim"]
+path = "examples/hrtim/flt-comp.rs"
+
+[[example]]
+name = "hrtim-flt"
+required-features = ["hrtim"]
+path = "examples/hrtim/flt.rs"
+
+[[example]]
+name = "hrtim"
+required-features = ["hrtim"]
+path = "examples/hrtim/hrtim.rs"
+
+[[example]]
+name = "hrtim-master"
+required-features = ["hrtim"]
+path = "examples/hrtim/master.rs"

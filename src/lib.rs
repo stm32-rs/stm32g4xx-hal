@@ -99,6 +99,8 @@ pub mod syscfg;
 pub mod time;
 pub mod timer;
 // pub mod watchdog;
+#[cfg(feature = "hrtim")]
+pub mod hrtim;
 pub mod independent_watchdog;
 #[cfg(feature = "usb")]
 pub mod usb;
