@@ -130,7 +130,11 @@ incremental = false
 lto = true
 
 [[test]]
-name = "tests"
+name = "nucleo-g474"
+harness = false
+
+[[test]]
+name = "nucleo-g474_w_jumpers"
 harness = false
 
 [lib]
@@ -151,14 +155,6 @@ required-features = ["usb"]
 [[example]]
 name = "cordic"
 required-features = ["cordic"]
-
-[[test]]
-name = "nucleo-g474"
-harness = false
-
-[[test]]
-name = "nucleo-g474_w_jumpers"
-harness = false
 
 [[example]]
 name = "hrtim-adc-trigger"
