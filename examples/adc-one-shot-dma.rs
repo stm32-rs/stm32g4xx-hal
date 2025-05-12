@@ -6,7 +6,7 @@ use cortex_m_rt::entry;
 use crate::hal::{
     adc::{
         config::{Continuous, Dma as AdcDma, Resolution, SampleTime, Sequence},
-        AdcClaim, ClockSource, Temperature,
+        AdcClaim,
     },
     delay::SYSTDelayExt,
     dma::{channel::DMAExt, config::DmaConfig, TransferExt},
@@ -15,7 +15,10 @@ use crate::hal::{
     rcc::{Config, RccExt},
     stm32::Peripherals,
 };
-use stm32g4xx_hal as hal;
+use stm32g4xx_hal::{
+    self as hal,
+    adc::{temperature::Temperature, AdcCommonExt},
+};
 
 #[macro_use]
 mod utils;
@@ -49,11 +52,10 @@ fn main() -> ! {
     info!("Setup Adc1");
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
-    let mut adc = dp
-        .ADC1
-        .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
+    let mut adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+    let mut adc = adc12_common.claim(dp.ADC1, &mut delay);
 
-    adc.enable_temperature(&dp.ADC12_COMMON);
+    adc12_common.enable_temperature();
     adc.set_continuous(Continuous::Single);
     adc.reset_sequence();
     adc.configure_channel(&pa0, Sequence::One, SampleTime::Cycles_640_5);

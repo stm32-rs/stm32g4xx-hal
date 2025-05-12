@@ -74,8 +74,7 @@ bus! {
     GPIOE => (AHB2, 4),
     GPIOF => (AHB2, 5),
     GPIOG => (AHB2, 6),
-    ADC1 => (AHB2, 13),
-    ADC2 => (AHB2, 13),
+    ADC12_COMMON => (AHB2, 13),
     DAC1 => (AHB2, 16),
     DAC2 => (AHB2, 17),
     DAC3 => (AHB2, 18),
@@ -93,18 +92,7 @@ bus! {
     feature = "stm32g4a1",
 ))]
 bus! {
-    ADC3 => (AHB2, 14),
-}
-
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
-bus! {
-    ADC4 => (AHB2, 14),
-    ADC5 => (AHB2, 14),
+    ADC345_COMMON => (AHB2, 14),
 }
 
 #[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g484",))]
