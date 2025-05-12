@@ -17,7 +17,12 @@ use hal::{
     stm32,
 };
 use rt::entry;
-use stm32g4xx_hal::{self as hal, adc::config::SampleTime, delay::DelayExt as _, stasis::Freeze};
+use stm32g4xx_hal::{
+    self as hal,
+    adc::{config::SampleTime, AdcCommonExt},
+    delay::DelayExt as _,
+    stasis::Freeze,
+};
 
 #[entry]
 fn main() -> ! {
@@ -40,12 +45,11 @@ fn main() -> ! {
     let _comp1 = comp1.enable(); // <-- TODO: Do things with comparator
 
     let mut delay = cp.SYST.delay(&rcc.clocks);
-    let mut adc = dp.ADC1.claim_and_configure(
-        stm32g4xx_hal::adc::ClockSource::SystemClock,
-        &rcc,
+    let adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+    let mut adc = adc12_common.claim_and_configure(
+        dp.ADC1,
         stm32g4xx_hal::adc::config::AdcConfig::default(),
         &mut delay,
-        false,
     );
 
     // Can not reconfigure pa1 here

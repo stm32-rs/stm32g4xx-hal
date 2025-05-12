@@ -8,7 +8,7 @@ use crate::hal::{
     stm32::Peripherals,
 };
 use hal::prelude::*;
-use stm32g4xx_hal as hal;
+use stm32g4xx_hal::{self as hal, adc::AdcCommonExt};
 
 use cortex_m_rt::entry;
 
@@ -33,12 +33,11 @@ fn main() -> ! {
 
     info!("Setup Adc1");
     let mut delay = cp.SYST.delay(&rcc.clocks);
-    let mut adc = dp.ADC2.claim_and_configure(
-        stm32g4xx_hal::adc::ClockSource::SystemClock,
-        &rcc,
+    let adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+    let mut adc = adc12_common.claim_and_configure(
+        dp.ADC2,
         stm32g4xx_hal::adc::config::AdcConfig::default(),
         &mut delay,
-        false,
     );
 
     info!("Setup Gpio");

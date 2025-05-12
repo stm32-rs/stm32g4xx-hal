@@ -8,7 +8,7 @@ use crate::hal::{
     adc::{
         config,
         config::{Continuous, Dma as AdcDma, SampleTime, Sequence},
-        AdcClaim, ClockSource, Temperature, Vref,
+        AdcClaim, Vref,
     },
     delay::SYSTDelayExt,
     dma::{channel::DMAExt, config::DmaConfig, TransferExt},
@@ -18,7 +18,10 @@ use crate::hal::{
     signature::{VrefCal, VDDA_CALIB},
     stm32::Peripherals,
 };
-use stm32g4xx_hal as hal;
+use stm32g4xx_hal::{
+    self as hal,
+    adc::{temperature::Temperature, AdcCommonExt},
+};
 
 use cortex_m_rt::entry;
 
@@ -49,12 +52,11 @@ fn main() -> ! {
     info!("Setup Adc1");
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
-    let mut adc = dp
-        .ADC1
-        .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
+    let mut adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+    let mut adc = adc12_common.claim(dp.ADC1, &mut delay);
 
-    adc.enable_temperature(&dp.ADC12_COMMON);
-    adc.enable_vref(&dp.ADC12_COMMON);
+    adc12_common.enable_temperature();
+    adc12_common.enable_vref();
     adc.set_continuous(Continuous::Continuous);
     adc.reset_sequence();
     adc.configure_channel(&pa0, Sequence::One, SampleTime::Cycles_640_5);

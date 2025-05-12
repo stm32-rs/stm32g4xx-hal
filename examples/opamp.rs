@@ -4,7 +4,7 @@
 #![no_main]
 
 use stm32g4xx_hal::adc::AdcClaim;
-use stm32g4xx_hal::adc::ClockSource;
+use stm32g4xx_hal::adc::AdcCommonExt;
 use stm32g4xx_hal::opamp::Gain;
 use stm32g4xx_hal::prelude::*;
 use stm32g4xx_hal::pwr::PwrExt;
@@ -66,9 +66,8 @@ fn main() -> ! {
     let opamp2 = opamp2.lock();
 
     let mut delay = cp.SYST.delay(&rcc.clocks);
-    let mut adc = dp
-        .ADC2
-        .claim(ClockSource::SystemClock, &rcc, &mut delay, true);
+    let adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+    let mut adc = adc12_common.claim(dp.ADC2, &mut delay);
 
     loop {
         // Here we can sample the output of opamp2 as if it was a regular AD pin

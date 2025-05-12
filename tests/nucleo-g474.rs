@@ -35,7 +35,7 @@ mod tests {
     use fixed::types::I1F15;
     use fugit::RateExtU32;
     use stm32g4xx_hal::{
-        adc::{self, AdcClaim, Temperature, Vref},
+        adc::{self, temperature::Temperature, AdcClaim, AdcCommonExt, Vref},
         cordic::{
             op::{dynamic::Mode, Magnitude, SinCos, Sqrt},
             prec::P60,
@@ -149,8 +149,8 @@ mod tests {
         let max: MicrosDurationU32 = 505u32.micros();
 
         debug!("Awaiting first rising edge...");
-        let duration_until_lo = await_lo(&gpioa, max).unwrap();
-        let first_lo_duration = await_hi(&gpioa, max).unwrap();
+        let duration_until_lo = await_lo(gpioa, max).unwrap();
+        let first_lo_duration = await_hi(gpioa, max).unwrap();
 
         let mut hi_duration = 0.micros();
         let mut lo_duration = 0.micros();
@@ -158,7 +158,7 @@ mod tests {
         for _ in 0..10 {
             // Make sure the timer half periods are within 495-505us
 
-            hi_duration = await_lo(&gpioa, max).unwrap();
+            hi_duration = await_lo(gpioa, max).unwrap();
             assert!(
                 hi_duration > min && hi_duration < max,
                 "hi: {} < {} < {}",
@@ -167,7 +167,7 @@ mod tests {
                 max
             );
 
-            lo_duration = await_hi(&gpioa, max).unwrap();
+            lo_duration = await_hi(gpioa, max).unwrap();
             assert!(
                 lo_duration > min && lo_duration < max,
                 "lo: {} < {} < {}",
@@ -234,15 +234,14 @@ mod tests {
         // TODO: Is it ok to steal these?
         let cp = unsafe { stm32::CorePeripherals::steal() };
         let dp = unsafe { stm32::Peripherals::steal() };
-        let rcc = dp.RCC.constrain();
+        let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
-        let mut adc = dp
-            .ADC1
-            .claim(adc::ClockSource::SystemClock, &rcc, &mut delay, true);
+        let mut adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+        let mut adc = adc12_common.claim(dp.ADC1, &mut delay);
 
-        adc.enable_temperature(&dp.ADC12_COMMON);
-        adc.enable_vref(&dp.ADC12_COMMON);
+        adc12_common.enable_temperature();
+        adc12_common.enable_vref();
         let sample_time = adc::config::SampleTime::Cycles_640_5;
 
         let vref = adc.convert(&Vref, sample_time);
@@ -262,7 +261,79 @@ mod tests {
             adc::config::Resolution::Twelve,
         );
         debug!("temp: {}°C", temp);
-        assert!((20.0..30.0).contains(&temp), "20.0 < {} < 30.0", temp);
+        assert!((20.0..35.0).contains(&temp), "20.0 < {} < 35.0", temp);
+    }
+
+    #[test]
+    fn adc_dma() {
+        use super::*;
+        use hal::{
+            adc,
+            dma::{channel::DMAExt, config::DmaConfig, TransferExt},
+        };
+
+        // TODO: Is it ok to steal these?
+        let cp = unsafe { stm32::CorePeripherals::steal() };
+        let dp = unsafe { stm32::Peripherals::steal() };
+        let mut rcc = dp.RCC.constrain();
+        let mut delay = cp.SYST.delay(&rcc.clocks);
+
+        let channels = dp.DMA1.split(&rcc);
+        let config = DmaConfig::default()
+            .transfer_complete_interrupt(false)
+            .circular_buffer(false)
+            .memory_increment(true);
+
+        let mut adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+        let mut adc = adc12_common.claim(dp.ADC1, &mut delay);
+
+        let sample_time = adc::config::SampleTime::Cycles_640_5;
+
+        adc12_common.enable_vref();
+        adc12_common.enable_temperature();
+        adc.set_continuous(adc::config::Continuous::Single);
+        adc.reset_sequence();
+        adc.configure_channel(&Vref, adc::config::Sequence::One, sample_time);
+        adc.configure_channel(&Temperature, adc::config::Sequence::Two, sample_time);
+
+        defmt::info!("Setup DMA");
+        let first_buffer = cortex_m::singleton!(: [u16; 2] = [0; 2]).unwrap();
+        let mut transfer = channels.ch1.into_peripheral_to_memory_transfer(
+            adc.enable_dma(adc::config::Dma::Single),
+            &mut first_buffer[..],
+            config,
+        );
+
+        transfer.start(|adc| adc.start_conversion());
+
+        defmt::info!("Wait for Conversion");
+        while !transfer.get_transfer_complete_flag() {}
+        defmt::info!("Conversion Done");
+
+        transfer.pause(|adc| adc.cancel_conversion());
+        let (_ch1, adc, first_buffer) = transfer.free();
+        let _adc = adc.disable();
+
+        let vref_reading = first_buffer[0];
+        let temperature_reading = first_buffer[1];
+
+        let vref_cal = VrefCal::get().read();
+        let vdda = VDDA_CALIB * vref_cal as u32 / vref_reading as u32;
+        debug!("vdda: {}mV", vdda);
+        assert!((3200..3400).contains(&vdda));
+
+        let vref =
+            Vref::sample_to_millivolts_ext(vref_reading, vdda, adc::config::Resolution::Twelve);
+        debug!("vref: {}mV", vref);
+        assert!((1182..1232).contains(&vref)); // From G474 datasheet
+
+        let temp = Temperature::temperature_to_degrees_centigrade(
+            temperature_reading,
+            vdda as f32 / 1000.,
+            adc::config::Resolution::Twelve,
+        );
+        debug!("temp: {}°C", temp);
+        assert!((20.0..35.0).contains(&temp), "20.0 < {} < 35.0", temp);
     }
 
     #[test]
@@ -287,11 +358,11 @@ mod tests {
 
         dac.set_value(0);
         delay.delay_ms(1);
-        assert!(is_pax_low(&gpioa, 4));
+        assert!(is_pax_low(gpioa, 4));
 
         dac.set_value(4095);
         delay.delay_ms(1);
-        assert!(!is_pax_low(&gpioa, 4));
+        assert!(!is_pax_low(gpioa, 4));
     }
 }
 

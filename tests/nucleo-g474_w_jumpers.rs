@@ -1,12 +1,12 @@
 #![no_std]
 #![no_main]
 
-/// Requires a jumper from A1<->A2 (arduino naming) aka PA1<->PA4
+// Requires a jumper from A1<->A2 (arduino naming) aka PA1<->PA4
 
 #[path = "../examples/utils/mod.rs"]
 mod utils;
 
-use stm32g4xx_hal::adc::{self, AdcClaim};
+use stm32g4xx_hal::adc::{self, AdcClaim, AdcCommonExt};
 use stm32g4xx_hal::comparator::{self, ComparatorSplit};
 use stm32g4xx_hal::dac::{self, DacExt, DacOut};
 use stm32g4xx_hal::delay::{self, SYSTDelayExt};
@@ -282,9 +282,8 @@ fn setup_opamp_comp_dac() -> Peripherals {
     let mut rcc = dp.RCC.constrain();
     let mut delay = cp.SYST.delay(&rcc.clocks);
 
-    let adc = dp
-        .ADC1
-        .claim(adc::ClockSource::SystemClock, &rcc, &mut delay, true);
+    let adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+    let adc = adc12_common.claim(dp.ADC1, &mut delay);
 
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pa1 = gpioa.pa1.into_analog();
