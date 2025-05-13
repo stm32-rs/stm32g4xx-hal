@@ -5,7 +5,8 @@
   ],
   "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
   "rust-analyzer.cargo.features": [
-    "stm32g473",
+    "stm32g484",
     "defmt",
+    "cordic"
   ]
 }
