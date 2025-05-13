@@ -845,7 +845,7 @@ tx: [
     (PB6, AF7),
     (PC4, AF7),
     (PE0, AF7),
-    #[cfg(any(feature = "stm32g471", feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
+    #[cfg(any(feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
     (PG9, AF7),
 ],
 rx: [
@@ -910,14 +910,14 @@ uart_shared!(LPUART1, LPUART1_RX, LPUART1_TX,
         (PA2, AF12),
         (PB11, AF8),
         (PC1, AF8),
-        #[cfg(any(feature = "stm32g471", feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
+        #[cfg(any(feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
         (PG7, AF8),
     ],
     rx: [
         (PA3, AF12),
         (PB10, AF8),
         (PC0, AF8),
-        #[cfg(any(feature = "stm32g471", feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
+        #[cfg(any(feature = "stm32g473", feature = "stm32g474", feature = "stm32g483", feature = "stm32g484"))]
         (PG8, AF8),
     ]
 );

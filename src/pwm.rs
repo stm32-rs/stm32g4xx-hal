@@ -184,7 +184,6 @@ use crate::stm32::RCC;
 ))]
 use crate::stm32::TIM20;
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -197,7 +196,6 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
 use crate::time::{ExtU32, Hertz, NanoSecond, RateExtU32};
 
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -205,7 +203,6 @@ use crate::time::{ExtU32, Hertz, NanoSecond, RateExtU32};
 ))]
 use crate::gpio::gpiog::*;
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -573,7 +570,6 @@ pins! {
             PA1<Alternate<AF9>>,
             PB15<Alternate<AF2>>,
             #[cfg(any(
-                feature = "stm32g471",
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
@@ -766,7 +762,6 @@ pins! {
             PB9<Alternate<AF2>>,
             PD15<Alternate<AF2>>,
             #[cfg(any(
-                feature = "stm32g471",
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
@@ -782,7 +777,6 @@ pins! {
         BRK2: []
 }
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -1455,7 +1449,6 @@ tim_hal! {
     TIM4: (tim4, u16, 16, DIR: cms),
 }
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -1767,7 +1760,6 @@ tim_pin_hal! {
     TIM4: (C4, cc4e, cc4p, ccmr2_output, oc4pe, oc4m, ccr4, u16),
 }
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",

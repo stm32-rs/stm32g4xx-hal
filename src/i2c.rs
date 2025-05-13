@@ -5,7 +5,6 @@ use embedded_hal_old::blocking::i2c::{Read, Write, WriteRead};
 
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*};
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -15,7 +14,6 @@ use crate::gpio::{gpiog::*, AF3};
 use crate::gpio::{AlternateOD, AF2, AF4, AF8};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -487,7 +485,6 @@ i2c!(
         PA9<AlternateOD<AF4>>,
         PC4<AlternateOD<AF4>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -505,7 +502,6 @@ i2c!(
         PC11<AlternateOD<AF8>>,
         PC9<AlternateOD<AF8>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -513,7 +509,6 @@ i2c!(
         ))]
         PF4<AlternateOD<AF4>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -525,7 +520,6 @@ i2c!(
         PA8<AlternateOD<AF2>>,
         PC8<AlternateOD<AF8>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -533,7 +527,6 @@ i2c!(
         ))]
         PF3<AlternateOD<AF4>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -544,7 +537,6 @@ i2c!(
 );
 
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
