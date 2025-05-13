@@ -28,8 +28,8 @@ jobs:
           - log-rtt,defmt
           # TODO: -log-rtt # log-rtt without defmt, more combos?
           - log-itm
-          - log-semihost
-          - cordic,log-rtt,defmt
+          - log-semihost,can
+          - cordic,usb,log-rtt,defmt
 
     steps:
       - uses: actions/checkout@v2

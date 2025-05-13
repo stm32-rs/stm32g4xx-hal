@@ -25,9 +25,6 @@ compile_error!(
         stm32g4a1"
 );
 
-extern crate bare_metal;
-extern crate void;
-
 pub extern crate cortex_m;
 pub extern crate nb;
 pub extern crate stm32g4;
@@ -71,6 +68,7 @@ pub use crate::stm32::interrupt;
 
 pub mod adc;
 pub mod bb;
+#[cfg(feature = "can")]
 pub mod can;
 pub mod comparator;
 #[cfg(feature = "cordic")]
