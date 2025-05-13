@@ -806,7 +806,7 @@ opamps! {
     },
 }
 
-#[cfg(any(feature = "stm32g471", feature = "stm32g491", feature = "stm32g4a1"))]
+#[cfg(any(feature = "stm32g491", feature = "stm32g4a1"))]
 opamps! {
     Opamp1 => opamp1: {
         vinm0: crate::gpio::gpioa::PA3<crate::gpio::Analog>,

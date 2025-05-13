@@ -4,7 +4,6 @@
 #[cfg(not(any(
     feature = "stm32g431",
     feature = "stm32g441",
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -38,9 +37,6 @@ pub use stm32g4::stm32g431 as stm32;
 
 #[cfg(feature = "stm32g441")]
 pub use stm32g4::stm32g441 as stm32;
-
-#[cfg(feature = "stm32g471")]
-pub use stm32g4::stm32g471 as stm32;
 
 #[cfg(feature = "stm32g473")]
 pub use stm32g4::stm32g473 as stm32;

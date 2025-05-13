@@ -3,7 +3,6 @@ use crate::dma::traits::TargetAddress;
 use crate::dma::MemoryToPeripheral;
 use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Alternate, AF5, AF6};
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -12,7 +11,6 @@ use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Alternate, AF5, AF6};
 use crate::gpio::{gpioe::*, gpiog::*};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",
@@ -382,7 +380,6 @@ spi!(
         PA5<Alternate<AF5>>,
         PB3<Alternate<AF5>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -394,7 +391,6 @@ spi!(
         PA6<Alternate<AF5>>,
         PB4<Alternate<AF5>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -406,7 +402,6 @@ spi!(
         PA7<Alternate<AF5>>,
         PB5<Alternate<AF5>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -444,7 +439,6 @@ spi!(
         PB3<Alternate<AF6>>,
         PC10<Alternate<AF6>>,
         #[cfg(any(
-            feature = "stm32g471",
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
@@ -464,7 +458,6 @@ spi!(
 );
 
 #[cfg(any(
-    feature = "stm32g471",
     feature = "stm32g473",
     feature = "stm32g474",
     feature = "stm32g483",

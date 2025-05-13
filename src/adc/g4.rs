@@ -8,7 +8,7 @@ use crate::gpio::{gpiod, gpioe};
 
 use super::{adc_channel_helper, adc_opamp, adc_pins, temperature::Temperature, Vbat, Vref};
 
-#[cfg(any(feature = "stm32g431", feature = "stm32g441", feature = "stm32g471",))]
+#[cfg(any(feature = "stm32g431", feature = "stm32g441"))]
 adc_pins!(
     gpioa::PA0<Analog> => (ADC1, 1),
     gpioa::PA0<Analog> => (ADC2, 1),

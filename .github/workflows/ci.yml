@@ -17,7 +17,6 @@ jobs:
         device:
           - stm32g431
           - stm32g441
-          - stm32g471
           - stm32g473
           - stm32g474
           - stm32g483
