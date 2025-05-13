@@ -77,6 +77,10 @@ impl<Resource: Freeze> EntitlementLock for Entitlement<Resource> {
     type Resource = Resource;
 }
 
+impl<Resource: Freeze, const N: usize> EntitlementLock for Frozen<Resource, N> {
+    type Resource = Resource;
+}
+
 /// Indicates a type-state is
 /// entitled to another type-state.
 ///
