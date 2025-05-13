@@ -49,6 +49,14 @@ probe-rs chip list
 
 For furher information, see the documentation for [probe-rs](https://github.com/probe-rs/probe-rs).
 
+#### Running tests on a Nucleo-G474RE
+
+First move jumper from CN12 and put it between A1 and A2 on CN8
+
+```bash
+cargo test --features stm32g474,defmt,cordic --tests -- --chip stm32g474RETx
+```
+
 ### Using as a Dependency
 
 When using this crate as a dependency in your project, the microcontroller can 
