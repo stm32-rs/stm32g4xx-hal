@@ -2,7 +2,6 @@
 //!
 
 use crate::rcc::{self, Rcc};
-use fdcan;
 
 mod sealed {
     /// A TX pin configured for CAN communication
