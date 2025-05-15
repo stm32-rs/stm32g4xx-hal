@@ -14,16 +14,7 @@ use stm32_hrtim::{
     HrParts, HrPwmAdvExt, Polarity, Pscl4,
 };
 use stm32g4xx_hal::{
-    self as hal,
-    adc::AdcClaim,
-    comparator::{self, ComparatorExt, ComparatorSplit},
-    dac::{Dac3IntSig1, DacExt, DacOut},
-    delay::{DelayExt as _, SYSTDelayExt},
-    gpio::GpioExt,
-    hrtim::{fault::FaultInput, HrControltExt, HrPwmBuilderExt},
-    pwr::PwrExt,
-    rcc::{self, RccExt},
-    stm32::{CorePeripherals, Peripherals},
+    self as hal, adc::{AdcClaim, AdcCommonExt}, comparator::{self, ComparatorExt, ComparatorSplit}, dac::{Dac3IntSig1, DacExt, DacOut}, delay::{DelayExt as _, SYSTDelayExt}, gpio::GpioExt, hrtim::{fault::FaultInput, HrControltExt, HrPwmBuilderExt}, pwr::PwrExt, rcc::{self, RccExt}, stasis::Freeze, stm32::{CorePeripherals, Peripherals}
 };
 
 #[entry]
@@ -45,21 +36,16 @@ fn main() -> ! {
     );
 
     let mut delay = cp.SYST.delay(&rcc.clocks);
-
-    let mut adc1 = dp.ADC1.claim_and_configure(
-        hal::adc::ClockSource::SystemClock,
-        &rcc,
-        hal::adc::config::AdcConfig::default()
-            .clock_mode(hal::adc::config::ClockMode::Synchronous_Div_4),
-        &mut delay,
-        false,
-    );
+    let adc12_common = dp
+        .ADC12_COMMON
+        .claim(hal::adc::config::ClockMode::AdcHclkDiv4, &mut rcc);
+    let mut adc1 = adc12_common.claim_and_configure(dp.ADC1, Default::default(), &mut delay);
 
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpioc = dp.GPIOC.split(&mut rcc);
 
     let dac3ch1 = dp.DAC3.constrain(Dac3IntSig1, &mut rcc);
-    let mut dac = dac3ch1.enable();
+    let mut dac = dac3ch1.enable(&mut rcc);
 
     // Use dac to define the fault threshold
     // 2^12 / 2 = 2^11 for about half of VCC
@@ -68,11 +54,11 @@ fn main() -> ! {
 
     let (_comp1, _comp2, comp3, ..) = dp.COMP.split(&mut rcc);
 
-    let pc1 = gpioc.pc1.into_analog();
+    let (pc1, [pc1_token]) = gpioc.pc1.into_analog().freeze();
     let comp3 = comp3
         .comparator(
-            &pc1,
-            &dac,
+            pc1_token,
+            dac,
             comparator::Config::default()
                 .hysteresis(comparator::Hysteresis::None)
                 .output_inverted(),
