@@ -18,6 +18,8 @@ use stm32_hrtim::{
     HrParts, HrPwmBuilder,
 };
 
+pub use stm32_hrtim;
+
 pub trait HrControltExt {
     fn hr_control(self, rcc: &mut crate::rcc::Rcc) -> HrTimOngoingCalibration;
 }
