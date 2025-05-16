@@ -13,7 +13,7 @@ version = "0.0.2"
 
 [dependencies]
 nb = "1"
-stm32g4 = { version = "0.22.0", package = "stm32g4-staging" }
+stm32g4 = { version = "0.22.0", package = "stm32g4-staging", features = ["defmt"] }
 paste = "1.0"
 fugit = "0.3.7"
 stm32-usbd = { version = "0.7.0", optional = true }
@@ -75,16 +75,17 @@ usbd-serial = "0.2.2"
 #TODO: Separate feature sets
 [features]
 default = ["rt"]
+
 rt = ["stm32g4/rt"]
 usb = ["dep:stm32-usbd"]
-stm32g431 = ["stm32g4/stm32g431"]
-stm32g441 = ["stm32g4/stm32g441"]
-stm32g473 = ["stm32g4/stm32g473", "adc3", "adc4", "adc5"]
-stm32g474 = ["stm32g4/stm32g474", "adc3", "adc4", "adc5"]
-stm32g483 = ["stm32g4/stm32g483", "adc3", "adc4", "adc5"]
-stm32g484 = ["stm32g4/stm32g484", "adc3", "adc4", "adc5"]
-stm32g491 = ["stm32g4/stm32g491", "adc3"]
-stm32g4a1 = ["stm32g4/stm32g4a1", "adc3"]
+stm32g431 = ["stm32g4/stm32g431", "cat2"]
+stm32g441 = ["stm32g4/stm32g441", "cat2"]
+stm32g473 = ["stm32g4/stm32g473", "cat3", "adc3", "adc4", "adc5"]
+stm32g474 = ["stm32g4/stm32g474", "cat3", "adc3", "adc4", "adc5"]
+stm32g483 = ["stm32g4/stm32g483", "cat3", "adc3", "adc4", "adc5"]
+stm32g484 = ["stm32g4/stm32g484", "cat3", "adc3", "adc4", "adc5"]
+stm32g491 = ["stm32g4/stm32g491", "cat4", "adc3"]
+stm32g4a1 = ["stm32g4/stm32g4a1", "cat4", "adc3"]
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
@@ -99,6 +100,12 @@ cordic = ["dep:fixed"]
 adc3 = []
 adc4 = []
 adc5 = []
+
+# Device category
+cat2 = []
+cat3 = []
+cat4 = []
+
 can = ["dep:fdcan"]
 
 [profile.dev]
