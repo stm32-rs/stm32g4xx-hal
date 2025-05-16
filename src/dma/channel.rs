@@ -263,9 +263,22 @@ impl<I: Instance, const N: u8> Channel for C<I, N> {
     fn set_request_line(&mut self, request_line: u8) {
         //NOTE(unsafe) We only access the registers that belongs to the ChannelX
         let dmamux = unsafe { &*I::mux_ptr() };
+        #[cfg(feature = "cat2")]
+        let channels_per_dma = 6;
+
+        #[cfg(any(feature = "cat3", feature = "cat4"))]
+        let channels_per_dma = 8;
+
+        let mux_ch = if I::IS_DMA1 {
+            // DMA1 ch 0..=(channels_per_dma-1) are dmamux ch 0..=channels_per_dma
+            N as usize
+        } else {
+            // DMA2 ch 0..=ch(channels_per_dma-1) are dmamux ch channels_per_dma..=(2*channels_per_dma-1)
+            N as usize + channels_per_dma
+        };
         unsafe {
             dmamux
-                .ccr(N as usize)
+                .ccr(mux_ch)
                 .modify(|_, w| w.dmareq_id().bits(request_line));
         }
     }
