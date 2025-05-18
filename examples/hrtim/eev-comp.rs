@@ -1,10 +1,13 @@
 #![no_std]
 #![no_main]
 
+#[path = "../utils/mod.rs"]
+mod utils;
+use utils::logger::info;
+
 /// Example showcasing the use of the HRTIM peripheral together with a comparator to implement a cycle by cycle current limit.
 /// Once the comparator input exceeds the reference set by the DAC, the output is set low thus limiting the pulse width and in turn the current.
 use cortex_m_rt::entry;
-use panic_probe as _;
 use stm32_hrtim::{
     compare_register::HrCompareRegister,
     external_event::{self, ToExternalEventSource},
@@ -124,10 +127,10 @@ fn main() -> ! {
     out.enable();
     timer.start(&mut hr_control.control);
 
-    defmt::info!("Started");
+    info!("Started");
 
     loop {
-        defmt::info!(
+        info!(
             "Comp: {}, pending: {}",
             comp1.output(),
             comp1.is_pending(&exti)

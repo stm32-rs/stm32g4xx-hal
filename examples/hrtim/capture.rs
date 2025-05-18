@@ -1,9 +1,12 @@
 #![no_std]
 #![no_main]
 
+#[path = "../utils/mod.rs"]
+mod utils;
+use utils::logger::info;
+
 /// Example showcasing the use of the HRTIM peripheral's capture function to detect phase shift between a digital event and the output of HRTIM_TIMA
 use cortex_m_rt::entry;
-use panic_probe as _;
 use stm32_hrtim::{
     capture::HrCapture,
     compare_register::HrCompareRegister,
@@ -22,13 +25,13 @@ use stm32g4xx_hal::{
 
 #[entry]
 fn main() -> ! {
-    defmt::info!("start");
+    info!("start");
 
     let dp = Peripherals::take().unwrap();
 
     // Set system frequency to 16MHz * 15/1/2 = 120MHz
     // This would lead to HrTim running at 120MHz * 32 = 3.84...
-    defmt::info!("rcc");
+    info!("rcc");
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
@@ -42,7 +45,7 @@ fn main() -> ! {
         pwr,
     );
 
-    defmt::info!("Setup Gpio");
+    info!("Setup Gpio");
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
 
@@ -102,7 +105,7 @@ fn main() -> ! {
     loop {
         for duty in (u32::from(period) / 10)..(9 * u32::from(period) / 10) {
             if let Some(value) = capture.get_signed(period) {
-                defmt::info!(
+                info!(
                     "Capture: {:?}, duty: {}, diff: {}",
                     value,
                     old_duty,

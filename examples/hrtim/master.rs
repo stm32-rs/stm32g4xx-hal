@@ -1,8 +1,11 @@
 #![no_std]
 #![no_main]
 
+#[path = "../utils/mod.rs"]
+mod utils;
+use utils::logger::info;
+
 use cortex_m_rt::entry;
-use panic_probe as _;
 use stm32_hrtim::{
     compare_register::HrCompareRegister,
     output::HrOutput,
@@ -107,7 +110,7 @@ fn main() -> ! {
     mtimer.start(&mut hr_control.control);
     timer.start(&mut hr_control.control);
 
-    defmt::info!("Running");
+    info!("Running");
 
     loop {
         // Step frequency from 15kHz to about 146kHz(half of that when only looking at one pin)
@@ -119,7 +122,7 @@ fn main() -> ! {
             mtimer.set_period(new_period);
             timer.set_period(new_period - 1000);
 
-            defmt::info!(
+            info!(
                 "period: {}, duty: {}, get_duty: {}, get_period: {}",
                 new_period,
                 new_period / 3,
