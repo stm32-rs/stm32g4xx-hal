@@ -104,6 +104,9 @@ fn main() -> ! {
     out1.enable();
     out2.enable();
 
+    mtimer.start(&mut hr_control.control);
+    timer.start(&mut hr_control.control);
+
     defmt::info!("Running");
 
     loop {
