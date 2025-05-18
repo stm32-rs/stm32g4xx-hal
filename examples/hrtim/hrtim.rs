@@ -1,7 +1,7 @@
 #![no_std]
 #![no_main]
 
-#[path ="../utils/mod.rs"]
+#[path = "../utils/mod.rs"]
 mod utils;
 
 use cortex_m_rt::entry;
