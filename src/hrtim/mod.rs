@@ -1,5 +1,6 @@
 pub mod adc_trigger;
 pub mod capture;
+pub mod dac_trigger;
 pub mod external_event;
 pub mod fault;
 
@@ -13,7 +14,7 @@ use crate::{
 use stm32_hrtim::{
     control::{HrPwmControl, HrTimOngoingCalibration},
     output::{HrOut1, HrOut2, ToHrOut},
-    HrParts, HrPwmBuilder,
+    DacResetTrigger, DacStepTrigger, HrParts, HrPwmBuilder,
 };
 
 pub use stm32_hrtim;
@@ -33,18 +34,31 @@ impl HrControltExt for crate::stm32::HRTIM_COMMON {
     }
 }
 
-pub trait HrPwmBuilderExt<TIM, PSCL, PINS: ToHrOut<TIM>> {
-    fn finalize(self, control: &mut HrPwmControl) -> HrParts<TIM, PSCL, PINS::Out<PSCL>>;
+pub trait HrPwmBuilderExt<TIM, PSCL, PINS: ToHrOut<TIM>, DacRst, DacStp>
+where
+    DacRst: DacResetTrigger,
+    DacStp: DacStepTrigger,
+{
+    fn finalize(
+        self,
+        control: &mut HrPwmControl,
+    ) -> HrParts<TIM, PSCL, PINS::Out<PSCL>, DacRst, DacStp>;
 }
+
 macro_rules! impl_finalize {
     ($($TIMX:ident),+) => {$(
-        impl<PSCL: stm32_hrtim::HrtimPrescaler, PINS: HrtimPin<$TIMX>> HrPwmBuilderExt<$TIMX, PSCL, PINS>
-            for HrPwmBuilder<$TIMX, PSCL, stm32_hrtim::PreloadSource, PINS>
+        impl<PSCL, PINS, DacRst, DacStp> HrPwmBuilderExt<$TIMX, PSCL, PINS, DacRst, DacStp>
+            for HrPwmBuilder<$TIMX, PSCL, stm32_hrtim::PreloadSource, PINS, DacRst, DacStp>
+            where
+                PSCL: stm32_hrtim::HrtimPrescaler,
+                PINS: HrtimPin<$TIMX>,
+                DacRst: DacResetTrigger,
+                DacStp: DacStepTrigger
         {
             fn finalize(
                 self,
                 control: &mut HrPwmControl,
-            ) -> HrParts<$TIMX, PSCL, <PINS as ToHrOut<$TIMX>>::Out<PSCL>> {
+            ) -> HrParts<$TIMX, PSCL, <PINS as ToHrOut<$TIMX>>::Out<PSCL>, DacRst, DacStp> {
                 let pins = self._init(control);
                 pins.connect_to_hrtim();
                 unsafe { MaybeUninit::uninit().assume_init() }
@@ -93,8 +107,12 @@ macro_rules! pins_helper {
     ($TIMX:ty, $HrOutY:ident, $CHY:ident<$CHY_AF:literal>) => {
         //impl sealed::Sealed<$TIMX> for $CHY<GpioInputMode> {}
 
-        unsafe impl ToHrOut<$TIMX> for $CHY<gpio::DefaultMode> {
-            type Out<PSCL> = $HrOutY<$TIMX, PSCL>;
+        unsafe impl<DacRst, DacStp> ToHrOut<$TIMX, DacRst, DacStp> for $CHY<gpio::DefaultMode>
+        where
+            DacRst: DacResetTrigger,
+            DacStp: DacStepTrigger,
+        {
+            type Out<PSCL> = $HrOutY<$TIMX, PSCL, DacRst, DacStp>;
         }
 
         impl HrtimPin<$TIMX> for $CHY<gpio::DefaultMode> {
