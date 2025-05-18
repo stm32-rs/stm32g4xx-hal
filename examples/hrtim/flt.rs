@@ -1,10 +1,13 @@
 #![no_std]
 #![no_main]
 
+#[path = "../utils/mod.rs"]
+mod utils;
+use utils::logger::info;
+
 /// Example showcasing the use of the HRTIM peripheral together with a comparator to implement a current fault.
 /// Once the digital input goes high, the output is forced low and put into a fault state.
 use cortex_m_rt::entry;
-use panic_probe as _;
 use stm32_hrtim::{
     compare_register::HrCompareRegister,
     fault::{FaultAction, FaultMonitor},
@@ -96,17 +99,17 @@ fn main() -> ! {
     out.enable();
     timer.start(&mut hr_control.control);
 
-    defmt::info!("Started");
+    info!("Started");
 
     loop {
         for _ in 0..5 {
             delay.delay(500_u32.millis());
-            defmt::info!("State: {:?}", out.get_state());
+            info!("State: {:?}", out.get_state());
         }
         if hr_control.fault_3.is_fault_active() {
             hr_control.fault_3.clear_fault(); // Clear fault every 5s
             out.enable();
-            defmt::info!("failt cleared, and output reenabled");
+            info!("failt cleared, and output reenabled");
         }
     }
 }

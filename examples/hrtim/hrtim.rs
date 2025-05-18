@@ -3,9 +3,9 @@
 
 #[path = "../utils/mod.rs"]
 mod utils;
+use utils::logger::info;
 
 use cortex_m_rt::entry;
-use panic_probe as _;
 use stm32_hrtim::{
     compare_register::HrCompareRegister, output::HrOutput, timer::HrTimer, HrParts, HrPwmAdvExt,
     Pscl4,
@@ -22,7 +22,7 @@ use stm32g4xx_hal::{
 
 #[entry]
 fn main() -> ! {
-    defmt::info!("Initializing...");
+    info!("Initializing...");
 
     let dp = Peripherals::take().expect("cannot take peripherals");
     let cp = CorePeripherals::take().expect("cannot take core");
