@@ -1,6 +1,9 @@
 #![no_std]
 #![no_main]
 
+#[path ="../utils/mod.rs"]
+mod utils;
+
 use cortex_m_rt::entry;
 use panic_probe as _;
 use stm32_hrtim::{
@@ -87,6 +90,7 @@ fn main() -> ! {
 
     out1.enable();
     out2.enable();
+    timer.start(&mut hr_control.control);
 
     loop {
         // Step frequency from 14.6kHz to about 146kHz(half of that when only looking at one pin)
