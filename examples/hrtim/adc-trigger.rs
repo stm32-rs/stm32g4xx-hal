@@ -1,9 +1,12 @@
 #![no_std]
 #![no_main]
 
+#[path = "../utils/mod.rs"]
+mod utils;
+use utils::logger::info;
+
 /// Example showcasing the use of the HRTIM peripheral to trigger the ADC at various points of the switch cycle off HRTIM_TIMA
 use cortex_m_rt::entry;
-use panic_probe as _;
 use stm32_hrtim::{
     compare_register::HrCompareRegister, output::HrOutput, timer::HrTimer, HrParts, HrPwmAdvExt,
     Pscl4,
@@ -23,14 +26,14 @@ use stm32g4xx_hal::{
 fn main() -> ! {
     const VREF: f32 = 3.3;
 
-    defmt::info!("start");
+    info!("start");
 
     let dp = Peripherals::take().unwrap();
     let cp = CorePeripherals::take().expect("cannot take core peripherals");
 
     // Set system frequency to 16MHz * 15/1/2 = 120MHz
     // This would lead to HrTim running at 120MHz * 32 = 3.84...
-    defmt::info!("rcc");
+    info!("rcc");
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
@@ -52,7 +55,7 @@ fn main() -> ! {
         .circular_buffer(true)
         .memory_increment(true);
 
-    defmt::info!("Setup Gpio");
+    info!("Setup Gpio");
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pa0 = gpioa.pa0.into_analog();
 
@@ -102,7 +105,7 @@ fn main() -> ! {
     out1.enable_set_event(&timer); // Set high at new period
     out2.enable_set_event(&timer);
 
-    defmt::info!("Setup Adc1");
+    info!("Setup Adc1");
     let mut adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
     let mut adc = adc12_common.claim(dp.ADC1, &mut delay);
 
@@ -124,7 +127,7 @@ fn main() -> ! {
         adc::config::SampleTime::Cycles_640_5,
     );
 
-    defmt::info!("Setup DMA");
+    info!("Setup DMA");
     let first_buffer = cortex_m::singleton!(: [u16; 10] = [0; 10]).unwrap();
 
     let mut transfer = dma1ch1.into_circ_peripheral_to_memory_transfer(
@@ -144,16 +147,16 @@ fn main() -> ! {
         let mut b = [0_u16; 4];
         let r = transfer.read_exact(&mut b);
 
-        defmt::info!("read: {}", r);
+        info!("read: {}", r);
         assert!(r == b.len());
 
         let millivolts = Vref::sample_to_millivolts((b[0] + b[2]) / 2);
-        defmt::info!("pa3: {}mV", millivolts);
+        info!("pa3: {}mV", millivolts);
         let temp = Temperature::temperature_to_degrees_centigrade(
             (b[1] + b[3]) / 2,
             VREF,
             adc::config::Resolution::Twelve,
         );
-        defmt::info!("temp: {}℃C", temp);
+        info!("temp: {}℃C", temp);
     }
 }

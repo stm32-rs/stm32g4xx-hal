@@ -1,9 +1,12 @@
 #![no_std]
 #![no_main]
 
+#[path = "../utils/mod.rs"]
+mod utils;
+use utils::logger::info;
+
 /// Example showcasing the use of the HRTIM peripheral's capture function to detect phase shift between a digital event and the output of HRTIM_TIMA
 use cortex_m_rt::entry;
-use panic_probe as _;
 use stm32_hrtim::{
     capture,
     compare_register::HrCompareRegister,
@@ -23,13 +26,13 @@ use stm32g4xx_hal::{
 
 #[entry]
 fn main() -> ! {
-    defmt::info!("start");
+    info!("start");
 
     let dp = Peripherals::take().unwrap();
 
     // Set system frequency to 16MHz * 15/1/2 = 120MHz
     // This would lead to HrTim running at 120MHz * 32 = 3.84...
-    defmt::info!("rcc");
+    info!("rcc");
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(
         rcc::Config::pll().pll_cfg(rcc::PllConfig {
@@ -43,7 +46,7 @@ fn main() -> ! {
         pwr,
     );
 
-    defmt::info!("Setup Gpio");
+    info!("Setup Gpio");
     let gpioa = dp.GPIOA.split(&mut rcc);
     let gpiob = dp.GPIOB.split(&mut rcc);
 
@@ -106,7 +109,7 @@ fn main() -> ! {
     capture.enable_interrupt(true, &mut hr_control);
     capture.add_event(&eev_input6);
 
-    defmt::info!("Setup DMA");
+    info!("Setup DMA");
     let channels = dp.DMA1.split(&rcc);
     let config = DmaConfig::default()
         .transfer_complete_interrupt(false)
@@ -129,7 +132,7 @@ fn main() -> ! {
             transfer.read_exact(&mut data);
             let [t1, t2] = data.map(|x| capture::dma_value_to_signed(x, period));
             cr1.set_duty(duty as u16);
-            defmt::info!("Capture: t1: {}, t2: {}, duty: {}, ", t1, t2, old_duty);
+            info!("Capture: t1: {}, t2: {}, duty: {}, ", t1, t2, old_duty);
             old_duty = duty;
         }
     }
