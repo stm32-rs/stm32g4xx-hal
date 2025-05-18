@@ -96,7 +96,7 @@ defmt = [
     "nb/defmt-0-3",
     "embedded-hal/defmt-03",
     "embedded-io/defmt-03",
-    "stm32-hrtim/defmt"
+    "stm32-hrtim?/defmt"
 ]
 cordic = ["dep:fixed"]
 adc3 = []
