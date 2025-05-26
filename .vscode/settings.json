@@ -2,11 +2,13 @@
   "rust-analyzer.check.allTargets": false,
   "rust-analyzer.check.extraArgs": [
     "--examples",
+    "--bins",
   ],
   "rust-analyzer.cargo.target": "thumbv7em-none-eabihf",
   "rust-analyzer.cargo.features": [
     "stm32g484",
     "defmt",
-    "cordic"
+    "cordic",
+    "hrtim"
   ]
 }
