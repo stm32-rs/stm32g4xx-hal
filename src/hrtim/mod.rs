@@ -34,8 +34,9 @@ impl HrControltExt for crate::stm32::HRTIM_COMMON {
     }
 }
 
-pub trait HrPwmBuilderExt<TIM, PSCL, PINS: ToHrOut<TIM>, DacRst, DacStp>
+pub trait HrPwmBuilderExt<TIM, PSCL, PINS, DacRst, DacStp>
 where
+    PINS: ToHrOut<TIM, DacRst, DacStp>,
     DacRst: DacResetTrigger,
     DacStp: DacStepTrigger,
 {
@@ -51,14 +52,14 @@ macro_rules! impl_finalize {
             for HrPwmBuilder<$TIMX, PSCL, stm32_hrtim::PreloadSource, PINS, DacRst, DacStp>
             where
                 PSCL: stm32_hrtim::HrtimPrescaler,
-                PINS: HrtimPin<$TIMX>,
+                PINS: HrtimPin<$TIMX> + ToHrOut<$TIMX, DacRst, DacStp>,
                 DacRst: DacResetTrigger,
                 DacStp: DacStepTrigger
         {
             fn finalize(
                 self,
                 control: &mut HrPwmControl,
-            ) -> HrParts<$TIMX, PSCL, <PINS as ToHrOut<$TIMX>>::Out<PSCL>, DacRst, DacStp> {
+            ) -> HrParts<$TIMX, PSCL, <PINS as ToHrOut<$TIMX, DacRst, DacStp>>::Out<PSCL>, DacRst, DacStp> {
                 let pins = self._init(control);
                 pins.connect_to_hrtim();
                 unsafe { MaybeUninit::uninit().assume_init() }

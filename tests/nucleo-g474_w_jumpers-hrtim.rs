@@ -195,7 +195,7 @@ const VREF_ADC_BITS: u16 = 1504;
 
 struct Peripherals<PSCL> {
     timer:
-        HrParts<HRTIM_TIMA, PSCL, HrOut1<HRTIM_TIMA, PSCL>, DacResetOnCounterReset, DacStepOnCmp2>,
+        HrParts<HRTIM_TIMA, PSCL, HrOut1<HRTIM_TIMA, PSCL, DacResetOnCounterReset, DacStepOnCmp2>, DacResetOnCounterReset, DacStepOnCmp2>,
     hr_control: HrPwmControl,
     eev_input4: ExternalEventSource<4, false>,
     comp: Comparator<comparator::COMP1, comparator::Enabled>,
@@ -281,7 +281,7 @@ fn setup<PSCL: HrtimPrescaler>(
     let mut hr_control = hr_control.constrain();
     let eev_cfgs =
         EevCfgs::default().eev4(EevCfg::default().filter(EventFilter::BlankingResetToCmp1));
-    let mut timer = dp
+    let mut timer: HrParts<_, PSCL, HrOut1<_, PSCL, DacResetOnCounterReset, DacStepOnCmp2>, DacResetOnCounterReset, DacStepOnCmp2> = dp
         .HRTIM_TIMA
         .pwm_advanced(pa8)
         .prescaler(prescaler)
@@ -306,6 +306,7 @@ fn setup<PSCL: HrtimPrescaler>(
         .comparator(pa1, comp_ref, comparator::Config::default(), &rcc.clocks)
         .enable();
 
+    let timer: HrParts<_, _, HrOut1<_, _, DacResetOnCounterReset, DacStepOnCmp2>, _, _> = timer;
     Peripherals {
         timer,
         hr_control,
