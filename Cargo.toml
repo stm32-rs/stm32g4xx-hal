@@ -19,7 +19,7 @@ fugit = "0.3.7"
 stm32-usbd = { version = "0.7.0", optional = true }
 fixed = { version = "1.28.0", optional = true }
 embedded-io = "0.6"
-stm32-hrtim = { git = "https://github.com/usbalbin/stm32-hrtim", rev = "ce1da43264a59b932eaf01651eba20b9cd0d96ba", optional = true }
+stm32-hrtim = { git = "https://github.com/usbalbin/stm32-hrtim", rev = "e8ab6db", optional = true }
 
 [dependencies.cortex-m]
 version = "0.7.7"
