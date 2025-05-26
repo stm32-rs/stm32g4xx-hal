@@ -12,6 +12,7 @@ use core::ops::Deref;
 use crate::gpio::{DefaultMode, PA4, PA5, PA6};
 use crate::pac;
 use crate::rcc::{self, *};
+use crate::stm32::dac1::mcr::HFSEL;
 use crate::stm32::RCC;
 use embedded_hal::delay::DelayNs;
 
@@ -260,15 +261,23 @@ impl_pin_for_dac!(
     (Dac4Ch1<M_INT_SIG, Disabled>, Dac4Ch2<M_INT_SIG, Disabled>)
 );
 
+pub fn hfsel(rcc: &Rcc) -> HFSEL {
+    match rcc.clocks.ahb_clk.to_MHz() {
+        0..80 => pac::dac1::mcr::HFSEL::Disabled,
+        80..160 => pac::dac1::mcr::HFSEL::More80mhz,
+        160.. => pac::dac1::mcr::HFSEL::More160mhz,
+    }
+}
+
 impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS, Disabled> {
     /// TODO: The DAC does not seem to work unless `calibrate_buffer` has been callen
     /// even when only using dac output internally
-    pub fn enable(self, _rcc: &mut Rcc) -> DacCh<DAC, CH, MODE_BITS, Enabled> {
+    pub fn enable(self, rcc: &mut Rcc) -> DacCh<DAC, CH, MODE_BITS, Enabled> {
         // We require rcc here just to ensure exclusive access to registers common to ch1 and ch2
         let dac = unsafe { &(*DAC::ptr()) };
 
         dac.mcr()
-            .modify(|_, w| unsafe { w.mode(CH).bits(MODE_BITS) });
+            .modify(|_, w| unsafe { w.hfsel().variant(hfsel(rcc)).mode(CH).bits(MODE_BITS) });
         dac.cr().modify(|_, w| w.en(CH).set_bit());
 
         DacCh::new()
@@ -277,13 +286,13 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS,
     pub fn enable_generator(
         self,
         config: GeneratorConfig,
-        _rcc: &mut Rcc,
+        rcc: &mut Rcc,
     ) -> DacCh<DAC, CH, MODE_BITS, WaveGenerator> {
         // We require rcc here just to ensure exclusive access to registers common to ch1 and ch2
         let dac = unsafe { &(*DAC::ptr()) };
 
         dac.mcr()
-            .modify(|_, w| unsafe { w.mode(CH).bits(MODE_BITS) });
+            .modify(|_, w| unsafe { w.hfsel().variant(hfsel(rcc)).mode(CH).bits(MODE_BITS) });
         dac.cr().modify(|_, w| unsafe {
             w.wave(CH).bits(config.mode);
             w.ten(CH).set_bit();
@@ -297,13 +306,13 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS,
     pub fn enable_sawtooth_generator(
         self,
         config: SawtoothConfig,
-        _rcc: &mut Rcc,
+        rcc: &mut Rcc,
     ) -> DacCh<DAC, CH, MODE_BITS, SawtoothGenerator> {
         // TODO: We require rcc here just to ensure exclusive access to registers common to ch1 and ch2
         let dac = unsafe { &(*DAC::ptr()) };
 
         dac.mcr()
-            .modify(|_, w| unsafe { w.mode(CH).bits(MODE_BITS) });
+            .modify(|_, w| unsafe { w.hfsel().variant(hfsel(rcc)).mode(CH).bits(MODE_BITS) });
 
         unsafe {
             dac.stmodr().modify(|_, w| {
