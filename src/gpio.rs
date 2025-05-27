@@ -5,6 +5,8 @@ use crate::rcc::{Enable, Rcc, Reset};
 use crate::stm32::EXTI;
 use crate::syscfg::SysCfg;
 
+use crate::pac;
+
 /// Default pin mode
 pub type DefaultMode = Input<Floating>;
 
@@ -49,17 +51,39 @@ pub struct Output<MODE> {
 pub struct PushPull;
 
 /// GPIO Pin speed selection
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum Speed {
+    /// Low speed
     Low = 0,
+    /// Medium speed
     Medium = 1,
+    /// High speed
     High = 2,
+    /// Very high speed
     VeryHigh = 3,
 }
 
-/// Trigger edgw
+impl From<Speed> for pac::gpioa::ospeedr::OUTPUT_SPEED {
+    fn from(value: Speed) -> Self {
+        match value {
+            Speed::Low => Self::LowSpeed,
+            Speed::Medium => Self::MediumSpeed,
+            Speed::High => Self::HighSpeed,
+            Speed::VeryHigh => Self::VeryHighSpeed,
+        }
+    }
+}
+
+/// GPIO interrupt trigger edge selection
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, PartialEq, Eq, Clone, Copy)]
 pub enum SignalEdge {
+    /// Rising edge of voltage
     Rising,
+    /// Falling edge of voltage
     Falling,
+    /// Rising and falling edge of voltage
     RisingFalling,
 }
 
@@ -250,7 +274,6 @@ macro_rules! gpio {
         /// GPIO
         pub mod $gpiox {
             use core::marker::PhantomData;
-            use embedded_hal_old::digital::v2::{toggleable, InputPin, OutputPin, StatefulOutputPin};
             use crate::stm32::{EXTI, $GPIOX};
             use crate::exti::{ExtiExt, Event};
             use crate::rcc::Rcc;
@@ -284,126 +307,150 @@ macro_rules! gpio {
                 _mode: PhantomData<MODE>,
             }
 
-            impl<MODE> OutputPin for $PXx<Output<MODE>> {
+            impl<MODE> $PXx<Output<MODE>> {
+                pub fn set_high(&mut self) {
+                    // NOTE(unsafe) atomic write to a stateless register
+                    unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.bs(self.i).set_bit()) };
+                }
+
+                pub fn set_low(&mut self) {
+                    // NOTE(unsafe) atomic write to a stateless register
+                    unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.br(self.i).set_bit()) };
+                }
+
+                pub fn is_set_high(&self) -> bool {
+                    !self.is_set_low()
+                }
+
+                pub fn is_set_low(&self) -> bool {
+                    // NOTE(unsafe) atomic read with no side effects
+                    unsafe { (*$GPIOX::ptr()).odr().read().odr(self.i).is_low()}
+                }
+
+                pub fn toggle(&mut self) {
+                    if self.is_set_low() {
+                        self.set_high()
+                    } else {
+                        self.set_low()
+                    }
+                }
+            }
+
+            impl<MODE> embedded_hal_old::digital::v2::OutputPin for $PXx<Output<MODE>> {
                 type Error = ();
 
                 fn set_high(&mut self) -> Result<(), ()> {
-                    // NOTE(unsafe) atomic write to a stateless register
-                    unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.bs(self.i).set_bit()) };
+                    self.set_high();
                     Ok(())
                 }
 
                 fn set_low(&mut self) -> Result<(), ()> {
-                    // NOTE(unsafe) atomic write to a stateless register
-                    unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.br(self.i).set_bit()) };
+                    self.set_low();
                     Ok(())
                 }
             }
 
-            impl<MODE> embedded_hal::digital::ErrorType for $PXx<Output<MODE>> {
+            impl<MODE> embedded_hal::digital::ErrorType for $PXx<MODE> {
                 type Error = core::convert::Infallible;
             }
 
             impl<MODE> embedded_hal::digital::OutputPin for $PXx<Output<MODE>> {
                 fn set_high(&mut self) -> Result<(), Self::Error> {
-                    // NOTE(unsafe) atomic write to a stateless register
-                    unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.bs(self.i).set_bit()) };
+                    self.set_high();
                     Ok(())
                 }
 
                 fn set_low(&mut self) -> Result<(), Self::Error> {
-                    // NOTE(unsafe) atomic write to a stateless register
-                    unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.br(self.i).set_bit()) };
+                    self.set_low();
                     Ok(())
                 }
             }
 
-            impl<MODE> StatefulOutputPin for $PXx<Output<MODE>> {
+            impl<MODE> embedded_hal_old::digital::v2::StatefulOutputPin for $PXx<Output<MODE>> {
                 fn is_set_high(&self) -> Result<bool, ()> {
-                    let is_set_high = !self.is_set_low()?;
-                    Ok(is_set_high)
+                    Ok(self.is_set_high())
                 }
 
                 fn is_set_low(&self) -> Result<bool, ()> {
-                    // NOTE(unsafe) atomic read with no side effects
-                    let is_set_low = unsafe { (*$GPIOX::ptr()).odr().read().odr(self.i).is_low()};
-                    Ok(is_set_low)
+                    Ok(self.is_set_low())
                 }
             }
 
             impl<MODE> embedded_hal::digital::StatefulOutputPin for $PXx<Output<MODE>> {
                 fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-                    let is_set_high = !self.is_set_low()?;
-                    Ok(is_set_high)
+                    Ok((*self).is_set_high())
                 }
 
                 fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-                    // NOTE(unsafe) atomic read with no side effects
-                    let is_set_low = unsafe { (*$GPIOX::ptr()).odr().read().odr(self.i).is_low() };
-                    Ok(is_set_low)
+                    Ok((*self).is_set_low())
                 }
             }
 
-            impl<MODE> toggleable::Default for $PXx<Output<MODE>> {}
+            impl $PXx<Output<OpenDrain>> {
+                pub fn is_high(&self) -> bool {
+                    !self.is_low()
+                }
 
-            impl<MODE> InputPin for $PXx<Output<MODE>> {
+                pub fn is_low(&self) -> bool  {
+                    // NOTE(unsafe) atomic read with no side effects
+                    unsafe { (*$GPIOX::ptr()).idr().read().idr(self.i).is_low() }
+                }
+            }
+
+            impl<MODE> embedded_hal_old::digital::v2::toggleable::Default for $PXx<Output<MODE>> {}
+
+            impl embedded_hal_old::digital::v2::InputPin for $PXx<Output<OpenDrain>> {
                 type Error = ();
 
                 fn is_high(&self) -> Result<bool, ()> {
-                    let is_high = !self.is_low()?;
-                    Ok(is_high)
+                    Ok(self.is_high())
                 }
 
                 fn is_low(&self) -> Result<bool, ()>  {
-                    // NOTE(unsafe) atomic read with no side effects
-                    let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr(self.i).is_low() };
-                    Ok(is_low)
+                    Ok(self.is_low())
                 }
             }
 
-            impl<MODE> embedded_hal::digital::InputPin for $PXx<Output<MODE>> {
+            impl embedded_hal::digital::InputPin for $PXx<Output<OpenDrain>> {
                 fn is_high(&mut self) -> Result<bool, Self::Error> {
-                    let is_high = !self.is_low()?;
-                    Ok(is_high)
+                    Ok((*self).is_high())
                 }
 
                 fn is_low(&mut self) -> Result<bool, Self::Error>  {
-                    // NOTE(unsafe) atomic read with no side effects
-                    let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr(self.i).is_low() };
-                    Ok(is_low)
+                    Ok((*self).is_low())
                 }
             }
 
+            impl<MODE> $PXx<Input<MODE>> {
+                pub fn is_high(&self) -> bool {
+                    !self.is_low()
+                }
 
-            impl<MODE> InputPin for $PXx<Input<MODE>> {
+                pub fn is_low(&self) -> bool {
+                    // NOTE(unsafe) atomic read with no side effects
+                    unsafe { (*$GPIOX::ptr()).idr().read().idr(self.i).is_low() }
+                }
+            }
+
+            impl<MODE> embedded_hal_old::digital::v2::InputPin for $PXx<Input<MODE>> {
                 type Error = ();
 
                 fn is_high(&self) -> Result<bool, ()> {
-                    let is_high = !self.is_low()?;
-                    Ok(is_high)
+                    Ok(self.is_high())
                 }
 
                 fn is_low(&self) -> Result<bool, ()> {
-                    // NOTE(unsafe) atomic read with no side effects
-                    let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr(self.i).is_low() };
-                    Ok(is_low)
+                    Ok(self.is_low())
                 }
-            }
-
-            impl<MODE> embedded_hal::digital::ErrorType for $PXx<Input<MODE>> {
-                type Error = core::convert::Infallible;
             }
 
             impl<MODE> embedded_hal::digital::InputPin for $PXx<Input<MODE>> {
                 fn is_high(&mut self) -> Result<bool, Self::Error> {
-                    let is_high = !self.is_low()?;
-                    Ok(is_high)
+                    Ok((*self).is_high())
                 }
 
                 fn is_low(&mut self) -> Result<bool, Self::Error> {
-                    // NOTE(unsafe) atomic read with no side effects
-                    let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr(self.i).is_low() };
-                    Ok(is_low)
+                    Ok((*self).is_low())
                 }
             }
 
@@ -552,13 +599,16 @@ macro_rules! gpio {
                     }
 
                     /// Set pin speed
-                    pub fn set_speed(self, speed: Speed) -> Self {
-                        let offset = 2 * $i;
+                    pub fn set_speed(&mut self, speed: Speed) {
                         unsafe {
-                            (*$GPIOX::ptr()).ospeedr().modify(|r, w| {
-                                w.bits((r.bits() & !(0b11 << offset)) | ((speed as u32) << offset))
-                            });
+                            (*$GPIOX::ptr()).ospeedr()
+                                .modify(|_, w| w.ospeedr($i).variant(speed.into()));
                         }
+                    }
+
+                    /// Set pin speed
+                    pub fn speed(mut self, speed: Speed) -> Self {
+                        self.set_speed(speed);
                         self
                     }
 
@@ -619,95 +669,117 @@ macro_rules! gpio {
                     pub fn downgrade(self) -> $PXx<Output<MODE>> {
                         $PXx { i: $i, _mode: self._mode }
                     }
+
+                    pub fn set_high(&mut self) {
+                        // NOTE(unsafe) atomic write to a stateless register
+                        unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.bs($i).set_bit()) };
+                    }
+
+                    pub fn set_low(&mut self) {
+                        // NOTE(unsafe) atomic write to a stateless register
+                        unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.br($i).set_bit()) };
+                    }
+
+                    pub fn is_set_high(&self) -> bool {
+                        !self.is_set_low()
+                    }
+
+                    pub fn is_set_low(&self) -> bool {
+                        // NOTE(unsafe) atomic read with no side effects
+                        unsafe { (*$GPIOX::ptr()).odr().read().odr($i).is_low()}
+                    }
+
+                    pub fn toggle(&mut self) {
+                        if self.is_set_low() {
+                            self.set_high()
+                        } else {
+                            self.set_low()
+                        }
+                    }
                 }
 
-                impl<MODE> OutputPin for $PXi<Output<MODE>> {
+                impl<MODE> embedded_hal_old::digital::v2::OutputPin for $PXi<Output<MODE>> {
                     type Error = ();
 
                     fn set_high(&mut self) -> Result<(), ()> {
-                        // NOTE(unsafe) atomic write to a stateless register
-                        unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.bs($i).set_bit()) };
+                        self.set_high();
                         Ok(())
                     }
 
                     fn set_low(&mut self) -> Result<(), ()>{
-                        // NOTE(unsafe) atomic write to a stateless register
-                        unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.br($i).set_bit()) };
+                        self.set_low();
                         Ok(())
                     }
                 }
 
-                impl<MODE> embedded_hal::digital::ErrorType for $PXi<Output<MODE>> {
+                impl<MODE> embedded_hal::digital::ErrorType for $PXi<MODE> {
                     type Error = core::convert::Infallible;
                 }
 
                 impl<MODE> embedded_hal::digital::OutputPin for $PXi<Output<MODE>> {
                     fn set_high(&mut self) -> Result<(), Self::Error> {
-                        // NOTE(unsafe) atomic write to a stateless register
-                        unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.bs($i).set_bit()) };
+                        self.set_high();
                         Ok(())
                     }
 
                     fn set_low(&mut self) -> Result<(), Self::Error>{
-                        // NOTE(unsafe) atomic write to a stateless register
-                        unsafe { (*$GPIOX::ptr()).bsrr().write(|w| w.br($i).set_bit()) };
+                        self.set_low();
                         Ok(())
                     }
                 }
 
-                impl<MODE> StatefulOutputPin for $PXi<Output<MODE>> {
+                impl<MODE> embedded_hal_old::digital::v2::StatefulOutputPin for $PXi<Output<MODE>> {
                     fn is_set_high(&self) -> Result<bool, ()> {
-                        let is_set_high = !self.is_set_low()?;
-                        Ok(is_set_high)
+                        Ok(self.is_set_high())
                     }
 
                     fn is_set_low(&self) -> Result<bool, ()> {
-                        // NOTE(unsafe) atomic read with no side effects
-                        let is_set_low = unsafe { (*$GPIOX::ptr()).odr().read().odr($i).is_low()};
-                        Ok(is_set_low)
+                        Ok(self.is_set_low())
                     }
                 }
 
                 impl<MODE> embedded_hal::digital::StatefulOutputPin for $PXi<Output<MODE>> {
                     fn is_set_high(&mut self) -> Result<bool, Self::Error> {
-                        let is_set_high = !self.is_set_low()?;
-                        Ok(is_set_high)
+                        Ok((*self).is_set_high())
                     }
 
                     fn is_set_low(&mut self) -> Result<bool, Self::Error> {
-                        // NOTE(unsafe) atomic read with no side effects
-                        let is_set_low = unsafe { (*$GPIOX::ptr()).odr().read().odr($i).is_low() };
-                        Ok(is_set_low)
+                        Ok((*self).is_set_low())
                     }
                 }
 
-                impl<MODE> toggleable::Default for $PXi<Output<MODE>> {}
+                impl<MODE> embedded_hal_old::digital::v2::toggleable::Default for $PXi<Output<MODE>> {}
 
-                impl<MODE> InputPin for $PXi<Output<MODE>> {
+                impl $PXi<Output<OpenDrain>> {
+                    pub fn is_high(&self) -> bool {
+                        !self.is_low()
+                    }
+
+                    pub fn is_low(&self) -> bool  {
+                        // NOTE(unsafe) atomic read with no side effects
+                        unsafe { (*$GPIOX::ptr()).idr().read().idr($i).is_low() }
+                    }
+                }
+
+                impl embedded_hal_old::digital::v2::InputPin for $PXi<Output<OpenDrain>> {
                     type Error = ();
 
                     fn is_high(&self) -> Result<bool, ()> {
-                        let is_high = !self.is_low()?;
-                        Ok(is_high)
+                        Ok(self.is_high())
                     }
 
                     fn is_low(&self) -> Result<bool, ()>  {
-                        // NOTE(unsafe) atomic read with no side effects
-                        let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr($i).is_low() };
-                        Ok(is_low)
+                        Ok(self.is_low())
                     }
                 }
 
-                impl<MODE> embedded_hal::digital::InputPin for $PXi<Output<MODE>> {
+                impl embedded_hal::digital::InputPin for $PXi<Output<OpenDrain>> {
                     fn is_high(&mut self) -> Result<bool, Self::Error> {
-                        let is_high = !self.is_low()?;
-                        Ok(is_high)
+                        Ok((*self).is_high())
                     }
 
                     fn is_low(&mut self) -> Result<bool, Self::Error>  {
-                        // NOTE(unsafe) atomic read with no side effects
-                        let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr($i).is_low() };
-                        Ok(is_low)
+                        Ok((*self).is_low())
                     }
                 }
 
@@ -719,37 +791,36 @@ macro_rules! gpio {
                     pub fn downgrade(self) -> $PXx<Input<MODE>> {
                         $PXx { i: $i, _mode: self._mode }
                     }
-                }
 
-                impl<MODE> embedded_hal::digital::ErrorType for $PXi<Input<MODE>> {
-                    type Error = core::convert::Infallible;
+                    pub fn is_high(&self) -> bool {
+                        !self.is_low()
+                    }
+
+                    pub fn is_low(&self) -> bool  {
+                        // NOTE(unsafe) atomic read with no side effects
+                        unsafe { (*$GPIOX::ptr()).idr().read().idr($i).is_low() }
+                    }
                 }
 
                 impl<MODE> embedded_hal::digital::InputPin for $PXi<Input<MODE>> {
                     fn is_high(&mut self) -> Result<bool, Self::Error> {
-                        let is_high = !self.is_low()?;
-                        Ok(is_high)
+                        Ok((*self).is_high())
                     }
 
                     fn is_low(&mut self) -> Result<bool, Self::Error> {
-                        // NOTE(unsafe) atomic read with no side effects
-                        let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr($i).is_low()};
-                        Ok(is_low)
+                        Ok((*self).is_low())
                     }
                 }
 
-                impl<MODE> InputPin for $PXi<Input<MODE>> {
+                impl<MODE> embedded_hal_old::digital::v2::InputPin for $PXi<Input<MODE>> {
                     type Error = ();
 
                     fn is_high(&self) -> Result<bool, ()> {
-                        let is_high = !self.is_low()?;
-                        Ok(is_high)
+                        Ok(self.is_high())
                     }
 
                     fn is_low(&self) -> Result<bool, ()> {
-                        // NOTE(unsafe) atomic read with no side effects
-                        let is_low = unsafe { (*$GPIOX::ptr()).idr().read().idr($i).is_low()};
-                        Ok(is_low)
+                        Ok(self.is_low())
                     }
                 }
 

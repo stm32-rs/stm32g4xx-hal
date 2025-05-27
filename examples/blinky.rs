@@ -29,12 +29,12 @@ fn main() -> ! {
     loop {
         info!("Set Led low");
         for _ in 0..10_000_000 {
-            led.set_low().unwrap();
+            led.set_low();
         }
 
         info!("Set Led High");
         for _ in 0..10_000_000 {
-            led.set_high().unwrap();
+            led.set_high();
         }
     }
 }

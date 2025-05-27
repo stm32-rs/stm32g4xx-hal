@@ -75,7 +75,7 @@ fn main() -> ! {
         while !transfer.get_transfer_complete_flag() {}
 
         delay_syst.delay(1000.millis());
-        led.toggle().unwrap();
+        led.toggle();
         transfer.restart(|_tx| {});
     }
 }

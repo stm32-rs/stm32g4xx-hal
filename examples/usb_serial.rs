@@ -31,7 +31,7 @@ fn main() -> ! {
     let gpioa = dp.GPIOA.split(&mut rcc);
 
     let mut led = gpioa.pa5.into_push_pull_output();
-    led.set_low().ok();
+    led.set_low();
 
     let usb_dm = gpioa.pa11.into_alternate();
     let usb_dp = gpioa.pa12.into_alternate();
@@ -63,7 +63,7 @@ fn main() -> ! {
 
         match serial.read(&mut buf) {
             Ok(count) if count > 0 => {
-                led.set_high().ok();
+                led.set_high();
 
                 // Echo back in upper case
                 for c in buf[0..count].iter_mut() {
@@ -85,6 +85,6 @@ fn main() -> ! {
             _ => {}
         }
 
-        led.set_low().ok();
+        led.set_low();
     }
 }
