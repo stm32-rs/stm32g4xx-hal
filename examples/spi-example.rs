@@ -45,7 +45,7 @@ fn main() -> ! {
         .SPI1
         .spi((sclk, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
     let mut cs = gpioa.pa8.into_push_pull_output();
-    cs.set_high().unwrap();
+    cs.set_high();
 
     // "Hello world!"
     let message = b"Hello world!";
@@ -53,10 +53,10 @@ fn main() -> ! {
 
     loop {
         for &byte in message {
-            cs.set_low().unwrap();
+            cs.set_low();
             spi.send(byte).unwrap();
             received_byte = nb::block!(FullDuplex::read(&mut spi)).unwrap();
-            cs.set_high().unwrap();
+            cs.set_high();
 
             info!("{}", received_byte as char);
         }

@@ -17,7 +17,6 @@ use rt::entry;
 fn main() -> ! {
     use hal::comparator::{refint_input, ComparatorExt, ComparatorSplit, Config, Hysteresis};
     use hal::gpio::GpioExt;
-    use hal::prelude::OutputPin;
     use hal::rcc::RccExt;
     use hal::stm32;
     use stm32g4xx_hal as hal;
@@ -55,8 +54,8 @@ fn main() -> ! {
     loop {
         // Read comp1 output and update led1 accordingly
         match comp1.output() {
-            true => led1.set_high().unwrap(),
-            false => led1.set_low().unwrap(),
+            true => led1.set_high(),
+            false => led1.set_low(),
         }
     }
 }

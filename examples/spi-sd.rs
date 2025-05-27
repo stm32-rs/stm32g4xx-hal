@@ -35,7 +35,7 @@ fn main() -> ! {
 
     let cs = {
         let mut cs = gpiof.pf8.into_push_pull_output();
-        cs.set_high().unwrap();
+        cs.set_high();
         cs
     };
 

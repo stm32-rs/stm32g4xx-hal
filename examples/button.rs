@@ -14,7 +14,6 @@ use core::cell::RefCell;
 use core::sync::atomic::{AtomicBool, Ordering};
 use cortex_m::{asm::wfi, interrupt::Mutex};
 use cortex_m_rt::entry;
-use embedded_hal::digital::OutputPin;
 
 type ButtonPin = gpio::PC13<Input<PullDown>>;
 
@@ -86,10 +85,10 @@ fn main() -> ! {
 
         if G_LED_ON.load(Ordering::Relaxed) {
             println!("Turn Led On!");
-            led.set_high().unwrap();
+            led.set_high();
         } else {
             println!("Turn Led Off!");
-            led.set_low().unwrap();
+            led.set_low();
         }
     }
 }

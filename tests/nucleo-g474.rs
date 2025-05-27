@@ -27,11 +27,7 @@ pub fn now() -> MicrosDurationU32 {
 
 #[defmt_test::tests]
 mod tests {
-    use embedded_hal::{
-        delay::DelayNs,
-        digital::{InputPin, OutputPin},
-        pwm::SetDutyCycle,
-    };
+    use embedded_hal::{delay::DelayNs, pwm::SetDutyCycle};
     use fixed::types::I1F15;
     use fugit::RateExtU32;
     use stm32g4xx_hal::{
@@ -67,17 +63,17 @@ mod tests {
         let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let mut pin = gpioa.pa8.into_push_pull_output();
 
-        pin.set_high().unwrap();
+        pin.set_high();
         delay.delay(1.millis()); // Give the pin plenty of time to go high
-        assert!(pin.is_high().unwrap());
+        assert!(pin.is_high());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
             assert!(!is_pax_low(gpioa, 8));
         }
 
-        pin.set_low().unwrap();
+        pin.set_low();
         delay.delay(1.millis()); // Give the pin plenty of time to go low
-        assert!(pin.is_low().unwrap());
+        assert!(pin.is_low());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
             assert!(is_pax_low(gpioa, 8));
@@ -104,17 +100,17 @@ mod tests {
             gpioa.pupdr().modify(|_, w| w.pupdr8().pull_up());
         }
 
-        pin.set_high().unwrap();
+        pin.set_high();
         delay.delay(1.millis()); // Give the pin plenty of time to go high
-        assert!(pin.is_high().unwrap());
+        assert!(pin.is_high());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
             assert!(!is_pax_low(gpioa, 8));
         }
 
-        pin.set_low().unwrap();
+        pin.set_low();
         delay.delay(1.millis()); // Give the pin plenty of time to go low
-        assert!(pin.is_low().unwrap());
+        assert!(pin.is_low());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
             assert!(is_pax_low(gpioa, 8));

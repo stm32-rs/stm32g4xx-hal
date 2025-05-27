@@ -1,10 +1,4 @@
-pub use embedded_hal::{
-    delay::DelayNs,
-    digital::{InputPin, OutputPin, StatefulOutputPin},
-    i2c::I2c,
-    pwm::SetDutyCycle,
-    spi::SpiBus,
-};
+pub use embedded_hal::{delay::DelayNs, i2c::I2c, pwm::SetDutyCycle, spi::SpiBus};
 
 pub use embedded_hal_old::{
     adc::OneShot as _,
