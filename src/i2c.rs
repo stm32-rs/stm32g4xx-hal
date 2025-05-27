@@ -3,15 +3,7 @@ use crate::stm32::i2c1;
 use embedded_hal::i2c::{ErrorKind, Operation, SevenBitAddress, TenBitAddress};
 use embedded_hal_old::blocking::i2c::{Read, Write, WriteRead};
 
-use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*};
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
-use crate::gpio::{gpiog::*, AF3};
-use crate::gpio::{AlternateOD, AF2, AF4, AF8};
+use crate::gpio::{self, OpenDrain};
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 #[cfg(any(
     feature = "stm32g473",
@@ -206,17 +198,17 @@ macro_rules! busy_wait {
 
 macro_rules! i2c {
     ($I2CX:ident, $i2cx:ident,
-        sda: [ $($( #[ $pmetasda:meta ] )* $PSDA:ty,)+ ],
-        scl: [ $($( #[ $pmetascl:meta ] )* $PSCL:ty,)+ ],
+        sda: [ $($( #[ $pmetasda:meta ] )* $PSDA:ident<$AFDA:ident>,)+ ],
+        scl: [ $($( #[ $pmetascl:meta ] )* $PSCL:ident<$AFCL:ident>,)+ ],
     ) => {
         $(
             $( #[ $pmetasda ] )*
-            impl SDAPin<$I2CX> for $PSDA {}
+            impl SDAPin<$I2CX> for gpio::$PSDA<gpio::$AFDA<OpenDrain>> {}
         )+
 
         $(
             $( #[ $pmetascl ] )*
-            impl SCLPin<$I2CX> for $PSCL {}
+            impl SCLPin<$I2CX> for gpio::$PSCL<gpio::$AFCL<OpenDrain>> {}
         )+
 
         impl I2cExt<$I2CX> for $I2CX {
@@ -463,14 +455,14 @@ i2c!(
     I2C1,
     i2c1,
     sda: [
-        PA14<AlternateOD<AF4>>,
-        PB7<AlternateOD<AF4>>,
-        PB9<AlternateOD<AF4>>,
+        PA14<AF4>,
+        PB7<AF4>,
+        PB9<AF4>,
     ],
     scl: [
-        PA13<AlternateOD<AF4>>,
-        PA15<AlternateOD<AF4>>,
-        PB8<AlternateOD<AF4>>,
+        PA13<AF4>,
+        PA15<AF4>,
+        PB8<AF4>,
     ],
 );
 
@@ -478,19 +470,19 @@ i2c!(
     I2C2,
     i2c2,
     sda: [
-        PA8<AlternateOD<AF4>>,
-        PF0<AlternateOD<AF4>>,
+        PA8<AF4>,
+        PF0<AF4>,
     ],
     scl: [
-        PA9<AlternateOD<AF4>>,
-        PC4<AlternateOD<AF4>>,
+        PA9<AF4>,
+        PC4<AF4>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PF6<AlternateOD<AF4>>,
+        PF6<AF4>,
     ],
 );
 
@@ -498,41 +490,41 @@ i2c!(
     I2C3,
     i2c3,
     sda: [
-        PB5<AlternateOD<AF8>>,
-        PC11<AlternateOD<AF8>>,
-        PC9<AlternateOD<AF8>>,
+        PB5<AF8>,
+        PC11<AF8>,
+        PC9<AF8>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PF4<AlternateOD<AF4>>,
+        PF4<AF4>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG8<AlternateOD<AF4>>,
+        PG8<AF4>,
     ],
     scl: [
-        PA8<AlternateOD<AF2>>,
-        PC8<AlternateOD<AF8>>,
+        PA8<AF2>,
+        PC8<AF8>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PF3<AlternateOD<AF4>>,
+        PF3<AF4>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG7<AlternateOD<AF4>>,
+        PG7<AF4>,
     ],
 );
 
@@ -546,15 +538,15 @@ i2c!(
     I2C4,
     i2c4,
     sda: [
-        PB7<AlternateOD<AF3>>,
-        PC7<AlternateOD<AF8>>,
-        PF15<AlternateOD<AF4>>,
-        PG4<AlternateOD<AF4>>,
+        PB7<AF3>,
+        PC7<AF8>,
+        PF15<AF4>,
+        PG4<AF4>,
     ],
     scl: [
-        PA13<AlternateOD<AF3>>,
-        PC6<AlternateOD<AF8>>,
-        PF14<AlternateOD<AF4>>,
-        PG3<AlternateOD<AF4>>,
+        PA13<AF3>,
+        PC6<AF8>,
+        PF14<AF4>,
+        PG3<AF4>,
     ],
 );

@@ -1,14 +1,7 @@
 use crate::dma::mux::DmaMuxResources;
 use crate::dma::traits::TargetAddress;
 use crate::dma::MemoryToPeripheral;
-use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiof::*, Alternate, AF5, AF6};
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
-use crate::gpio::{gpioe::*, gpiog::*};
+use crate::gpio;
 use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
 #[cfg(any(
     feature = "stm32g473",
@@ -94,9 +87,9 @@ impl FrameSize for u16 {
 
 macro_rules! spi {
     ($SPIX:ident, $spiX:ident,
-        sck: [ $($( #[ $pmetasck:meta ] )* $SCK:ty,)+ ],
-        miso: [ $($( #[ $pmetamiso:meta ] )* $MISO:ty,)+ ],
-        mosi: [ $($( #[ $pmetamosi:meta ] )* $MOSI:ty,)+ ],
+        sck: [ $($( #[ $pmetasck:meta ] )* $SCK:ident<$ASCK:ident>,)+ ],
+        miso: [ $($( #[ $pmetamiso:meta ] )* $MISO:ident<$AMISO:ident>,)+ ],
+        mosi: [ $($( #[ $pmetamosi:meta ] )* $MOSI:ident<$AMOSI:ident>,)+ ],
         $mux:expr,
     ) => {
         impl PinSck<$SPIX> for NoSck {}
@@ -107,15 +100,15 @@ macro_rules! spi {
 
         $(
             $( #[ $pmetasck ] )*
-            impl PinSck<$SPIX> for $SCK {}
+            impl PinSck<$SPIX> for gpio::$SCK<gpio::$ASCK> {}
         )*
         $(
             $( #[ $pmetamiso ] )*
-            impl PinMiso<$SPIX> for $MISO {}
+            impl PinMiso<$SPIX> for gpio::$MISO<gpio::$AMISO> {}
         )*
         $(
             $( #[ $pmetamosi ] )*
-            impl PinMosi<$SPIX> for $MOSI {}
+            impl PinMosi<$SPIX> for gpio::$MOSI<gpio::$AMOSI> {}
         )*
 
         impl<PINS: Pins<$SPIX>> Spi<$SPIX, PINS> {
@@ -377,37 +370,37 @@ spi!(
     SPI1,
     spi1,
     sck: [
-        PA5<Alternate<AF5>>,
-        PB3<Alternate<AF5>>,
+        PA5<AF5>,
+        PB3<AF5>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG2<Alternate<AF5>>,
+        PG2<AF5>,
     ],
     miso: [
-        PA6<Alternate<AF5>>,
-        PB4<Alternate<AF5>>,
+        PA6<AF5>,
+        PB4<AF5>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG3<Alternate<AF5>>,
+        PG3<AF5>,
     ],
     mosi: [
-        PA7<Alternate<AF5>>,
-        PB5<Alternate<AF5>>,
+        PA7<AF5>,
+        PB5<AF5>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG4<Alternate<AF5>>,
+        PG4<AF5>,
     ],
     DmaMuxResources::SPI1_TX,
 );
@@ -416,18 +409,18 @@ spi!(
     SPI2,
     spi2,
     sck: [
-        PF1<Alternate<AF5>>,
-        PF9<Alternate<AF5>>,
-        PF10<Alternate<AF5>>,
-        PB13<Alternate<AF5>>,
+        PF1<AF5>,
+        PF9<AF5>,
+        PF10<AF5>,
+        PB13<AF5>,
     ],
     miso: [
-        PA10<Alternate<AF5>>,
-        PB14<Alternate<AF5>>,
+        PA10<AF5>,
+        PB14<AF5>,
     ],
     mosi: [
-        PA11<Alternate<AF5>>,
-        PB15<Alternate<AF5>>,
+        PA11<AF5>,
+        PB15<AF5>,
     ],
     DmaMuxResources::SPI2_TX,
 );
@@ -436,23 +429,23 @@ spi!(
     SPI3,
     spi3,
     sck: [
-        PB3<Alternate<AF6>>,
-        PC10<Alternate<AF6>>,
+        PB3<AF6>,
+        PC10<AF6>,
         #[cfg(any(
             feature = "stm32g473",
             feature = "stm32g474",
             feature = "stm32g483",
             feature = "stm32g484"
         ))]
-        PG9<Alternate<AF6>>,
+        PG9<AF6>,
     ],
     miso: [
-        PB4<Alternate<AF6>>,
-        PC11<Alternate<AF6>>,
+        PB4<AF6>,
+        PC11<AF6>,
     ],
     mosi: [
-        PB5<Alternate<AF6>>,
-        PC12<Alternate<AF6>>,
+        PB5<AF6>,
+        PC12<AF6>,
     ],
     DmaMuxResources::SPI3_TX,
 );
@@ -467,16 +460,16 @@ spi!(
     SPI4,
     spi4,
     sck: [
-        PE2<Alternate<AF5>>,
-        PE12<Alternate<AF5>>,
+        PE2<AF5>,
+        PE12<AF5>,
     ],
     miso: [
-        PE5<Alternate<AF5>>,
-        PE13<Alternate<AF5>>,
+        PE5<AF5>,
+        PE13<AF5>,
     ],
     mosi: [
-        PE6<Alternate<AF5>>,
-        PE14<Alternate<AF5>>,
+        PE6<AF5>,
+        PE14<AF5>,
     ],
     DmaMuxResources::SPI4_TX,
 );

@@ -9,8 +9,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::ops::Deref;
 
-use crate::gpio::gpioa::{PA4, PA5, PA6};
-use crate::gpio::DefaultMode;
+use crate::gpio::{DefaultMode, PA4, PA5, PA6};
 use crate::pac;
 use crate::rcc::{self, *};
 use crate::stm32::RCC;

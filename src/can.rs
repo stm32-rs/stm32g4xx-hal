@@ -53,11 +53,11 @@ macro_rules! pins {
          rx: [ $($( #[ $pmetarx:meta ] )* $rx:ident<$rxaf:ident>),+ $(,)? ])) => {
         $(
             $( #[ $pmetatx ] )*
-            impl sealed::Tx<$PER> for $tx<crate::gpio::Alternate<$txaf>> {}
+            impl sealed::Tx<$PER> for $tx<$txaf> {}
         )+
         $(
             $( #[ $pmetarx ] )*
-            impl sealed::Rx<$PER> for $rx<crate::gpio::Alternate<$rxaf>> {}
+            impl sealed::Rx<$PER> for $rx<$rxaf> {}
         )+
     };
 }
@@ -65,12 +65,7 @@ macro_rules! pins {
 mod fdcan1 {
     use super::sealed;
     use super::{Can, CanExt};
-    use crate::gpio::{
-        gpioa::{PA11, PA12},
-        gpiob::{PB8, PB9},
-        gpiod::{PD0, PD1},
-        AF9,
-    };
+    use crate::gpio::{AF9, PA11, PA12, PB8, PB9, PD0, PD1};
     use crate::stm32::FDCAN1;
     use fdcan;
 
@@ -119,10 +114,7 @@ mod fdcan1 {
 mod fdcan2 {
     use super::sealed;
     use super::{Can, CanExt};
-    use crate::gpio::{
-        gpiob::{PB12, PB13, PB5, PB6},
-        AF9,
-    };
+    use crate::gpio::{AF9, PB12, PB13, PB5, PB6};
     use crate::stm32::FDCAN2;
     use fdcan;
     use fdcan::message_ram;
@@ -166,11 +158,7 @@ mod fdcan2 {
 mod fdcan3 {
     use super::sealed;
     use super::{Can, CanExt};
-    use crate::gpio::{
-        gpioa::{PA15, PA8},
-        gpiob::{PB3, PB4},
-        AF11,
-    };
+    use crate::gpio::{AF11, PA15, PA8, PB3, PB4};
     use crate::stm32::FDCAN3;
     use fdcan;
     use fdcan::message_ram;

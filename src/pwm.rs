@@ -201,23 +201,15 @@ use crate::time::{ExtU32, Hertz, NanoSecond, RateExtU32};
     feature = "stm32g483",
     feature = "stm32g484"
 ))]
-use crate::gpio::gpiog::*;
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g474",
-    feature = "stm32g483",
-    feature = "stm32g484"
-))]
 use crate::gpio::AF14;
-use crate::gpio::{gpioa::*, gpiob::*, gpioc::*, gpiod::*, gpioe::*, gpiof::*};
-use crate::gpio::{Alternate, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
+use crate::gpio::{self, AF1, AF10, AF11, AF12, AF2, AF3, AF4, AF5, AF6, AF9};
 
 use core::mem::size_of;
 
 // This trait marks that a GPIO pin can be used with a specific timer channel
 // TIM is the timer being used
 // CHANNEL is a marker struct for the channel (or multi channels for tuples)
-// Example: impl Pins<TIM1, C1> for PA8<Alternate<AF1>> { type Channel = Pwm<TIM1, C1>; }
+// Example: impl Pins<TIM1, C1> for PA8<AF1> { type Channel = Pwm<TIM1, C1>; }
 /// Pins is a trait that marks which GPIO pins may be used as PWM channels; it should not be directly used.
 /// See the device datasheet 'Pin descriptions' chapter for which pins can be used with which timer PWM channels (or look at Implementors)
 pub trait Pins<TIM, CHANNEL, COMP> {
@@ -548,74 +540,74 @@ macro_rules! pins {
 pins! {
     LPTIMER1:
         OUT: [
-            PA14<Alternate<AF1>>,
-            PB2<Alternate<AF1>>,
-            PC1<Alternate<AF1>>
+            gpio::PA14<AF1>,
+            gpio::PB2<AF1>,
+            gpio::PC1<AF1>
         ]
 }
 // Dual channel timers
 pins! {
     TIM15:
         CH1(ComplementaryDisabled): [
-            PA2<Alternate<AF9>>,
-            PB14<Alternate<AF1>>,
-            PF9<Alternate<AF3>>
+            gpio::PA2<AF9>,
+            gpio::PB14<AF1>,
+            gpio::PF9<AF3>
         ]
         CH2(ComplementaryImpossible): [
-            PA3<Alternate<AF9>>,
-            PB15<Alternate<AF1>>,
-            PF10<Alternate<AF3>>
+            gpio::PA3<AF9>,
+            gpio::PB15<AF1>,
+            gpio::PF10<AF3>
         ]
         CH1N: [
-            PA1<Alternate<AF9>>,
-            PB15<Alternate<AF2>>,
+            gpio::PA1<AF9>,
+            gpio::PB15<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484"
             ))]
-            PG9<Alternate<AF14>>
+            gpio::PG9<AF14>
         ]
         CH2N: []
         BRK: [
-            PA9<Alternate<AF9>>,
-            PC5<Alternate<AF2>>
+            gpio::PA9<AF9>,
+            gpio::PC5<AF2>
         ]
         BRK2: []
     TIM16:
         CH1(ComplementaryDisabled): [
-            PA6<Alternate<AF1>>,
-            PA12<Alternate<AF1>>,
-            PB4<Alternate<AF1>>,
-            PB8<Alternate<AF1>>,
-            PE0<Alternate<AF4>>
+            gpio::PA6<AF1>,
+            gpio::PA12<AF1>,
+            gpio::PB4<AF1>,
+            gpio::PB8<AF1>,
+            gpio::PE0<AF4>
         ]
         CH2(ComplementaryImpossible): []
         CH1N: [
-            PA13<Alternate<AF1>>,
-            PB6<Alternate<AF1>>
+            gpio::PA13<AF1>,
+            gpio::PB6<AF1>
         ]
         CH2N: []
         BRK: [
-            PB5<Alternate<AF1>>
+            gpio::PB5<AF1>
         ]
         BRK2: []
     TIM17:
         CH1(ComplementaryDisabled): [
-            PA7<Alternate<AF1>>,
-            PB5<Alternate<AF10>>,
-            PB9<Alternate<AF1>>,
-            PE1<Alternate<AF4>>
+            gpio::PA7<AF1>,
+            gpio::PB5<AF10>,
+            gpio::PB9<AF1>,
+            gpio::PE1<AF4>
         ]
         CH2(ComplementaryImpossible): []
         CH1N: [
-            PB7<Alternate<AF1>>
+            gpio::PB7<AF1>
         ]
         CH2N: []
         BRK: [
-            PA10<Alternate<AF1>>,
-            PB4<Alternate<AF10>>
+            gpio::PA10<AF1>,
+            gpio::PB4<AF10>
         ]
         BRK2: []
 }
@@ -623,87 +615,87 @@ pins! {
 pins! {
     TIM1:
         CH1(ComplementaryDisabled): [
-            PA8<Alternate<AF6>>,
-            PC0<Alternate<AF2>>,
-            PE9<Alternate<AF2>>
+            gpio::PA8<AF6>,
+            gpio::PC0<AF2>,
+            gpio::PE9<AF2>
         ]
         CH2(ComplementaryDisabled): [
-            PA9<Alternate<AF6>>,
-            PC1<Alternate<AF2>>,
-            PE11<Alternate<AF2>>
+            gpio::PA9<AF6>,
+            gpio::PC1<AF2>,
+            gpio::PE11<AF2>
         ]
         CH3(ComplementaryDisabled): [
-            PA10<Alternate<AF6>>,
-            PC2<Alternate<AF2>>,
-            PE13<Alternate<AF2>>
+            gpio::PA10<AF6>,
+            gpio::PC2<AF2>,
+            gpio::PE13<AF2>
         ]
         CH4(ComplementaryDisabled): [
-            PA11<Alternate<AF11>>,
-            PC3<Alternate<AF2>>,
-            PE14<Alternate<AF2>>
+            gpio::PA11<AF11>,
+            gpio::PC3<AF2>,
+            gpio::PE14<AF2>
         ]
         CH1N: [
-            PA7<Alternate<AF6>>,
-            PA11<Alternate<AF6>>,
-            PB13<Alternate<AF6>>,
-            PC13<Alternate<AF4>>,
-            PE8<Alternate<AF2>>
+            gpio::PA7<AF6>,
+            gpio::PA11<AF6>,
+            gpio::PB13<AF6>,
+            gpio::PC13<AF4>,
+            gpio::PE8<AF2>
         ]
         CH2N: [
-            PA12<Alternate<AF6>>,
-            PB0<Alternate<AF6>>,
-            PB14<Alternate<AF6>>,
-            PE10<Alternate<AF2>>
+            gpio::PA12<AF6>,
+            gpio::PB0<AF6>,
+            gpio::PB14<AF6>,
+            gpio::PE10<AF2>
         ]
         CH3N: [
-            PB1<Alternate<AF6>>,
-            PB9<Alternate<AF12>>,
-            PB15<Alternate<AF4>>,
-            PE12<Alternate<AF2>>,
-            PF0<Alternate<AF6>>
+            gpio::PB1<AF6>,
+            gpio::PB9<AF12>,
+            gpio::PB15<AF4>,
+            gpio::PE12<AF2>,
+            gpio::PF0<AF6>
         ]
         CH4N: [
-            PC5<Alternate<AF6>>,
-            PE15<Alternate<AF6>>
+            gpio::PC5<AF6>,
+            gpio::PE15<AF6>
         ]
         BRK: [
-            PA6<Alternate<AF6>>,
-            PA14<Alternate<AF6>>,
-            PA15<Alternate<AF9>>,
-            PB8<Alternate<AF12>>,
-            PB10<Alternate<AF12>>,
-            PB12<Alternate<AF6>>,
-            PC13<Alternate<AF2>>,
-            PE15<Alternate<AF2>>
+            gpio::PA6<AF6>,
+            gpio::PA14<AF6>,
+            gpio::PA15<AF9>,
+            gpio::PB8<AF12>,
+            gpio::PB10<AF12>,
+            gpio::PB12<AF6>,
+            gpio::PC13<AF2>,
+            gpio::PE15<AF2>
         ]
         BRK2: [
-            PA11<Alternate<AF12>>,
-            PC3<Alternate<AF6>>,
-            PE14<Alternate<AF6>>
+            gpio::PA11<AF12>,
+            gpio::PC3<AF6>,
+            gpio::PE14<AF6>
         ]
     TIM2:
         CH1(ComplementaryImpossible): [
-            PA0<Alternate<AF1>>,
-            PA5<Alternate<AF1>>,
-            PA15<Alternate<AF1>>,
-            PD3<Alternate<AF2>>
+            gpio::PA0<AF1>,
+            gpio::PA5<AF1>,
+            gpio::PA15<AF1>,
+            gpio::PD3<AF2>
         ]
         CH2(ComplementaryImpossible): [
-            PA1<Alternate<AF1>>,
-            PB3<Alternate<AF1>>,
-            PD4<Alternate<AF2>>
+            gpio::PA1<AF1>,
+            gpio::PB3<AF1>,
+            gpio::PD4<AF2>
         ]
         CH3(ComplementaryImpossible): [
-            PA2<Alternate<AF1>>,
-            PA9<Alternate<AF10>>,
-            PB10<Alternate<AF1>>,
-            PD7<Alternate<AF2>>
+            gpio::PA2<AF1>,
+            gpio::PA9<AF10>,
+            gpio::PB10<AF1>,
+            gpio::PD7<AF2>
         ]
         CH4(ComplementaryImpossible): [
-            PA3<Alternate<AF1>>,
-            PA10<Alternate<AF10>>,
-            PB11<Alternate<AF1>>,
-            PD6<Alternate<AF2>>
+            gpio::PA3<AF1>,
+            gpio::PA10<AF10>,
+            gpio::PB11<AF1>,
+            gpio::PD6<AF2>
         ]
         CH1N: []
         CH2N: []
@@ -713,28 +705,28 @@ pins! {
         BRK2: []
     TIM3:
         CH1(ComplementaryImpossible): [
-            PA6<Alternate<AF2>>,
-            PB4<Alternate<AF2>>,
-            PC6<Alternate<AF2>>,
-            PE2<Alternate<AF2>>
+            gpio::PA6<AF2>,
+            gpio::PB4<AF2>,
+            gpio::PC6<AF2>,
+            gpio::PE2<AF2>
         ]
         CH2(ComplementaryImpossible): [
-            PA4<Alternate<AF2>>,
-            PA7<Alternate<AF2>>,
-            PB5<Alternate<AF2>>,
-            PC7<Alternate<AF2>>,
-            PE3<Alternate<AF2>>
+            gpio::PA4<AF2>,
+            gpio::PA7<AF2>,
+            gpio::PB5<AF2>,
+            gpio::PC7<AF2>,
+            gpio::PE3<AF2>
         ]
         CH3(ComplementaryImpossible): [
-            PB0<Alternate<AF2>>,
-            PC8<Alternate<AF2>>,
-            PE4<Alternate<AF2>>
+            gpio::PB0<AF2>,
+            gpio::PC8<AF2>,
+            gpio::PE4<AF2>
         ]
         CH4(ComplementaryImpossible): [
-            PB1<Alternate<AF2>>,
-            PB7<Alternate<AF10>>,
-            PC9<Alternate<AF2>>,
-            PE5<Alternate<AF2>>
+            gpio::PB1<AF2>,
+            gpio::PB7<AF10>,
+            gpio::PC9<AF2>,
+            gpio::PE5<AF2>
         ]
         CH1N: []
         CH2N: []
@@ -744,30 +736,30 @@ pins! {
         BRK2: []
     TIM4:
         CH1(ComplementaryImpossible): [
-            PA11<Alternate<AF10>>,
-            PB6<Alternate<AF2>>,
-            PD12<Alternate<AF2>>
+            gpio::PA11<AF10>,
+            gpio::PB6<AF2>,
+            gpio::PD12<AF2>
         ]
         CH2(ComplementaryImpossible): [
-            PA12<Alternate<AF10>>,
-            PB7<Alternate<AF2>>,
-            PD13<Alternate<AF2>>
+            gpio::PA12<AF10>,
+            gpio::PB7<AF2>,
+            gpio::PD13<AF2>
         ]
         CH3(ComplementaryImpossible): [
-            PA13<Alternate<AF10>>,
-            PB8<Alternate<AF2>>,
-            PD14<Alternate<AF2>>
+            gpio::PA13<AF10>,
+            gpio::PB8<AF2>,
+            gpio::PD14<AF2>
         ]
         CH4(ComplementaryImpossible): [
-            PB9<Alternate<AF2>>,
-            PD15<Alternate<AF2>>,
+            gpio::PB9<AF2>,
+            gpio::PD15<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484"
             ))]
-            PF6<Alternate<AF2>>
+            gpio::PF6<AF2>
         ]
         CH1N: []
         CH2N: []
@@ -785,24 +777,24 @@ pins! {
 pins! {
     TIM5:
         CH1(ComplementaryImpossible): [
-            PA0<Alternate<AF2>>,
-            PB2<Alternate<AF2>>,
-            PF6<Alternate<AF6>>
+            gpio::PA0<AF2>,
+            gpio::PB2<AF2>,
+            gpio::PF6<AF6>
         ]
         CH2(ComplementaryImpossible): [
-            PA1<Alternate<AF2>>,
-            PC12<Alternate<AF1>>,
-            PF7<Alternate<AF6>>
+            gpio::PA1<AF2>,
+            gpio::PC12<AF1>,
+            gpio::PF7<AF6>
         ]
         CH3(ComplementaryImpossible): [
-            PA2<Alternate<AF2>>,
-            PE8<Alternate<AF1>>,
-            PF8<Alternate<AF6>>
+            gpio::PA2<AF2>,
+            gpio::PE8<AF1>,
+            gpio::PF8<AF6>
         ]
         CH4(ComplementaryImpossible): [
-            PA3<Alternate<AF2>>,
-            PE9<Alternate<AF1>>,
-            PF9<Alternate<AF6>>
+            gpio::PA3<AF2>,
+            gpio::PE9<AF1>,
+            gpio::PF9<AF6>
         ]
         CH1N: []
         CH2N: []
@@ -814,53 +806,53 @@ pins! {
 pins! {
     TIM8:
         CH1(ComplementaryDisabled): [
-            PA15<Alternate<AF2>>,
-            PB6<Alternate<AF5>>,
-            PC6<Alternate<AF4>>
+            gpio::PA15<AF2>,
+            gpio::PB6<AF5>,
+            gpio::PC6<AF4>
         ]
         CH2(ComplementaryDisabled): [
-            PA14<Alternate<AF5>>,
-            PB8<Alternate<AF10>>,
-            PC7<Alternate<AF4>>
+            gpio::PA14<AF5>,
+            gpio::PB8<AF10>,
+            gpio::PC7<AF4>
         ]
         CH3(ComplementaryDisabled): [
-            PB9<Alternate<AF10>>,
-            PC8<Alternate<AF4>>
+            gpio::PB9<AF10>,
+            gpio::PC8<AF4>
         ]
         CH4(ComplementaryDisabled): [
-            PC9<Alternate<AF4>>,
-            PD1<Alternate<AF4>>
+            gpio::PC9<AF4>,
+            gpio::PD1<AF4>
         ]
         CH1N: [
-            PA7<Alternate<AF4>>,
-            PB3<Alternate<AF4>>,
-            PC10<Alternate<AF4>>
+            gpio::PA7<AF4>,
+            gpio::PB3<AF4>,
+            gpio::PC10<AF4>
         ]
         CH2N: [
-            PB0<Alternate<AF4>>,
-            PB4<Alternate<AF4>>,
-            PC11<Alternate<AF4>>
+            gpio::PB0<AF4>,
+            gpio::PB4<AF4>,
+            gpio::PC11<AF4>
         ]
         CH3N: [
-            PB1<Alternate<AF4>>,
-            PB5<Alternate<AF3>>,
-            PC12<Alternate<AF4>>
+            gpio::PB1<AF4>,
+            gpio::PB5<AF3>,
+            gpio::PC12<AF4>
         ]
         CH4N: [
-            PC13<Alternate<AF6>>,
-            PD0<Alternate<AF6>>
+            gpio::PC13<AF6>,
+            gpio::PD0<AF6>
         ]
         BRK: [
-            PA0<Alternate<AF9>>,
-            PA6<Alternate<AF4>>,
-            PA10<Alternate<AF11>>,
-            PB7<Alternate<AF5>>,
-            PD2<Alternate<AF4>>
+            gpio::PA0<AF9>,
+            gpio::PA6<AF4>,
+            gpio::PA10<AF11>,
+            gpio::PB7<AF5>,
+            gpio::PD2<AF4>
         ]
         BRK2: [
-            PB6<Alternate<AF10>>,
-            PC9<Alternate<AF6>>,
-            PD1<Alternate<AF6>>
+            gpio::PB6<AF10>,
+            gpio::PC9<AF6>,
+            gpio::PD1<AF6>
         ]
 }
 #[cfg(any(
@@ -874,108 +866,108 @@ pins! {
 pins! {
     TIM20:
         CH1(ComplementaryDisabled): [
-            PB2<Alternate<AF3>>,
-            PE2<Alternate<AF6>>,
+            gpio::PB2<AF3>,
+            gpio::PE2<AF6>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF12<Alternate<AF2>>
+            gpio::PF12<AF2>
         ]
         CH2(ComplementaryDisabled): [
-            PC2<Alternate<AF6>>,
-            PE3<Alternate<AF6>>,
+            gpio::PC2<AF6>,
+            gpio::PE3<AF6>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF13<Alternate<AF2>>
+            gpio::PF13<AF2>
         ]
         CH3(ComplementaryDisabled): [
-            PC8<Alternate<AF6>>,
-            PF2<Alternate<AF2>>,
+            gpio::PC8<AF6>,
+            gpio::PF2<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF14<Alternate<AF2>>
+            gpio::PF14<AF2>
         ]
         CH4(ComplementaryDisabled): [
-            PE1<Alternate<AF4>>,
+            gpio::PE1<AF4>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF3<Alternate<AF2>>,
+            gpio::PF3<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF15<Alternate<AF2>>
+            gpio::PF15<AF2>
         ]
         CH1N: [
-            PE4<Alternate<AF6>>,
+            gpio::PE4<AF6>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF4<Alternate<AF3>>,
+            gpio::PF4<AF3>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG0<Alternate<AF2>>
+            gpio::PG0<AF2>
         ]
         CH2N: [
-            PE5<Alternate<AF6>>,
+            gpio::PE5<AF6>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF5<Alternate<AF2>>,
+            gpio::PF5<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG1<Alternate<AF2>>
+            gpio::PG1<AF2>
         ]
         CH3N: [
-            PE6<Alternate<AF6>>,
+            gpio::PE6<AF6>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG2<Alternate<AF2>>
+            gpio::PG2<AF2>
         ]
         CH4N: [
-            PE0<Alternate<AF3>>,
+            gpio::PE0<AF3>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG3<Alternate<AF6>>
+            gpio::PG3<AF6>
         ]
         BRK: [
             #[cfg(any(
@@ -984,22 +976,22 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF7<Alternate<AF2>>,
-            PF9<Alternate<AF2>>,
+            gpio::PF7<AF2>,
+            gpio::PF9<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG3<Alternate<AF2>>,
+            gpio::PG3<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG6<Alternate<AF2>>
+            gpio::PG6<AF2>
         ]
         BRK2: [
             #[cfg(any(
@@ -1008,15 +1000,15 @@ pins! {
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PF8<Alternate<AF2>>,
-            PF10<Alternate<AF2>>,
+            gpio::PF8<AF2>,
+            gpio::PF10<AF2>,
             #[cfg(any(
                 feature = "stm32g473",
                 feature = "stm32g474",
                 feature = "stm32g483",
                 feature = "stm32g484",
             ))]
-            PG4<Alternate<AF2>>
+            gpio::PG4<AF2>
         ]
 }
 

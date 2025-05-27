@@ -45,7 +45,7 @@ mod tests {
         },
         dac::{DacExt, DacOut},
         delay::SYSTDelayExt,
-        gpio::{GpioExt, AF6},
+        gpio::{GpioExt, AF6, PA8},
         pwm::PwmExt,
         rcc::RccExt,
         signature::{VrefCal, VDDA_CALIB},
@@ -135,8 +135,7 @@ mod tests {
 
         let gpioa = dp.GPIOA.split(&mut rcc);
         let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
-        let pin: stm32g4xx_hal::gpio::gpioa::PA8<stm32g4xx_hal::gpio::Alternate<AF6>> =
-            gpioa.pa8.into_alternate();
+        let pin: PA8<AF6> = gpioa.pa8.into_alternate();
 
         let mut pwm = dp.TIM1.pwm(pin, 1000u32.Hz(), &mut rcc);
 

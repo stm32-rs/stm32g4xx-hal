@@ -5,7 +5,7 @@ use crate::stm32::RCC;
 pub type LscoPin = gpioa::PA2<DefaultMode>;
 
 pub struct Lsco {
-    pin: gpioa::PA2<Alternate<AF0>>,
+    pin: gpioa::PA2<AF0>,
 }
 
 impl Lsco {
@@ -77,8 +77,8 @@ pub trait MCOExt<PIN> {
 macro_rules! mco {
     ($($PIN:ident),+) => {
         $(
-            impl MCOExt<$PIN<Alternate<AF0>>> for $PIN<DefaultMode> {
-                fn mco(self, src: MCOSrc, psc: Prescaler, rcc: &mut Rcc) -> Mco<$PIN<Alternate<AF0>>> {
+            impl MCOExt<crate::gpio::$PIN<AF0>> for crate::gpio::$PIN<DefaultMode> {
+                fn mco(self, src: MCOSrc, psc: Prescaler, rcc: &mut Rcc) -> Mco<crate::gpio::$PIN<AF0>> {
                     let psc_bits = match psc {
                         Prescaler::NotDivided => 0b000,
                         Prescaler::Div2 => 0b001,
@@ -119,8 +119,5 @@ macro_rules! mco {
         )+
     };
 }
-
-use crate::gpio::gpioa::PA8;
-use crate::gpio::gpiog::PG10;
 
 mco!(PA8, PG10);
