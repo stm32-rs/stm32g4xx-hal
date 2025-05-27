@@ -65,7 +65,6 @@ mod tests {
 
         pin.set_high();
         delay.delay(1.millis()); // Give the pin plenty of time to go high
-        assert!(pin.is_high());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
             assert!(!is_pax_low(gpioa, 8));
@@ -73,7 +72,6 @@ mod tests {
 
         pin.set_low();
         delay.delay(1.millis()); // Give the pin plenty of time to go low
-        assert!(pin.is_low());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
             assert!(is_pax_low(gpioa, 8));
