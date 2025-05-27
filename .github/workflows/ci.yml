@@ -42,6 +42,6 @@ jobs:
       - name: Regular build
         run: cargo check --features ${{ matrix.device }} --features ${{ matrix.features }}
       - name: Build examples
-        run: cargo check --examples --features ${{ matrix.device }} --features ${{ matrix.features }}
+        run: cargo check --examples --tests --features ${{ matrix.device }} --features ${{ matrix.features }}
       - name: Clippy
-        run: cargo clippy --examples --features ${{ matrix.device }} --features ${{ matrix.features }}
+        run: cargo clippy --examples --tests --features ${{ matrix.device }} --features ${{ matrix.features }}

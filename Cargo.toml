@@ -147,10 +147,12 @@ required-features = ["cordic"]
 [[test]]
 name = "nucleo-g474"
 harness = false
+required-features = ["stm32g474", "defmt", "cordic"]
 
 [[test]]
 name = "nucleo-g474_w_jumpers"
 harness = false
+required-features = ["stm32g474", "defmt", "cordic"]
 
 [lib]
 test = false
