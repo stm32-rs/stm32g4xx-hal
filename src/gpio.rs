@@ -22,6 +22,9 @@ pub struct Input<MODE> {
     _mode: PhantomData<MODE>,
 }
 
+/// Some alternate mode (type state)
+pub struct Alternate<const A: u8, Otype = PushPull>(PhantomData<Otype>);
+
 /// Floating input (type state)
 pub struct Floating;
 
@@ -60,26 +63,33 @@ pub enum SignalEdge {
     RisingFalling,
 }
 
-/// Altername Mode (type state)
-pub struct Alternate<const A: u8>;
-pub struct AlternateOD<const A: u8>;
+macro_rules! af {
+    ($($i:literal: $AFi:ident),+) => {
+        $(
+            #[doc = concat!("Alternate function ", $i, " (type state)" )]
+            pub type $AFi<Otype = PushPull> = Alternate<$i, Otype>;
+        )+
+    };
+}
 
-pub const AF0: u8 = 0;
-pub const AF1: u8 = 1;
-pub const AF2: u8 = 2;
-pub const AF3: u8 = 3;
-pub const AF4: u8 = 4;
-pub const AF5: u8 = 5;
-pub const AF6: u8 = 6;
-pub const AF7: u8 = 7;
-pub const AF8: u8 = 8;
-pub const AF9: u8 = 9;
-pub const AF10: u8 = 10;
-pub const AF11: u8 = 11;
-pub const AF12: u8 = 12;
-pub const AF13: u8 = 13;
-pub const AF14: u8 = 14;
-pub const AF15: u8 = 15;
+af!(
+    0: AF0,
+    1: AF1,
+    2: AF2,
+    3: AF3,
+    4: AF4,
+    5: AF5,
+    6: AF6,
+    7: AF7,
+    8: AF8,
+    9: AF9,
+    10: AF10,
+    11: AF11,
+    12: AF12,
+    13: AF13,
+    14: AF14,
+    15: AF15
+);
 
 /// External Interrupt Pin
 pub trait ExtiPin {
@@ -576,7 +586,7 @@ macro_rules! gpio {
                         $PXi { _mode: PhantomData }
                     }
 
-                    pub fn into_alternate_open_drain<const A: u8>(self) -> $PXi<AlternateOD<A>> {
+                    pub fn into_alternate_open_drain<const A: u8>(self) -> $PXi<Alternate<A, OpenDrain>> {
                         let mode = A as u8;
                         unsafe {
                             let gpio = &(*$GPIOX::ptr());
@@ -753,6 +763,8 @@ macro_rules! gpio {
                 }
             }
         }
+
+        pub use $gpiox::{ $($PXi,)+ };
     }
 }
 

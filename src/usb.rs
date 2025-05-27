@@ -5,7 +5,6 @@
 pub use stm32_usbd::UsbBus;
 
 use crate::gpio;
-use crate::gpio::gpioa::{PA11, PA12};
 use crate::rcc::{Enable, Reset};
 use crate::stm32::{RCC, USB};
 use core::fmt;
@@ -17,8 +16,8 @@ pub trait DmPin: crate::Sealed {}
 /// Trait implemented by all pins that can be the "D+" pin for the USB peripheral
 pub trait DpPin: crate::Sealed {}
 
-impl DmPin for PA11<gpio::Alternate<{ gpio::AF14 }>> {}
-impl DpPin for PA12<gpio::Alternate<{ gpio::AF14 }>> {}
+impl DmPin for gpio::PA11<gpio::AF14> {}
+impl DpPin for gpio::PA12<gpio::AF14> {}
 
 pub struct Peripheral<Dm: DmPin, Dp: DpPin> {
     /// USB register block
