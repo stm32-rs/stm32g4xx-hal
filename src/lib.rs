@@ -117,3 +117,9 @@ impl<RB, const A: usize> Ptr for Periph<RB, A> {
         Self::ptr()
     }
 }
+
+fn stripped_type_name<T>() -> &'static str {
+    let s = core::any::type_name::<T>();
+    let p = s.split("::");
+    p.last().unwrap()
+}

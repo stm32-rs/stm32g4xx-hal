@@ -34,7 +34,7 @@ fn main() -> ! {
     let gpiof = dp.GPIOF.split(&mut rcc);
 
     let cs = {
-        let mut cs = gpiof.pf8.into_push_pull_output();
+        let mut cs = gpiof.pf0.into_push_pull_output();
         cs.set_high();
         cs
     };
