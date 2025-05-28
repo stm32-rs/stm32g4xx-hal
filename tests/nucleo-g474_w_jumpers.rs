@@ -6,6 +6,8 @@
 #[path = "../examples/utils/mod.rs"]
 mod utils;
 
+mod common;
+
 use stm32g4xx_hal::adc::{self, AdcClaim, AdcCommonExt};
 use stm32g4xx_hal::comparator::{self, ComparatorSplit};
 use stm32g4xx_hal::dac::{self, DacExt, DacOut};
@@ -150,7 +152,7 @@ mod tests {
     ///            |    \
     ///   dac ---> | +     \
     ///            |         *----->
-    /// Vref---> | -     /
+    /// Vref--->   | -     /
     ///            |    /
     ///            | /
     ///
