@@ -621,7 +621,6 @@ output_pin! {
     COMP1: PA6,  8,
     COMP1: PA11, 8,
     COMP1: PB8,  8,
-    COMP1: PF4,  2,
 
     COMP2: PA2,  8,
     COMP2: PA7,  8,
@@ -637,13 +636,10 @@ output_pin! {
     COMP4: PB14, 8,
 }
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484",
-))]
+#[cfg(feature = "gpio-g47x")]
 output_pin! {
+    COMP1: PF4,  2,
+
     COMP5: PA9,  8,
     COMP5: PC7,  7,
 

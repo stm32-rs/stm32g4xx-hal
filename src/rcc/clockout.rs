@@ -2,7 +2,7 @@ use crate::gpio::*;
 use crate::rcc::*;
 use crate::stm32::RCC;
 
-pub type LscoPin = gpioa::PA2<DefaultMode>;
+pub type LscoPin = gpioa::PA2<Analog>;
 
 pub struct Lsco {
     pin: gpioa::PA2<AF0>,
@@ -20,7 +20,7 @@ impl Lsco {
     }
 
     pub fn release(self) -> LscoPin {
-        self.pin.into_floating_input()
+        self.pin.into_analog()
     }
 }
 
@@ -43,7 +43,7 @@ impl LSCOExt for LscoPin {
         };
         rcc.rb.bdcr().modify(|_, w| w.lscosel().bit(src_select_bit));
         Lsco {
-            pin: self.into_alternate(),
+            pin: self.into_mode(),
         }
     }
 }

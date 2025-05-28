@@ -3,7 +3,7 @@ authors = ["Vitaly Domnikov <oss@vitaly.codes>"]
 categories = ["embedded", "hardware-support", "no-std"]
 description = "Peripheral access API for STM32G4 series microcontrollers"
 documentation = "https://docs.rs/stm32g4xx-hal"
-edition = "2018"
+edition = "2021"
 keywords = ["arm", "cortex-m", "stm32g4xx", "hal"]
 license = "MIT/Apache-2.0"
 name = "stm32g4xx-hal"
@@ -86,6 +86,14 @@ stm32g483 = ["stm32g4/stm32g483", "cat3", "adc3", "adc4", "adc5"]
 stm32g484 = ["stm32g4/stm32g484", "cat3", "adc3", "adc4", "adc5"]
 stm32g491 = ["stm32g4/stm32g491", "cat4", "adc3"]
 stm32g4a1 = ["stm32g4/stm32g4a1", "cat4", "adc3"]
+
+
+gpio-g43x = []
+
+gpio-g47x = []
+
+gpio-g49x = []
+
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
 log-semihost = ["cortex-m-log/semihosting"]
@@ -103,9 +111,9 @@ adc4 = []
 adc5 = []
 
 # Device category
-cat2 = []
-cat3 = []
-cat4 = []
+cat2 = ["gpio-g43x"]
+cat3 = ["gpio-g47x"]
+cat4 = ["gpio-g49x"]
 
 can = ["dep:fdcan"]
 

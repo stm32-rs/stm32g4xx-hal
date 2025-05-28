@@ -3,7 +3,7 @@
 
 use stm32g4xx_hal::{
     //delay::{DelayExt, SYSTDelayExt},
-    gpio::{self, ExtiPin, GpioExt, Input, PullDown, SignalEdge},
+    gpio::{self, ExtiPin, GpioExt, Input, SignalEdge},
     rcc::RccExt,
     stm32,
     stm32::{interrupt, Interrupt},
@@ -15,7 +15,7 @@ use core::sync::atomic::{AtomicBool, Ordering};
 use cortex_m::{asm::wfi, interrupt::Mutex};
 use cortex_m_rt::entry;
 
-type ButtonPin = gpio::PC13<Input<PullDown>>;
+type ButtonPin = gpio::PC13<Input>;
 
 // Make LED pin globally available
 static G_BUTTON: Mutex<RefCell<Option<ButtonPin>>> = Mutex::new(RefCell::new(None));
