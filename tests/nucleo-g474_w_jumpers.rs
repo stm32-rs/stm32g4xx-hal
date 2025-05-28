@@ -288,7 +288,7 @@ fn setup_opamp_comp_dac() -> Peripherals {
     let gpioa = dp.GPIOA.split(&mut rcc);
     let pa1 = gpioa.pa1.into_analog();
     let pa2 = gpioa.pa2.into_analog();
-    let pa4 = gpioa.pa4.into_floating_input();
+    let pa4 = gpioa.pa4.into_analog();
 
     let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
     let dac3ch1 = dp.DAC3.constrain(dac::Dac3IntSig1, &mut rcc);

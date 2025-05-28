@@ -341,7 +341,7 @@ mod tests {
 
         let gpioa = dp.GPIOA.split(&mut rcc);
         let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
-        let pa4 = gpioa.pa4.into_floating_input();
+        let pa4 = gpioa.pa4.into_analog();
         let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
 
         let gpioa = unsafe { &*GPIOA::PTR };
