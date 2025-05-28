@@ -59,17 +59,11 @@ mod tests {
 
         pin.set_high();
         delay.delay(1.millis()); // Give the pin plenty of time to go high
-        {
-            let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(!is_pax_low(gpioa, pin_num));
-        }
+        assert!(!is_pax_low(pin_num));
 
         pin.set_low();
         delay.delay(1.millis()); // Give the pin plenty of time to go low
-        {
-            let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(is_pax_low(gpioa, pin_num));
-        }
+        assert!(is_pax_low(pin_num));
     }
 
     #[test]
@@ -96,18 +90,12 @@ mod tests {
         pin.set_high();
         delay.delay(1.millis()); // Give the pin plenty of time to go high
         assert!(pin.is_high());
-        {
-            let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(!is_pax_low(gpioa, pin_num));
-        }
+        assert!(!is_pax_low(pin_num));
 
         pin.set_low();
         delay.delay(1.millis()); // Give the pin plenty of time to go low
         assert!(pin.is_low());
-        {
-            let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(is_pax_low(gpioa, pin_num));
-        }
+        assert!(is_pax_low(pin_num));
     }
 
     #[test]
@@ -132,21 +120,19 @@ mod tests {
         pwm.set_duty_cycle_percent(50).unwrap();
         pwm.enable();
 
-        let gpioa = unsafe { &*GPIOA::PTR };
-
         let min: MicrosDurationU32 = 495u32.micros();
         let max: MicrosDurationU32 = 505u32.micros();
 
         debug!("Awaiting first rising edge...");
-        let duration_until_lo = await_lo(&timer, gpioa, pin_num, max).unwrap();
-        let first_lo_duration = await_hi(&timer, gpioa, pin_num, max).unwrap();
+        let duration_until_lo = await_lo(&timer, pin_num, max).unwrap();
+        let first_lo_duration = await_hi(&timer, pin_num, max).unwrap();
 
         let mut hi_duration = 0.micros();
         let mut lo_duration = 0.micros();
 
         for _ in 0..10 {
             // Make sure the timer half periods are within 495-505us
-            hi_duration = await_lo(&timer, gpioa, pin_num, max).unwrap();
+            hi_duration = await_lo(&timer, pin_num, max).unwrap();
             assert!(
                 hi_duration > min && hi_duration < max,
                 "hi: {} < {} < {}",
@@ -155,7 +141,7 @@ mod tests {
                 max
             );
 
-            lo_duration = await_hi(&timer, gpioa, pin_num, max).unwrap();
+            lo_duration = await_hi(&timer, pin_num, max).unwrap();
             assert!(
                 lo_duration > min && lo_duration < max,
                 "lo: {} < {} < {}",

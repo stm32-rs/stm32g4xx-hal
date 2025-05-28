@@ -20,7 +20,8 @@ impl<const CYCLES_PER_US: u32> Timer<CYCLES_PER_US> {
 }
 
 #[allow(dead_code)]
-pub fn is_pax_low(gpioa: &stm32::gpioa::RegisterBlock, pin: u8) -> bool {
+pub fn is_pax_low(pin: u8) -> bool {
+    let gpioa = unsafe { &*GPIOA::PTR };
     gpioa.idr().read().idr(pin).is_low()
 }
 
@@ -31,21 +32,19 @@ pub struct ErrorTimedOut;
 #[allow(dead_code)]
 pub fn await_lo<const CYCLES_PER_US: u32>(
     timer: &Timer<CYCLES_PER_US>,
-    gpioa: &stm32::gpioa::RegisterBlock,
     pin: u8,
     timeout: MicrosDurationU32,
 ) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    await_p(timer, || is_pax_low(gpioa, pin), timeout)
+    await_p(timer, || is_pax_low(pin), timeout)
 }
 
 #[allow(dead_code)]
 pub fn await_hi<const CYCLES_PER_US: u32>(
     timer: &Timer<CYCLES_PER_US>,
-    gpioa: &stm32::gpioa::RegisterBlock,
     pin: u8,
     timeout: MicrosDurationU32,
 ) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    await_p(timer, || !is_pax_low(gpioa, pin), timeout)
+    await_p(timer, || !is_pax_low(pin), timeout)
 }
 
 #[allow(dead_code)]
