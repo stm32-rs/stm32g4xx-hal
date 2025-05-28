@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::ops::Deref;
 
-use crate::gpio::{DefaultMode, PA4, PA5, PA6};
+use crate::gpio::{Analog, PA4, PA5, PA6};
 use crate::pac;
 use crate::rcc::{self, *};
 use crate::stm32::dac1::mcr::HFSEL;
@@ -223,27 +223,27 @@ macro_rules! impl_dac1_ch2_combos {
         $(impl_pin_for_dac!(DAC1: $pin_ch1,                                   // ch2: Not used
             $output_ch1
         );)*
-        impl_pin_for_dac!(DAC1: ($($pin_ch1,)* PA5<DefaultMode>),             // ch2: Ext pin
+        impl_pin_for_dac!(DAC1: ($($pin_ch1,)* PA5<Analog>),             // ch2: Ext pin
             ($($output_ch1,)* Dac1Ch2<M_EXT_PIN, Disabled>)
         );
         impl_pin_for_dac!(DAC1: ($($pin_ch1,)* Dac1IntSig2),                    // ch2: Internal
             ($($output_ch1,)* Dac1Ch2<M_INT_SIG, Disabled>)
         );
-        impl_pin_for_dac!(DAC1: ($($pin_ch1,)* (PA5<DefaultMode>, Dac1IntSig2)),// ch2: Mixed
+        impl_pin_for_dac!(DAC1: ($($pin_ch1,)* (PA5<Analog>, Dac1IntSig2)),// ch2: Mixed
             ($($output_ch1,)* Dac1Ch2<M_MIX_SIG, Disabled>)
         );
     };
 }
 
 impl_dac1_ch2_combos!(); // ch1: Not used
-impl_dac1_ch2_combos!(PA4<DefaultMode>, Dac1Ch1<M_EXT_PIN, Disabled>); // ch1: Ext pin
+impl_dac1_ch2_combos!(PA4<Analog>, Dac1Ch1<M_EXT_PIN, Disabled>); // ch1: Ext pin
 impl_dac1_ch2_combos!(Dac1IntSig1, Dac1Ch1<M_INT_SIG, Disabled>); // ch1: Internal
-impl_dac1_ch2_combos!((PA4<DefaultMode>, Dac1IntSig1), Dac1Ch1<M_MIX_SIG, Disabled>); // ch1: Mixed
+impl_dac1_ch2_combos!((PA4<Analog>, Dac1IntSig1), Dac1Ch1<M_MIX_SIG, Disabled>); // ch1: Mixed
 
 // DAC2
-impl_pin_for_dac!(DAC2: PA6<DefaultMode>, Dac2Ch1<M_EXT_PIN, Disabled>); // ch1: Ext pin
+impl_pin_for_dac!(DAC2: PA6<Analog>, Dac2Ch1<M_EXT_PIN, Disabled>); // ch1: Ext pin
 impl_pin_for_dac!(DAC2: Dac2IntSig1, Dac2Ch1<M_INT_SIG, Disabled>); // ch1: Internal
-impl_pin_for_dac!(DAC2: (PA6<DefaultMode>, Dac2IntSig1), Dac2Ch1<M_MIX_SIG, Disabled>); // ch1: Mixed
+impl_pin_for_dac!(DAC2: (PA6<Analog>, Dac2IntSig1), Dac2Ch1<M_MIX_SIG, Disabled>); // ch1: Mixed
 
 // DAC3 int
 impl_pin_for_dac!(DAC3: Dac3IntSig1, Dac3Ch1<M_INT_SIG, Disabled>);
