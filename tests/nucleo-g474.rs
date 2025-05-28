@@ -4,10 +4,10 @@
 #[path = "../examples/utils/mod.rs"]
 mod utils;
 
+mod common;
+
 use utils::logger::debug;
 
-use core::ops::FnMut;
-use core::result::Result;
 use fugit::{ExtU32, HertzU32, MicrosDurationU32};
 use hal::delay::DelayExt;
 use hal::stm32;
@@ -15,15 +15,6 @@ use stm32g4xx_hal as hal;
 
 pub const F_SYS: HertzU32 = HertzU32::MHz(16);
 pub const CYCLES_PER_US: u32 = F_SYS.raw() / 1_000_000;
-
-pub fn enable_timer(cp: &mut stm32::CorePeripherals) {
-    cp.DCB.enable_trace();
-    cp.DWT.enable_cycle_counter();
-}
-
-pub fn now() -> MicrosDurationU32 {
-    (stm32::DWT::cycle_count() / CYCLES_PER_US).micros()
-}
 
 #[defmt_test::tests]
 mod tests {
@@ -47,6 +38,9 @@ mod tests {
         stm32::GPIOA,
     };
 
+    use crate::common::{await_hi, await_lo, is_pax_low};
+    type Timer = crate::common::Timer<{ crate::CYCLES_PER_US }>;
+
     #[test]
     fn gpio_push_pull() {
         use super::*;
@@ -61,19 +55,20 @@ mod tests {
         let gpioa = dp.GPIOA.split(&mut rcc);
         let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let mut pin = gpioa.pa8.into_push_pull_output();
+        let pin_num = 8; // PA8
 
         pin.set_high();
         delay.delay(1.millis()); // Give the pin plenty of time to go high
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(!is_pax_low(gpioa, 8));
+            assert!(!is_pax_low(gpioa, pin_num));
         }
 
         pin.set_low();
         delay.delay(1.millis()); // Give the pin plenty of time to go low
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(is_pax_low(gpioa, 8));
+            assert!(is_pax_low(gpioa, pin_num));
         }
     }
 
@@ -90,11 +85,12 @@ mod tests {
         let gpioa = dp.GPIOA.split(&mut rcc);
         let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let mut pin = gpioa.pa8.into_open_drain_output();
+        let pin_num = 8; // PA8
 
         // Enable pull-up resistor
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            gpioa.pupdr().modify(|_, w| w.pupdr8().pull_up());
+            gpioa.pupdr().modify(|_, w| w.pupdr(pin_num).pull_up());
         }
 
         pin.set_high();
@@ -102,7 +98,7 @@ mod tests {
         assert!(pin.is_high());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(!is_pax_low(gpioa, 8));
+            assert!(!is_pax_low(gpioa, pin_num));
         }
 
         pin.set_low();
@@ -110,7 +106,7 @@ mod tests {
         assert!(pin.is_low());
         {
             let gpioa = unsafe { &*GPIOA::PTR };
-            assert!(is_pax_low(gpioa, 8));
+            assert!(is_pax_low(gpioa, pin_num));
         }
     }
 
@@ -121,7 +117,7 @@ mod tests {
         // TODO: Is it ok to steal these?
         let mut cp = unsafe { stm32::CorePeripherals::steal() };
         let dp = unsafe { stm32::Peripherals::steal() };
-        enable_timer(&mut cp);
+        let timer = Timer::enable_timer(&mut cp);
 
         let mut rcc = dp.RCC.constrain();
         assert_eq!(rcc.clocks.sys_clk, F_SYS);
@@ -129,6 +125,7 @@ mod tests {
         let gpioa = dp.GPIOA.split(&mut rcc);
         let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
         let pin: PA8<AF6> = gpioa.pa8.into_alternate();
+        let pin_num = 8; // PA8
 
         let mut pwm = dp.TIM1.pwm(pin, 1000u32.Hz(), &mut rcc);
 
@@ -141,16 +138,15 @@ mod tests {
         let max: MicrosDurationU32 = 505u32.micros();
 
         debug!("Awaiting first rising edge...");
-        let duration_until_lo = await_lo(gpioa, max).unwrap();
-        let first_lo_duration = await_hi(gpioa, max).unwrap();
+        let duration_until_lo = await_lo(&timer, gpioa, pin_num, max).unwrap();
+        let first_lo_duration = await_hi(&timer, gpioa, pin_num, max).unwrap();
 
         let mut hi_duration = 0.micros();
         let mut lo_duration = 0.micros();
 
         for _ in 0..10 {
             // Make sure the timer half periods are within 495-505us
-
-            hi_duration = await_lo(gpioa, max).unwrap();
+            hi_duration = await_lo(&timer, gpioa, pin_num, max).unwrap();
             assert!(
                 hi_duration > min && hi_duration < max,
                 "hi: {} < {} < {}",
@@ -159,7 +155,7 @@ mod tests {
                 max
             );
 
-            lo_duration = await_hi(gpioa, max).unwrap();
+            lo_duration = await_hi(&timer, gpioa, pin_num, max).unwrap();
             assert!(
                 lo_duration > min && lo_duration < max,
                 "lo: {} < {} < {}",
@@ -326,43 +322,5 @@ mod tests {
         );
         debug!("temp: {}°C", temp);
         assert!((20.0..35.0).contains(&temp), "20.0 < {} < 35.0", temp);
-    }
-}
-
-fn is_pax_low(gpioa: &stm32::gpioa::RegisterBlock, x: u8) -> bool {
-    gpioa.idr().read().idr(x).is_low()
-}
-
-#[derive(Debug, defmt::Format)]
-struct ErrorTimedOut;
-
-fn await_lo(
-    gpioa: &stm32::gpioa::RegisterBlock,
-    timeout: MicrosDurationU32,
-) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    await_p(|| is_pax_low(gpioa, 8), timeout)
-}
-
-fn await_hi(
-    gpioa: &stm32::gpioa::RegisterBlock,
-    timeout: MicrosDurationU32,
-) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    await_p(|| !is_pax_low(gpioa, 8), timeout)
-}
-
-fn await_p(
-    mut p: impl FnMut() -> bool,
-    timeout: MicrosDurationU32,
-) -> Result<MicrosDurationU32, ErrorTimedOut> {
-    let before = now();
-
-    loop {
-        let passed_time = now() - before;
-        if p() {
-            return Ok(passed_time);
-        }
-        if passed_time > timeout {
-            return Err(ErrorTimedOut);
-        }
     }
 }
