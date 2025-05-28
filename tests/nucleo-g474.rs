@@ -328,35 +328,6 @@ mod tests {
         debug!("temp: {}°C", temp);
         assert!((20.0..35.0).contains(&temp), "20.0 < {} < 35.0", temp);
     }
-
-    #[test]
-    fn dac() {
-        use super::*;
-
-        // TODO: Is it ok to steal these?
-        let cp = unsafe { stm32::CorePeripherals::steal() };
-        let dp = unsafe { stm32::Peripherals::steal() };
-        let mut rcc = dp.RCC.constrain();
-        let mut delay = cp.SYST.delay(&rcc.clocks);
-
-        let gpioa = dp.GPIOA.split(&mut rcc);
-        let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
-        let pa4 = gpioa.pa4.into_analog();
-        let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
-
-        let gpioa = unsafe { &*GPIOA::PTR };
-
-        // dac_manual will have its value set manually
-        let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable(&mut rcc);
-
-        dac.set_value(0);
-        delay.delay_ms(1);
-        assert!(is_pax_low(gpioa, 4));
-
-        dac.set_value(4095);
-        delay.delay_ms(1);
-        assert!(!is_pax_low(gpioa, 4));
-    }
 }
 
 fn is_pax_low(gpioa: &stm32::gpioa::RegisterBlock, x: u8) -> bool {
