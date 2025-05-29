@@ -19,7 +19,7 @@ use stm32g4xx_hal::rcc::{self, RccExt};
 use hal::stm32;
 use stm32g4xx_hal as hal;
 
-#[defmt_test::tests]
+#[embedded_test::tests]
 mod tests {
     use embedded_hal::delay::DelayNs;
     use stm32g4xx_hal::{
@@ -311,9 +311,8 @@ fn setup_opamp_comp_dac() -> Peripherals {
     //op1+ PA1 -> A1
     //DAC1_OUT1 PA4 -> A2
 
-    // TODO: Is it ok to steal these?
-    let cp = unsafe { stm32::CorePeripherals::steal() };
-    let dp = unsafe { stm32::Peripherals::steal() };
+    let cp = stm32::CorePeripherals::take().unwrap();
+    let dp = stm32::Peripherals::take().unwrap();
     let mut rcc = dp.RCC.constrain();
     let mut delay = cp.SYST.delay(&rcc.clocks);
 

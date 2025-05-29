@@ -16,7 +16,7 @@ use stm32g4xx_hal as hal;
 pub const F_SYS: HertzU32 = HertzU32::MHz(16);
 pub const CYCLES_PER_US: u32 = F_SYS.raw() / 1_000_000;
 
-#[defmt_test::tests]
+#[embedded_test::tests]
 mod tests {
     use embedded_hal::pwm::SetDutyCycle;
     use fixed::types::I1F15;
@@ -45,9 +45,8 @@ mod tests {
     fn gpio_push_pull() {
         use super::*;
 
-        // TODO: Is it ok to steal these?
-        let cp = unsafe { stm32::CorePeripherals::steal() };
-        let dp = unsafe { stm32::Peripherals::steal() };
+        let cp = stm32::CorePeripherals::take().unwrap();
+        let dp = stm32::Peripherals::take().unwrap();
         let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
         defmt::dbg!(rcc.clocks.sys_clk);
@@ -70,9 +69,8 @@ mod tests {
     fn gpio_open_drain() {
         use super::*;
 
-        // TODO: Is it ok to steal these?
-        let cp = unsafe { stm32::CorePeripherals::steal() };
-        let dp = unsafe { stm32::Peripherals::steal() };
+        let cp = stm32::CorePeripherals::take().unwrap();
+        let dp = stm32::Peripherals::take().unwrap();
         let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
@@ -102,9 +100,8 @@ mod tests {
     fn pwm() {
         use super::*;
 
-        // TODO: Is it ok to steal these?
-        let mut cp = unsafe { stm32::CorePeripherals::steal() };
-        let dp = unsafe { stm32::Peripherals::steal() };
+        let mut cp = stm32::CorePeripherals::take().unwrap();
+        let dp = stm32::Peripherals::take().unwrap();
         let timer = Timer::enable_timer(&mut cp);
 
         let mut rcc = dp.RCC.constrain();
@@ -171,7 +168,7 @@ mod tests {
 
         use super::*;
 
-        let dp = unsafe { stm32::Peripherals::steal() };
+        let dp = stm32::Peripherals::take().unwrap();
         let mut rcc = dp.RCC.constrain();
 
         let mut cordic = dp
@@ -205,9 +202,8 @@ mod tests {
     fn adc() {
         use super::*;
 
-        // TODO: Is it ok to steal these?
-        let cp = unsafe { stm32::CorePeripherals::steal() };
-        let dp = unsafe { stm32::Peripherals::steal() };
+        let cp = stm32::CorePeripherals::take().unwrap();
+        let dp = stm32::Peripherals::take().unwrap();
         let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
@@ -246,9 +242,8 @@ mod tests {
             dma::{channel::DMAExt, config::DmaConfig, TransferExt},
         };
 
-        // TODO: Is it ok to steal these?
-        let cp = unsafe { stm32::CorePeripherals::steal() };
-        let dp = unsafe { stm32::Peripherals::steal() };
+        let cp = stm32::CorePeripherals::take().unwrap();
+        let dp = stm32::Peripherals::take().unwrap();
         let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
