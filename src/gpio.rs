@@ -6,11 +6,11 @@
 //! ```rust
 //! // Acquire the GPIOC peripheral
 //! // NOTE: `dp` is the device peripherals from the `PAC` crate
-//! let mut gpioa = dp.GPIOA.split();
+//! let mut gpioa = dp.GPIOA.split(&mut rcc);
 //! ```
 //!
 //! This gives you a struct containing all the pins `px0..px15`.
-//! By default pins are in floating input mode. You can change their modes.
+//! By default pins are in `Analog` mode. You can change their modes.
 //! For example, to set `pa5` high, you would call
 //!
 //! ```rust
@@ -62,8 +62,8 @@ mod convert;
 pub use convert::PinMode;
 mod partially_erased;
 pub use partially_erased::{PEPin, PartiallyErasedPin};
-mod erased;
-pub use erased::{AnyPin, ErasedPin};
+mod anypin;
+pub use anypin::AnyPin;
 mod exti;
 pub use exti::ExtiPin;
 mod dynamic;
@@ -408,8 +408,8 @@ impl<const P: char, const N: u8, MODE> Pin<P, N, MODE> {
     ///
     /// This is useful when you want to collect the pins into an array where you
     /// need all the elements to have the same type
-    pub fn erase(self) -> ErasedPin<MODE> {
-        ErasedPin::new(P as u8 - b'A', N)
+    pub fn erase(self) -> AnyPin<MODE> {
+        AnyPin::new(P as u8 - b'A', N)
     }
 }
 
@@ -422,7 +422,7 @@ impl<const P: char, const N: u8, MODE> From<Pin<P, N, MODE>> for PartiallyErased
     }
 }
 
-impl<const P: char, const N: u8, MODE> From<Pin<P, N, MODE>> for ErasedPin<MODE> {
+impl<const P: char, const N: u8, MODE> From<Pin<P, N, MODE>> for AnyPin<MODE> {
     /// Pin-to-erased pin conversion using the [`From`] trait.
     ///
     /// Note that [`From`] is the reciprocal of [`Into`].

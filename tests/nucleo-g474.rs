@@ -27,7 +27,7 @@ pub fn now() -> MicrosDurationU32 {
 
 #[defmt_test::tests]
 mod tests {
-    use embedded_hal::{delay::DelayNs, pwm::SetDutyCycle};
+    use embedded_hal::pwm::SetDutyCycle;
     use fixed::types::I1F15;
     use fugit::RateExtU32;
     use stm32g4xx_hal::{
@@ -39,7 +39,6 @@ mod tests {
             types::{Q15, Q31},
             Ext,
         },
-        dac::{DacExt, DacOut},
         delay::SYSTDelayExt,
         gpio::{GpioExt, AF6, PA8},
         pwm::PwmExt,
