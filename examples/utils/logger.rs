@@ -12,6 +12,7 @@ cfg_if::cfg_if! {
 
 cfg_if::cfg_if! {
     if #[cfg(feature = "log-itm")] {
+        #[cfg(not(test))]
         use panic_itm as _;
 
         use lazy_static::lazy_static;
@@ -57,6 +58,7 @@ cfg_if::cfg_if! {
     }
     else if #[cfg(feature = "defmt")] {
         use defmt_rtt as _; // global logger
+        #[cfg(not(test))]
         use panic_probe as _;
         #[allow(unused_imports)]
         pub use defmt::Logger;
@@ -67,6 +69,7 @@ cfg_if::cfg_if! {
         pub fn init() {}
     }
     else if #[cfg(feature = "log-semihost")] {
+        #[cfg(not(test))]
         use panic_semihosting as _;
 
         use lazy_static::lazy_static;
@@ -104,6 +107,7 @@ cfg_if::cfg_if! {
         }
     }
     else {
+        #[cfg(not(test))]
         use panic_halt as _;
 
         #[allow(dead_code)]

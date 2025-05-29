@@ -21,7 +21,7 @@ impl<const CYCLES_PER_US: u32> Timer<CYCLES_PER_US> {
 
 #[allow(dead_code)]
 pub fn is_pax_low(pin: u8) -> bool {
-    let gpioa = unsafe { &*GPIOA::PTR };
+    let gpioa = unsafe { &*stm32::GPIOA::PTR };
     gpioa.idr().read().idr(pin).is_low()
 }
 
