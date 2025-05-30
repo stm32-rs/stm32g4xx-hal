@@ -33,13 +33,13 @@ where
         self,
         _tx: TX,
         _rx: RX,
-        rcc: &Rcc,
+        rcc: &mut Rcc,
     ) -> fdcan::FdCan<Can<Self>, fdcan::ConfigMode>
     where
         TX: sealed::Tx<Self>,
         RX: sealed::Rx<Self>,
     {
-        Self::enable(&rcc.rb);
+        Self::enable(rcc);
 
         self.fdcan_unchecked()
     }

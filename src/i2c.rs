@@ -12,7 +12,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
     feature = "stm32g484"
 ))]
 use crate::stm32::I2C4;
-use crate::stm32::{I2C1, I2C2, I2C3, RCC};
+use crate::stm32::{I2C1, I2C2, I2C3};
 use crate::time::Hertz;
 use core::cmp;
 use core::convert::TryInto;
@@ -29,12 +29,9 @@ pub struct Config {
 
 impl Config {
     /// Creates a default configuration for the given bus frequency.
-    pub fn new<T>(speed: T) -> Self
-    where
-        T: Into<Hertz>,
-    {
+    pub fn new(speed: Hertz) -> Self {
         Config {
-            speed: Some(speed.into()),
+            speed: Some(speed),
             timing: None,
             analog_filter: true,
             digital_filter: 0,
@@ -98,16 +95,17 @@ impl Config {
             (psc, scll, sclh, sdadel, scldel)
         };
 
-        reg.presc()
-            .set(psc.try_into().unwrap())
-            .scldel()
-            .set(scldel)
-            .sdadel()
-            .set(sdadel)
-            .sclh()
-            .set(sclh.try_into().unwrap())
-            .scll()
-            .set(scll.try_into().unwrap())
+        reg.presc().set(psc.try_into().unwrap());
+        reg.scldel().set(scldel);
+        reg.sdadel().set(sdadel);
+        reg.sclh().set(sclh.try_into().unwrap());
+        reg.scll().set(scll.try_into().unwrap())
+    }
+}
+
+impl From<Hertz> for Config {
+    fn from(value: Hertz) -> Self {
+        Self::new(value)
     }
 }
 
@@ -149,7 +147,13 @@ impl embedded_hal::i2c::Error for Error {
 }
 
 pub trait I2cExt<I2C> {
-    fn i2c<SDA, SCL>(self, sda: SDA, scl: SCL, config: Config, rcc: &mut Rcc) -> I2c<I2C, SDA, SCL>
+    fn i2c<SDA, SCL>(
+        self,
+        sda: SDA,
+        scl: SCL,
+        config: impl Into<Config>,
+        rcc: &mut Rcc,
+    ) -> I2c<I2C, SDA, SCL>
     where
         SDA: SDAPin<I2C>,
         SCL: SCLPin<I2C>;
@@ -216,7 +220,7 @@ macro_rules! i2c {
                 self,
                 sda: SDA,
                 scl: SCL,
-                config: Config,
+                config: impl Into<Config>,
                 rcc: &mut Rcc,
             ) -> I2c<$I2CX, SDA, SCL>
             where
@@ -232,17 +236,15 @@ macro_rules! i2c {
             SCL: SCLPin<$I2CX>
         {
             /// Initializes the I2C peripheral.
-            pub fn $i2cx(i2c: $I2CX, sda: SDA, scl: SCL, config: Config, rcc: &mut Rcc) -> Self
+            pub fn $i2cx(i2c: $I2CX, sda: SDA, scl: SCL, config: impl Into<Config>, rcc: &mut Rcc) -> Self
             where
                 SDA: SDAPin<$I2CX>,
                 SCL: SCLPin<$I2CX>,
             {
+                let config = config.into();
                 // Enable and reset I2C
-                unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $I2CX::enable(rcc_ptr);
-                    $I2CX::reset(rcc_ptr);
-                }
+                $I2CX::enable(rcc);
+                $I2CX::reset(rcc);
 
                 // Make sure the I2C unit is disabled so we can configure it
                 i2c.cr1().modify(|_, w| w.pe().clear_bit());
@@ -252,12 +254,9 @@ macro_rules! i2c {
 
                 // Enable the I2C processing
                 i2c.cr1().modify(|_, w| {
-                    w.pe()
-                        .set_bit()
-                        .dnf()
-                        .set(config.digital_filter)
-                        .anfoff()
-                        .bit(!config.analog_filter)
+                    w.pe().set_bit();
+                    w.dnf().set(config.digital_filter);
+                    w.anfoff().bit(!config.analog_filter)
                 });
 
                 I2c { i2c, sda, scl }
@@ -267,9 +266,8 @@ macro_rules! i2c {
             pub fn release(self) -> ($I2CX, SDA, SCL) {
                 // Disable I2C.
                 unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $I2CX::reset(rcc_ptr);
-                    $I2CX::disable(rcc_ptr);
+                    $I2CX::reset_unchecked();
+                    $I2CX::disable_unchecked();
                 }
 
                 (self.i2c, self.sda, self.scl)

@@ -49,11 +49,8 @@ fn init_adc_common<ADCC: AdcCommonExt>(
 ) -> AdcCommon<ADCC> {
     let cfg = cfg.to_bits(rcc);
 
-    unsafe {
-        let rcc_ptr = &(*stm32::RCC::ptr());
-        ADCC::enable(rcc_ptr);
-        ADCC::reset(rcc_ptr);
-    }
+    ADCC::enable(rcc);
+    ADCC::reset(rcc);
 
     // Select system clock as ADC clock source
     rcc.rb

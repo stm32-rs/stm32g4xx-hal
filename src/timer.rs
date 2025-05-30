@@ -10,8 +10,6 @@ use cortex_m::peripheral::{DCB, DWT, SYST};
 use embedded_hal_old::timer::{Cancel, CountDown as _, Periodic};
 use void::Void;
 
-use crate::stm32::RCC;
-
 use crate::rcc::{self, Clocks};
 use crate::time::{Hertz, MicroSecond};
 
@@ -214,10 +212,10 @@ where
     pub fn new(tim: TIM, clocks: &Clocks) -> Self {
         unsafe {
             //NOTE(unsafe) this reference will only be used for atomic writes with no side effects
-            let rcc = &(*RCC::ptr());
+
             // Enable and reset the timer peripheral
-            TIM::enable(rcc);
-            TIM::reset(rcc);
+            TIM::enable_unchecked();
+            TIM::reset_unchecked();
         }
 
         Self {

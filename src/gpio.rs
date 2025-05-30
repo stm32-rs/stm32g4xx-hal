@@ -582,8 +582,8 @@ macro_rules! gpio {
                 type Parts = Parts;
 
                 fn split(self, rcc: &mut Rcc) -> Parts {
-                    Self::enable(&rcc.rb);
-                    Self::reset(&rcc.rb);
+                    Self::enable(rcc);
+                    Self::reset(rcc);
 
                     Parts {
                         $(

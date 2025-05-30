@@ -173,7 +173,6 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 
 use crate::stm32::LPTIMER1;
-use crate::stm32::RCC;
 #[cfg(any(
     feature = "stm32g473",
     feature = "stm32g474",
@@ -1147,11 +1146,8 @@ macro_rules! tim_hal {
             where
                 PINS: Pins<$TIMX, T, U>,
             {
-                unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $TIMX::enable(rcc_ptr);
-                    $TIMX::reset(rcc_ptr);
-                }
+                $TIMX::enable(rcc);
+                $TIMX::reset(rcc);
 
                 let clk = $TIMX::get_timer_frequency(&rcc.clocks);
 
@@ -1189,11 +1185,8 @@ macro_rules! tim_hal {
                 where
                     PINS: Pins<Self, CHANNEL, COMP>
                 {
-                    unsafe {
-                        let rcc_ptr = &(*RCC::ptr());
-                        $TIMX::enable(rcc_ptr);
-                        $TIMX::reset(rcc_ptr);
-                    }
+                    $TIMX::enable(rcc);
+                    $TIMX::reset(rcc);
 
                     let clk = $TIMX::get_timer_frequency(&rcc.clocks).raw();
 
@@ -1801,11 +1794,8 @@ macro_rules! lptim_hal {
             where
                 PINS: Pins<$TIMX, T, U>,
             {
-                unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $TIMX::enable(rcc_ptr);
-                    $TIMX::reset(rcc_ptr);
-                }
+                $TIMX::enable(rcc);
+                $TIMX::reset(rcc);
 
                 let clk = $TIMX::get_timer_frequency(&rcc.clocks);
                 let reload = clk / freq;

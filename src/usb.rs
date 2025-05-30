@@ -5,8 +5,8 @@
 pub use stm32_usbd::UsbBus;
 
 use crate::gpio;
+use crate::pac::USB;
 use crate::rcc::{Enable, Reset};
-use crate::stm32::{RCC, USB};
 use core::fmt;
 use stm32_usbd::UsbPeripheral;
 
@@ -56,9 +56,8 @@ unsafe impl<Dm: DmPin + Send, Dp: DpPin + Send> UsbPeripheral for Peripheral<Dm,
 
     fn enable() {
         cortex_m::interrupt::free(|_| unsafe {
-            let rcc_ptr = &(*RCC::ptr());
-            USB::enable(rcc_ptr);
-            USB::reset(rcc_ptr);
+            USB::enable_unchecked();
+            USB::reset_unchecked();
         });
     }
 

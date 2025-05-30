@@ -13,7 +13,6 @@ use crate::gpio::{Analog, PA4, PA5, PA6};
 use crate::pac;
 use crate::rcc::{self, *};
 use crate::stm32::dac1::mcr::HFSEL;
-use crate::stm32::RCC;
 use embedded_hal::delay::DelayNs;
 
 pub trait DacOut<V> {
@@ -458,15 +457,12 @@ pub trait DacExt: Sized {
 }
 
 impl<DAC: Instance> DacExt for DAC {
-    fn constrain<PINS>(self, _pins: PINS, _rcc: &mut Rcc) -> PINS::Output
+    fn constrain<PINS>(self, _pins: PINS, rcc: &mut Rcc) -> PINS::Output
     where
         PINS: Pins<Self>,
     {
-        unsafe {
-            let rcc_ptr = &(*RCC::ptr());
-            Self::enable(rcc_ptr);
-            Self::reset(rcc_ptr);
-        }
+        Self::enable(rcc);
+        Self::reset(rcc);
 
         #[allow(clippy::uninit_assumed_init)]
         unsafe {
