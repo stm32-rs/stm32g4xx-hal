@@ -13,7 +13,7 @@ fn main() -> ! {
     use hal::comparator::{self, ComparatorExt, ComparatorSplit};
     use hal::dac::{Dac1IntSig1, DacExt, DacOut};
     use hal::delay::SYSTDelayExt;
-    use hal::gpio::GpioExt;
+    use hal::gpio::{GpioExt, PushPull};
     use hal::rcc::RccExt;
     use hal::stasis::Freeze;
     use hal::stm32;
@@ -44,10 +44,10 @@ fn main() -> ! {
         &rcc.clocks,
     );
 
-    let led2 = gpioa.pa0.into_push_pull_output();
+    let led2 = gpioa.pa0;
     // Configure PA12 to the comparator's alternate function so it gets
     // changed directly by the comparator.
-    comp.output_pin(led2);
+    comp.output_pin::<PushPull>(led2);
     let _comp1 = comp.enable().lock();
 
     enum Direction {

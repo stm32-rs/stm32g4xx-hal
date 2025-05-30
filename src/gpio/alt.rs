@@ -295,6 +295,12 @@ pub trait CanCommon {
     type Tx;
 }
 
+/// Comparator pins
+pub trait CompOutput {
+    /// Output pin
+    type Out<Otype>;
+}
+
 // Serial pins
 pub trait SerialAsync {
     /// Receive

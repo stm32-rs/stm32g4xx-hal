@@ -16,7 +16,7 @@ use rt::entry;
 #[entry]
 fn main() -> ! {
     use hal::comparator::{refint_input, ComparatorExt, ComparatorSplit, Config, Hysteresis};
-    use hal::gpio::GpioExt;
+    use hal::gpio::{GpioExt, PushPull};
     use hal::rcc::RccExt;
     use hal::stm32;
     use stm32g4xx_hal as hal;
@@ -45,10 +45,10 @@ fn main() -> ! {
             .output_inverted(),
         &rcc.clocks,
     );
-    let led2 = gpioa.pa12.into_push_pull_output();
+    let led2 = gpioa.pa12;
     // Configure PA12 to the comparator's alternate function so it gets
     // changed directly by the comparator.
-    comp2.output_pin(led2);
+    comp2.output_pin::<PushPull>(led2);
     let _comp2 = comp2.enable().lock();
 
     loop {

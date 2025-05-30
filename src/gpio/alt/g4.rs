@@ -9,7 +9,7 @@ pub mod comp1 {
     use super::*;
 
     pin! {
-        <Out, PushPull> for [
+        <Out> default:PushPull for [
             PA0<8>,
             PA6<8>,
             PA11<8>,
@@ -18,6 +18,9 @@ pub mod comp1 {
             PF4<2>,
         ],
     }
+    impl CompOutput for crate::comparator::COMP1 {
+        type Out<Otype> = Out<Otype>;
+    }
 }
 
 #[cfg(any(feature = "gpio-g43x", feature = "gpio-g47x", feature = "gpio-g49x"))]
@@ -25,12 +28,15 @@ pub mod comp2 {
     use super::*;
 
     pin! {
-        <Out, PushPull> for [
+        <Out> default:PushPull for [
             PA2<8>,
             PA7<8>,
             PA12<8>,
             PB9<8>,
         ],
+    }
+    impl CompOutput for crate::comparator::COMP2 {
+        type Out<Otype> = Out<Otype>;
     }
 }
 
@@ -39,11 +45,15 @@ pub mod comp3 {
     use super::*;
 
     pin! {
-        <Out, PushPull> for [
+        <Out> default:PushPull for [
             PB7<8>,
             PB15<3>,
             PC2<3>,
         ],
+    }
+
+    impl CompOutput for crate::comparator::COMP3 {
+        type Out<Otype> = Out<Otype>;
     }
 }
 
@@ -52,11 +62,14 @@ pub mod comp4 {
     use super::*;
 
     pin! {
-        <Out, PushPull> for [
+        <Out> default:PushPull for [
             PB1<8>,
             PB6<8>,
             PB14<8>,
         ],
+    }
+    impl CompOutput for crate::comparator::COMP4 {
+        type Out<Otype> = Out<Otype>;
     }
 }
 
@@ -65,10 +78,13 @@ pub mod comp5 {
     use super::*;
 
     pin! {
-        <Out, PushPull> for [
+        <Out> default:PushPull for [
             PA9<8>,
             PC7<7>,
         ],
+    }
+    impl CompOutput for crate::comparator::COMP5 {
+        type Out<Otype> = Out<Otype>;
     }
 }
 
@@ -77,10 +93,14 @@ pub mod comp6 {
     use super::*;
 
     pin! {
-        <Out, PushPull> for [
+        <Out> default:PushPull for [
             PA10<8>,
             PC6<7>,
         ],
+    }
+
+    impl CompOutput for crate::comparator::COMP6 {
+        type Out<Otype> = Out<Otype>;
     }
 }
 
@@ -89,10 +109,14 @@ pub mod comp7 {
     use super::*;
 
     pin! {
-        <Out, PushPull> for [
+        <Out> default:PushPull for [
             PA8<8>,
             PC8<7>,
         ],
+    }
+
+    impl CompOutput for crate::comparator::COMP7 {
+        type Out<Otype> = Out<Otype>;
     }
 }
 
