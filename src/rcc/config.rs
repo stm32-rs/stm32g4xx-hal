@@ -392,6 +392,10 @@ impl Config {
         Config::const_default().clock_src(SysClockSrc::HSI)
     }
 
+    pub const fn hse(freq: Hertz) -> Self {
+        Config::const_default().clock_src(SysClockSrc::HSE(freq))
+    }
+
     pub const fn clock_src(mut self, mux: SysClockSrc) -> Self {
         self.sys_mux = mux;
         self

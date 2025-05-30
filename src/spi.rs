@@ -10,7 +10,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, RccBus, Reset};
     feature = "stm32g484"
 ))]
 use crate::stm32::SPI4;
-use crate::stm32::{RCC, SPI1, SPI2, SPI3};
+use crate::stm32::{SPI1, SPI2, SPI3};
 use crate::time::Hertz;
 use core::ptr;
 
@@ -123,11 +123,8 @@ macro_rules! spi {
             T: Into<Hertz>
             {
                  // Enable and reset SPI
-                unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $SPIX::enable(rcc_ptr);
-                    $SPIX::reset(rcc_ptr);
-                }
+                    $SPIX::enable(rcc);
+                    $SPIX::reset(rcc);
 
                 // disable SS output
                 spi.cr2().write(|w| w.ssoe().disabled());

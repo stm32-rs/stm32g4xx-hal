@@ -6,7 +6,7 @@ use crate::hal::{
     gpio::{GpioExt as _, Speed},
     nb::block,
     pwr::PwrExt,
-    rcc::{Config, RccExt, SysClockSrc},
+    rcc::{Config, RccExt},
     stm32::Peripherals,
     time::RateExtU32,
 };
@@ -49,7 +49,7 @@ fn main() -> ! {
 
     let pwr = dp.PWR.constrain().freeze();
     let rcc = dp.RCC.constrain();
-    let mut rcc = rcc.freeze(Config::new(SysClockSrc::HSE(24.MHz())), pwr);
+    let mut rcc = rcc.freeze(Config::hse(24.MHz()), pwr);
 
     info!("Split GPIO");
 
@@ -61,7 +61,7 @@ fn main() -> ! {
         let tx = gpiob.pb9.into_alternate().speed(Speed::VeryHigh);
 
         info!("-- Create CAN 1 instance");
-        let mut can = dp.FDCAN1.fdcan(tx, rx, &rcc);
+        let mut can = dp.FDCAN1.fdcan(tx, rx, &mut rcc);
         can.set_protocol_exception_handling(false);
 
         info!("-- Configure nominal timing");

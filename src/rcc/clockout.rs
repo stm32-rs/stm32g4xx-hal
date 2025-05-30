@@ -1,6 +1,6 @@
 use crate::gpio::*;
+use crate::pac::RCC;
 use crate::rcc::*;
-use crate::stm32::RCC;
 
 pub type LscoPin = gpioa::PA2<Analog>;
 

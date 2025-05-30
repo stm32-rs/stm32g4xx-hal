@@ -1,6 +1,7 @@
+use crate::pac::{rcc, FLASH, PWR, RCC};
 use crate::pwr::{self, PowerConfiguration};
-use crate::stm32::{rcc, FLASH, PWR, RCC};
 use crate::time::{Hertz, RateExtU32};
+use core::ops::{Deref, DerefMut};
 
 mod clockout;
 mod config;
@@ -73,6 +74,19 @@ pub struct Rcc {
     /// Clock configuration
     pub clocks: Clocks,
     pub(crate) rb: RCC,
+}
+
+impl Deref for Rcc {
+    type Target = RCC;
+    fn deref(&self) -> &Self::Target {
+        &self.rb
+    }
+}
+
+impl DerefMut for Rcc {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.rb
+    }
 }
 
 impl Rcc {
@@ -533,120 +547,41 @@ impl RccExt for RCC {
 
 use crate::stm32::rcc::RegisterBlock as RccRB;
 
-pub struct AHB1 {
-    _0: (),
-}
-impl AHB1 {
-    #[inline(always)]
-    fn enr(rcc: &RccRB) -> &rcc::AHB1ENR {
-        rcc.ahb1enr()
-    }
-    #[inline(always)]
-    fn rstr(rcc: &RccRB) -> &rcc::AHB1RSTR {
-        rcc.ahb1rstr()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn smenr(rcc: &RccRB) -> &rcc::AHB1SMENR {
-        rcc.ahb1smenr()
-    }
-}
+macro_rules! bus_struct {
+    ($($busX:ident => ($EN:ident, $en:ident, $SMEN:ident, $smenr:ident, $RST:ident, $rst:ident, $doc:literal),)+) => {
+        $(
+            #[doc = $doc]
+            #[non_exhaustive]
+            pub struct $busX;
 
-pub struct AHB2 {
-    _0: (),
-}
-impl AHB2 {
-    #[inline(always)]
-    fn enr(rcc: &RccRB) -> &rcc::AHB2ENR {
-        rcc.ahb2enr()
-    }
-    #[inline(always)]
-    fn rstr(rcc: &RccRB) -> &rcc::AHB2RSTR {
-        rcc.ahb2rstr()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn smenr(rcc: &RccRB) -> &rcc::AHB2SMENR {
-        rcc.ahb2smenr()
-    }
-}
+            impl $busX {
+                #[allow(unused)]
+                pub(crate) fn enr(rcc: &RccRB) -> &rcc::$EN {
+                    rcc.$en()
+                }
 
-pub struct AHB3 {
-    _0: (),
-}
-impl AHB3 {
-    #[allow(unused)]
-    #[inline(always)]
-    fn enr(rcc: &RccRB) -> &rcc::AHB3ENR {
-        rcc.ahb3enr()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn rstr(rcc: &RccRB) -> &rcc::AHB3RSTR {
-        rcc.ahb3rstr()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn smenr(rcc: &RccRB) -> &rcc::AHB3SMENR {
-        rcc.ahb3smenr()
-    }
-}
+                #[allow(unused)]
+                pub(crate) fn smenr(rcc: &RccRB) -> &rcc::$SMEN {
+                    rcc.$smenr()
+                }
 
-pub struct APB1_1 {
-    _0: (),
+                #[allow(unused)]
+                pub(crate) fn rstr(rcc: &RccRB) -> &rcc::$RST {
+                    rcc.$rst()
+                }
+            }
+        )+
+    };
 }
-impl APB1_1 {
-    #[inline(always)]
-    fn enr(rcc: &RccRB) -> &rcc::APB1ENR1 {
-        rcc.apb1enr1()
-    }
-    #[inline(always)]
-    fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR1 {
-        rcc.apb1rstr1()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR1 {
-        rcc.apb1smenr1()
-    }
-}
+use bus_struct;
 
-pub struct APB1_2 {
-    _0: (),
-}
-impl APB1_2 {
-    #[inline(always)]
-    fn enr(rcc: &RccRB) -> &rcc::APB1ENR2 {
-        rcc.apb1enr2()
-    }
-    #[inline(always)]
-    fn rstr(rcc: &RccRB) -> &rcc::APB1RSTR2 {
-        rcc.apb1rstr2()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn smenr(rcc: &RccRB) -> &rcc::APB1SMENR2 {
-        rcc.apb1smenr2()
-    }
-}
-
-pub struct APB2 {
-    _0: (),
-}
-impl APB2 {
-    #[inline(always)]
-    fn enr(rcc: &RccRB) -> &rcc::APB2ENR {
-        rcc.apb2enr()
-    }
-    #[inline(always)]
-    fn rstr(rcc: &RccRB) -> &rcc::APB2RSTR {
-        rcc.apb2rstr()
-    }
-    #[allow(unused)]
-    #[inline(always)]
-    fn smenr(rcc: &RccRB) -> &rcc::APB2SMENR {
-        rcc.apb2smenr()
-    }
+bus_struct! {
+    AHB1 => (AHB1ENR, ahb1enr, AHB1SMENR, ahb1smenr, AHB1RSTR, ahb1rstr, "Advanced High-performance Bus 1 (AHB1) registers"),
+    AHB2 => (AHB2ENR, ahb2enr, AHB2SMENR, ahb2smenr, AHB2RSTR, ahb2rstr, "Advanced High-performance Bus 2 (AHB2) registers"),
+    AHB3 => (AHB3ENR, ahb3enr, AHB3SMENR, ahb3smenr, AHB3RSTR, ahb3rstr, "Advanced High-performance Bus 3 (AHB3) registers"),
+    APB1_1 => (APB1ENR1, apb1enr1, APB1SMENR1, apb1smenr1, APB1RSTR1, apb1rstr1, "Advanced Peripheral Bus 1 (APB1) block 1 registers"),
+    APB1_2 => (APB1ENR2, apb1enr2, APB1SMENR2, apb1smenr2, APB1RSTR2, apb1rstr2, "Advanced Peripheral Bus 1 (APB1) block 2 registers"),
+    APB2 => (APB2ENR, apb2enr, APB2SMENR, apb2smenr, APB2RSTR, apb2rstr, "Advanced Peripheral Bus 2 (APB2) registers"),
 }
 
 /// Bus associated to peripheral
@@ -657,14 +592,84 @@ pub trait RccBus: crate::Sealed {
 
 /// Enable/disable peripheral
 pub trait Enable: RccBus {
-    fn enable(rcc: &RccRB);
-    fn disable(rcc: &RccRB);
-    fn enable_for_sleep_stop(rcc: &RccRB);
+    /// Enables peripheral
+    fn enable(rcc: &mut RCC);
+
+    /// Disables peripheral
+    fn disable(rcc: &mut RCC);
+
+    /// Check if peripheral enabled
+    fn is_enabled() -> bool;
+
+    /// Check if peripheral disabled
+    #[inline]
+    fn is_disabled() -> bool {
+        !Self::is_enabled()
+    }
+
+    /// # Safety
+    ///
+    /// Enables peripheral. Takes access to RCC internally
+    unsafe fn enable_unchecked() {
+        let mut rcc = RCC::steal();
+        Self::enable(&mut rcc);
+    }
+
+    /// # Safety
+    ///
+    /// Disables peripheral. Takes access to RCC internally
+    unsafe fn disable_unchecked() {
+        let mut rcc = RCC::steal();
+        Self::disable(&mut rcc);
+    }
+}
+
+/// Enable/disable peripheral in Sleep mode
+pub trait SMEnable: RccBus {
+    /// Enables peripheral
+    fn sleep_mode_enable(rcc: &mut RCC);
+
+    /// Disables peripheral
+    fn sleep_mode_disable(rcc: &mut RCC);
+
+    /// Check if peripheral enabled
+    fn is_sleep_mode_enabled() -> bool;
+
+    /// Check if peripheral disabled
+    #[inline]
+    fn is_sleep_mode_disabled() -> bool {
+        !Self::is_sleep_mode_enabled()
+    }
+
+    /// # Safety
+    ///
+    /// Enables peripheral. Takes access to RCC internally
+    unsafe fn sleep_mode_enable_unchecked() {
+        let mut rcc = RCC::steal();
+        Self::sleep_mode_enable(&mut rcc);
+    }
+
+    /// # Safety
+    ///
+    /// Disables peripheral. Takes access to RCC internally
+    unsafe fn sleep_mode_disable_unchecked() {
+        let mut rcc = RCC::steal();
+        Self::sleep_mode_disable(&mut rcc);
+    }
 }
 
 /// Reset peripheral
 pub trait Reset: RccBus {
-    fn reset(rcc: &RccRB);
+    /// Resets peripheral
+    fn reset(rcc: &mut RCC);
+
+    /// # Safety
+    ///
+    /// Resets peripheral. Takes access to RCC internally
+    unsafe fn reset_unchecked() {
+        let mut rcc = RCC::steal();
+        Self::reset(&mut rcc);
+    }
 }
 
 pub trait GetBusFreq {

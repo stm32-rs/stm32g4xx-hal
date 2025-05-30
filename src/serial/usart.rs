@@ -490,8 +490,7 @@ macro_rules! uart_shared {
                 // Disable the UART as well as its clock.
                 self.tx.usart.cr1().modify(|_, w| w.ue().clear_bit());
                 unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $USARTX::disable(rcc_ptr);
+                    $USARTX::disable_unchecked();
                 }
                 (self.tx.usart, self.tx.pin, self.rx.pin)
             }
@@ -556,11 +555,8 @@ macro_rules! uart_lp {
                 rcc: &mut Rcc,
             ) -> Result<Self, InvalidConfig> {
                 // Enable clock for USART
-                unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $USARTX::enable(rcc_ptr);
-                    $USARTX::reset(rcc_ptr);
-                }
+                $USARTX::enable(rcc);
+                $USARTX::reset(rcc);
 
                 // TODO: By default, all UARTs are clocked from PCLK. We could modify RCC_CCIPR to
                 // try SYSCLK if PCLK is not high enough. We could also select 8x oversampling
@@ -703,11 +699,8 @@ macro_rules! uart_full {
                 rcc: &mut Rcc,
             ) -> Result<Self, InvalidConfig> {
                 // Enable clock for USART
-                unsafe {
-                    let rcc_ptr = &(*RCC::ptr());
-                    $USARTX::enable(rcc_ptr);
-                    $USARTX::reset(rcc_ptr);
-                }
+                $USARTX::enable(rcc);
+                $USARTX::reset(rcc);
 
                 // TODO: By default, all UARTs are clocked from PCLK. We could modify RCC_CCIPR to
                 // try SYSCLK if PCLK is not high enough. We could also select 8x oversampling

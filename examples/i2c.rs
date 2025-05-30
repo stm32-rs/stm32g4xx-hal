@@ -3,7 +3,6 @@
 #![no_main]
 #![no_std]
 
-use hal::i2c::Config;
 use hal::prelude::*;
 use hal::stm32;
 use hal::time::RateExtU32;
@@ -26,7 +25,7 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let scl = gpiob.pb8.into_alternate_open_drain();
 
-    let mut i2c = dp.I2C1.i2c(sda, scl, Config::new(40.kHz()), &mut rcc);
+    let mut i2c = dp.I2C1.i2c(sda, scl, 40.kHz(), &mut rcc);
     // Alternatively, it is possible to specify the exact timing as follows (see the documentation
     // of with_timing() for an explanation of the constant):
     //let mut i2c = dp

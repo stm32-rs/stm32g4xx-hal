@@ -5,7 +5,7 @@ macro_rules! bus_enable {
     ($PER:ident => ($busX:ty, $bit:literal)) => {
         impl Enable for crate::stm32::$PER {
             #[inline(always)]
-            fn enable(rcc: &RccRB) {
+            fn enable(rcc: &mut RCC) {
                 unsafe {
                     bb::set(Self::Bus::enr(rcc), $bit);
                 }
@@ -13,17 +13,41 @@ macro_rules! bus_enable {
                 // cortex_m::asm::dsb();
             }
             #[inline(always)]
-            fn disable(rcc: &RccRB) {
+            fn disable(rcc: &mut RCC) {
                 unsafe {
                     bb::clear(Self::Bus::enr(rcc), $bit);
                 }
             }
-
             #[inline(always)]
-            fn enable_for_sleep_stop(rcc: &RccRB) {
+            fn is_enabled() -> bool {
+                let rcc = unsafe { &*RCC::ptr() };
+                (Self::Bus::enr(rcc).read().bits() >> $bit) & 0x1 != 0
+            }
+        }
+    };
+}
+
+macro_rules! bus_smenable {
+    ($PER:ident => ($busX:ty, $bit:literal)) => {
+        impl SMEnable for crate::stm32::$PER {
+            #[inline(always)]
+            fn sleep_mode_enable(rcc: &mut RCC) {
                 unsafe {
                     bb::set(Self::Bus::smenr(rcc), $bit);
                 }
+                // // Stall the pipeline to work around erratum 2.1.13 (DM00037591)
+                // cortex_m::asm::dsb();
+            }
+            #[inline(always)]
+            fn sleep_mode_disable(rcc: &mut RCC) {
+                unsafe {
+                    bb::clear(Self::Bus::smenr(rcc), $bit);
+                }
+            }
+            #[inline(always)]
+            fn is_sleep_mode_enabled() -> bool {
+                let rcc = unsafe { &*RCC::ptr() };
+                (Self::Bus::smenr(rcc).read().bits() >> $bit) & 0x1 != 0
             }
         }
     };
@@ -33,7 +57,7 @@ macro_rules! bus_reset {
     ($PER:ident => ($busX:ty, $bit:literal)) => {
         impl Reset for crate::stm32::$PER {
             #[inline(always)]
-            fn reset(rcc: &RccRB) {
+            fn reset(rcc: &mut RCC) {
                 unsafe {
                     bb::set(Self::Bus::rstr(rcc), $bit);
                     bb::clear(Self::Bus::rstr(rcc), $bit);
@@ -51,6 +75,7 @@ macro_rules! bus {
             }
             impl crate::rcc::Instance for crate::stm32::$PER {}
             bus_enable!($PER => ($busX, $bit));
+            bus_smenable!($PER => ($busX, $bit));
             bus_reset!($PER => ($busX, $bit));
         )+
     }
