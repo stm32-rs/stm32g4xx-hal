@@ -3,22 +3,20 @@
 #![no_main]
 #![no_std]
 
-extern crate cortex_m;
-extern crate cortex_m_rt as rt;
-extern crate stm32g4xx_hal as hal;
-
-use hal::cordic::{
-    op::{dynamic::Mode as _, Magnitude, SinCos, Sqrt},
-    prec::P60,
-    scale::N0,
-    types::{I1F15, Q15, Q31},
-    Ext as _,
+use cortex_m_rt::entry;
+use stm32g4xx_hal::{
+    cordic::{
+        op::{dynamic::Mode as _, Magnitude, SinCos, Sqrt},
+        prec::P60,
+        scale::N0,
+        types::{I1F15, Q15, Q31},
+        Ext as _,
+    },
+    pac,
+    prelude::*,
+    pwr::PwrExt,
+    rcc::Config,
 };
-use hal::prelude::*;
-use hal::pwr::PwrExt;
-use hal::rcc::Config;
-use hal::stm32;
-use rt::entry;
 
 #[macro_use]
 mod utils;
@@ -27,7 +25,7 @@ use utils::logger::println;
 
 #[entry]
 fn main() -> ! {
-    let dp = stm32::Peripherals::take().expect("cannot take peripherals");
+    let dp = pac::Peripherals::take().expect("cannot take peripherals");
     let pwr = dp.PWR.constrain().freeze();
     let mut rcc = dp.RCC.freeze(Config::hsi(), pwr);
 
