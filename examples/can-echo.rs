@@ -61,7 +61,7 @@ fn main() -> ! {
         let tx = gpiob.pb9.into_alternate().speed(Speed::VeryHigh);
 
         info!("-- Create CAN 1 instance");
-        let mut can = dp.FDCAN1.fdcan(tx, rx, &mut rcc);
+        let mut can = dp.FDCAN1.fdcan((tx, rx), &mut rcc);
         can.set_protocol_exception_handling(false);
 
         info!("-- Configure nominal timing");
