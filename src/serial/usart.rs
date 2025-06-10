@@ -92,15 +92,15 @@ pub use gpio::alt::SerialAsync as CommonPins;
 pub trait Instance: crate::Sealed + crate::Ptr + Enable + Reset + CommonPins {}
 
 /// Serial receiver
-pub struct Rx<USART: Instance, Dma> {
-    pin: USART::Rx<PushPull>,
+pub struct Rx<USART: Instance, Dma = NoDMA> {
+    pin: Option<USART::Rx<PushPull>>,
     usart: USART,
     _dma: PhantomData<Dma>,
 }
 
 /// Serial transmitter
-pub struct Tx<USART: Instance, Dma, Otype = PushPull> {
-    pin: USART::Tx<Otype>,
+pub struct Tx<USART: Instance, Dma = NoDMA, Otype = PushPull> {
+    pin: Option<USART::Tx<Otype>>,
     usart: USART,
     _dma: PhantomData<Dma>,
 }
@@ -118,6 +118,7 @@ pub struct NoDMA;
 #[derive(Debug)]
 pub struct DMA;
 
+#[allow(non_upper_case_globals)]
 pub trait SerialExt<Config>: Sized + Instance {
     fn usart<Otype>(
         self,
@@ -125,6 +126,18 @@ pub trait SerialExt<Config>: Sized + Instance {
         config: impl Into<Config>,
         rcc: &mut Rcc,
     ) -> Result<Serial<Self, Otype>, InvalidConfig>;
+    fn tx<Otype>(
+        self,
+        tx: impl Into<Self::Tx<Otype>>,
+        config: impl Into<Config>,
+        rcc: &mut Rcc,
+    ) -> Result<Tx<Self, NoDMA, Otype>, InvalidConfig>;
+    fn rx(
+        self,
+        rx: impl Into<Self::Rx<PushPull>>,
+        config: impl Into<Config>,
+        rcc: &mut Rcc,
+    ) -> Result<Rx<Self, NoDMA>, InvalidConfig>;
 }
 
 impl<USART: Instance, Otype> fmt::Write for Serial<USART, Otype>
@@ -160,35 +173,30 @@ macro_rules! uart_shared {
         impl<Dma> Rx<$USARTX, Dma> {
             /// Starts listening for an interrupt event
             pub fn listen(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.rxneie().set_bit());
+                self.usart.cr1().modify(|_, w| w.rxneie().set_bit());
             }
 
             /// Stop listening for an interrupt event
             pub fn unlisten(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.rxneie().clear_bit());
+                self.usart.cr1().modify(|_, w| w.rxneie().clear_bit());
             }
 
             /// Return true if the rx register is not empty (and can be read)
             pub fn is_rxne(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().rxne().bit_is_set()
+                self.usart.isr().read().rxne().bit_is_set()
             }
 
             /// Returns true if the rx fifo threshold has been reached.
             pub fn fifo_threshold_reached(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().rxft().bit_is_set()
+                self.usart.isr().read().rxft().bit_is_set()
             }
         }
 
         impl Rx<$USARTX, NoDMA> {
             pub fn enable_dma(self) -> Rx<$USARTX, DMA> {
                 // NOTE(unsafe) critical section prevents races
-                cortex_m::interrupt::free(|_| unsafe {
-                    let cr3 = &(*$USARTX::ptr()).cr3();
-                    cr3.modify(|_, w| w.dmar().set_bit());
+                cortex_m::interrupt::free(|_| {
+                    self.usart.cr3().modify(|_, w| w.dmar().set_bit());
                 });
 
                 Rx {
@@ -198,7 +206,7 @@ macro_rules! uart_shared {
                 }
             }
             fn data_ready(&mut self) -> nb::Result<(), Error> {
-                let usart = unsafe { &(*$USARTX::ptr()) };
+                let usart = &self.usart;
                 let isr = usart.isr().read();
                 Err(if isr.pe().bit_is_set() {
                     usart.icr().write(|w| w.pecf().clear());
@@ -223,9 +231,8 @@ macro_rules! uart_shared {
         impl Rx<$USARTX, DMA> {
             pub fn disable_dma(self) -> Rx<$USARTX, NoDMA> {
                 // NOTE(unsafe) critical section prevents races
-                interrupt::free(|_| unsafe {
-                    let cr3 = &(*$USARTX::ptr()).cr3();
-                    cr3.modify(|_, w| w.dmar().clear_bit());
+                interrupt::free(|_| {
+                    self.usart.cr3().modify(|_, w| w.dmar().clear_bit());
                 });
 
                 Rx {
@@ -240,8 +247,8 @@ macro_rules! uart_shared {
             type Error = Error;
 
             fn read(&mut self) -> nb::Result<u8, Error> {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                self.data_ready().map(|_| usart.rdr().read().bits() as u8)
+                self.data_ready()
+                    .map(|_| self.usart.rdr().read().bits() as u8)
             }
         }
 
@@ -256,35 +263,30 @@ macro_rules! uart_shared {
         impl<Dma, Otype> Tx<$USARTX, Dma, Otype> {
             /// Starts listening for an interrupt event
             pub fn listen(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.txeie().set_bit());
+                self.usart.cr1().modify(|_, w| w.txeie().set_bit());
             }
 
             /// Stop listening for an interrupt event
             pub fn unlisten(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.txeie().clear_bit());
+                self.usart.cr1().modify(|_, w| w.txeie().clear_bit());
             }
 
             /// Return true if the tx register is empty (and can accept data)
             pub fn is_txe(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().txe().bit_is_set()
+                self.usart.isr().read().txe().bit_is_set()
             }
 
             /// Returns true if the tx fifo threshold has been reached.
             pub fn fifo_threshold_reached(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().txft().bit_is_set()
+                self.usart.isr().read().txft().bit_is_set()
             }
         }
 
         impl<Otype> Tx<$USARTX, NoDMA, Otype> {
             pub fn enable_dma(self) -> Tx<$USARTX, DMA, Otype> {
                 // NOTE(unsafe) critical section prevents races
-                interrupt::free(|_| unsafe {
-                    let cr3 = &(*$USARTX::ptr()).cr3();
-                    cr3.modify(|_, w| w.dmat().set_bit());
+                interrupt::free(|_| {
+                    self.usart.cr3().modify(|_, w| w.dmat().set_bit());
                 });
 
                 Tx {
@@ -298,9 +300,8 @@ macro_rules! uart_shared {
         impl<Otype> Tx<$USARTX, DMA, Otype> {
             pub fn disable_dma(self) -> Tx<$USARTX, NoDMA, Otype> {
                 // NOTE(unsafe) critical section prevents races
-                interrupt::free(|_| unsafe {
-                    let cr3 = &(*$USARTX::ptr()).cr3();
-                    cr3.modify(|_, w| w.dmat().clear_bit());
+                interrupt::free(|_| {
+                    self.usart.cr3().modify(|_, w| w.dmat().clear_bit());
                 });
 
                 Tx {
@@ -315,8 +316,7 @@ macro_rules! uart_shared {
             type Error = Error;
 
             fn flush(&mut self) -> nb::Result<(), Self::Error> {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                if usart.isr().read().tc().bit_is_set() {
+                if self.usart.isr().read().tc().bit_is_set() {
                     Ok(())
                 } else {
                     Err(nb::Error::WouldBlock)
@@ -324,9 +324,8 @@ macro_rules! uart_shared {
             }
 
             fn write(&mut self, byte: u8) -> nb::Result<(), Self::Error> {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                if usart.isr().read().txe().bit_is_set() {
-                    usart.tdr().write(|w| unsafe { w.bits(byte as u32) });
+                if self.usart.isr().read().txe().bit_is_set() {
+                    self.usart.tdr().write(|w| unsafe { w.bits(byte as u32) });
                     Ok(())
                 } else {
                     Err(nb::Error::WouldBlock)
@@ -351,8 +350,7 @@ macro_rules! uart_shared {
         }
         impl<Otype> WriteReady for Tx<$USARTX, NoDMA, Otype> {
             fn write_ready(&mut self) -> Result<bool, Self::Error> {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                Ok(usart.isr().read().txe().bit_is_set())
+                Ok(self.usart.isr().read().txe().bit_is_set())
             }
         }
         // writes until fifo (or tdr) is full
@@ -361,15 +359,18 @@ macro_rules! uart_shared {
                 if buf.len() == 0 {
                     return Ok(0);
                 }
-                let usart = unsafe { &(*$USARTX::ptr()) };
                 while !self.write_ready()? {
                     core::hint::spin_loop()
                 }
                 // can't know fifo capacity in advance
                 let count = buf
                     .into_iter()
-                    .take_while(|_| usart.isr().read().txe().bit_is_set())
-                    .map(|b| usart.tdr().write(|w| unsafe { w.tdr().bits(*b as u16) }))
+                    .take_while(|_| self.usart.isr().read().txe().bit_is_set())
+                    .map(|b| {
+                        self.usart
+                            .tdr()
+                            .write(|w| unsafe { w.tdr().bits(*b as u16) })
+                    })
                     .count();
 
                 Ok(count)
@@ -396,14 +397,13 @@ macro_rules! uart_shared {
                 if buf.len() == 0 {
                     return Ok(0);
                 }
-                let usart = unsafe { &(*$USARTX::ptr()) };
                 let mut count = 0;
 
                 while !self.read_ready()? {
                     core::hint::spin_loop()
                 }
                 while self.read_ready()? && count < buf.len() {
-                    buf[count] = usart.rdr().read().bits() as u8;
+                    buf[count] = self.usart.rdr().read().bits() as u8;
                     count += 1
                 }
                 Ok(count)
@@ -461,15 +461,17 @@ macro_rules! uart_shared {
                 self,
             ) -> (
                 $USARTX,
-                <$USARTX as CommonPins>::Tx<Otype>,
-                <$USARTX as CommonPins>::Rx<PushPull>,
+                (
+                    Option<<$USARTX as CommonPins>::Tx<Otype>>,
+                    Option<<$USARTX as CommonPins>::Rx<PushPull>>,
+                ),
             ) {
                 // Disable the UART as well as its clock.
                 self.tx.usart.cr1().modify(|_, w| w.ue().clear_bit());
                 unsafe {
                     $USARTX::disable_unchecked();
                 }
-                (self.tx.usart, self.tx.pin, self.rx.pin)
+                (self.tx.usart, (self.tx.pin, self.rx.pin))
             }
         }
 
@@ -512,6 +514,24 @@ macro_rules! uart_lp {
             ) -> Result<Serial<Self, Otype>, InvalidConfig> {
                 Serial::$usartX(self, pins, config, rcc)
             }
+            fn tx<Otype>(
+                self,
+                tx: impl Into<Self::Tx<Otype>>,
+                config: impl Into<LowPowerConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Tx<Self, NoDMA, Otype>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (Some(tx), None::<Self::Rx<PushPull>>), config, rcc)
+                    .map(|s| s.split().0)
+            }
+            fn rx(
+                self,
+                rx: impl Into<Self::Rx<PushPull>>,
+                config: impl Into<LowPowerConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Rx<Self, NoDMA>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (None::<Self::Tx<PushPull>>, Some(rx)), config, rcc)
+                    .map(|s| s.split().1)
+            }
         }
 
         impl<Otype> Serial<$USARTX, Otype> {
@@ -520,6 +540,17 @@ macro_rules! uart_lp {
                 pins: (
                     impl Into<<$USARTX as CommonPins>::Tx<Otype>>,
                     impl Into<<$USARTX as CommonPins>::Rx<PushPull>>,
+                ),
+                config: impl Into<LowPowerConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Self, InvalidConfig> {
+                Self::_new(usart, (Some(pins.0), Some(pins.1)), config, rcc)
+            }
+            fn _new(
+                usart: $USARTX,
+                pins: (
+                    Option<impl Into<<$USARTX as CommonPins>::Tx<Otype>>>,
+                    Option<impl Into<<$USARTX as CommonPins>::Rx<PushPull>>>,
                 ),
                 config: impl Into<LowPowerConfig>,
                 rcc: &mut Rcc,
@@ -567,8 +598,8 @@ macro_rules! uart_lp {
                     w.ue().set_bit();
                     w.te().set_bit();
                     w.re().set_bit();
-                    w.m1().bit(config.wordlength == WordLength::DataBits9);
-                    w.m0().bit(config.wordlength == WordLength::DataBits7);
+                    w.m1().bit(config.wordlength == WordLength::DataBits7);
+                    w.m0().bit(config.wordlength == WordLength::DataBits9);
                     w.pce().bit(config.parity != Parity::ParityNone);
                     w.ps().bit(config.parity == Parity::ParityOdd);
                     w.fifoen().bit(config.fifo_enable)
@@ -576,12 +607,12 @@ macro_rules! uart_lp {
 
                 Ok(Serial {
                     tx: Tx {
-                        pin: pins.0.into(),
+                        pin: pins.0.map(Into::into),
                         usart,
                         _dma: PhantomData,
                     },
                     rx: Rx {
-                        pin: pins.1.into(),
+                        pin: pins.1.map(Into::into),
                         usart: unsafe { $USARTX::steal() },
                         _dma: PhantomData,
                     },
@@ -639,6 +670,24 @@ macro_rules! uart_full {
             ) -> Result<Serial<Self, Otype>, InvalidConfig> {
                 Serial::$usartX(self, pins, config, rcc)
             }
+            fn tx<Otype>(
+                self,
+                tx: impl Into<Self::Tx<Otype>>,
+                config: impl Into<FullConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Tx<Self, NoDMA, Otype>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (Some(tx), None::<Self::Rx<PushPull>>), config, rcc)
+                    .map(|s| s.split().0)
+            }
+            fn rx(
+                self,
+                rx: impl Into<Self::Rx<PushPull>>,
+                config: impl Into<FullConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Rx<Self, NoDMA>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (None::<Self::Tx<PushPull>>, Some(rx)), config, rcc)
+                    .map(|s| s.split().1)
+            }
         }
 
         impl<Otype> Serial<$USARTX, Otype> {
@@ -647,6 +696,17 @@ macro_rules! uart_full {
                 pins: (
                     impl Into<<$USARTX as CommonPins>::Tx<Otype>>,
                     impl Into<<$USARTX as CommonPins>::Rx<PushPull>>,
+                ),
+                config: impl Into<FullConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Self, InvalidConfig> {
+                Self::_new(usart, (Some(pins.0), Some(pins.1)), config, rcc)
+            }
+            fn _new(
+                usart: $USARTX,
+                pins: (
+                    Option<impl Into<<$USARTX as CommonPins>::Tx<Otype>>>,
+                    Option<impl Into<<$USARTX as CommonPins>::Rx<PushPull>>>,
                 ),
                 config: impl Into<FullConfig>,
                 rcc: &mut Rcc,
@@ -710,12 +770,12 @@ macro_rules! uart_full {
 
                 Ok(Serial {
                     tx: Tx {
-                        pin: pins.0.into(),
+                        pin: pins.0.map(Into::into),
                         usart,
                         _dma: PhantomData,
                     },
                     rx: Rx {
-                        pin: pins.1.into(),
+                        pin: pins.1.map(Into::into),
                         usart: unsafe { $USARTX::steal() },
                         _dma: PhantomData,
                     },

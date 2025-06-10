@@ -3,11 +3,12 @@
     "rust-analyzer": {
       "initialization_options": {
         "cargo": {
-          "features": ["defmt", "stm32g473"]
+          "features": ["stm32g484", "defmt", "cordic", "hrtim"]
         },
         "check": {
           "allTargets": false,
-          "targets": "thumbv7em-none-eabihf"
+          "targets": "thumbv7em-none-eabihf",
+          "extraArgs": ["--examples", "--tests"]
         }
       }
     }

@@ -108,8 +108,7 @@ impl From<Hertz> for Config {
 /// I2C abstraction
 pub struct I2c<I2C: Instance> {
     i2c: I2C,
-    sda: I2C::Sda,
-    scl: I2C::Scl,
+    pins: (I2C::Sda, I2C::Scl),
 }
 
 /// I2C error
@@ -139,8 +138,7 @@ impl embedded_hal::i2c::Error for Error {
 pub trait I2cExt: Instance + Sized {
     fn i2c(
         self,
-        sda: impl Into<Self::Sda>,
-        scl: impl Into<Self::Scl>,
+        pins: (impl Into<Self::Sda>, impl Into<Self::Scl>),
         config: impl Into<Config>,
         rcc: &mut Rcc,
     ) -> I2c<Self>;
@@ -201,12 +199,11 @@ impl Instance for I2C4 {}
 impl<I2C: Instance> I2cExt for I2C {
     fn i2c(
         self,
-        sda: impl Into<Self::Sda>,
-        scl: impl Into<Self::Scl>,
+        pins: (impl Into<Self::Sda>, impl Into<Self::Scl>),
         config: impl Into<Config>,
         rcc: &mut Rcc,
     ) -> I2c<Self> {
-        I2c::new(self, sda, scl, config, rcc)
+        I2c::new(self, pins, config, rcc)
     }
 }
 
@@ -214,8 +211,7 @@ impl<I2C: Instance> I2c<I2C> {
     /// Initializes the I2C peripheral.
     pub fn new(
         i2c: I2C,
-        sda: impl Into<I2C::Sda>,
-        scl: impl Into<I2C::Scl>,
+        pins: (impl Into<I2C::Sda>, impl Into<I2C::Scl>),
         config: impl Into<Config>,
         rcc: &mut Rcc,
     ) -> Self {
@@ -241,20 +237,19 @@ impl<I2C: Instance> I2c<I2C> {
 
         I2c {
             i2c,
-            sda: sda.into(),
-            scl: scl.into(),
+            pins: (pins.0.into(), pins.1.into()),
         }
     }
 
     /// Disables I2C and releases the peripheral as well as the pins.
-    pub fn release(self) -> (I2C, I2C::Sda, I2C::Scl) {
+    pub fn release(self) -> (I2C, (I2C::Sda, I2C::Scl)) {
         // Disable I2C.
         unsafe {
             I2C::reset_unchecked();
             I2C::disable_unchecked();
         }
 
-        (self.i2c, self.sda, self.scl)
+        (self.i2c, self.pins)
     }
 
     // copied from f3 hal
