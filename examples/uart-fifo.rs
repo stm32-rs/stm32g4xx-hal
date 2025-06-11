@@ -36,7 +36,7 @@ fn main() -> ! {
     let mut usart = dp
         .USART2
         .usart(
-            (Some(tx), Some(rx)),
+            (tx, rx),
             FullConfig::default()
                 .baudrate(115200.bps())
                 .fifo_enable()

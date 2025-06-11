@@ -48,7 +48,7 @@ fn main() -> ! {
         //.USART2
         .USART3
         .usart(
-            (Some(tx), Some(rx)),
+            (tx, rx),
             FullConfig::default()
                 .baudrate(115200.bps())
                 .receiver_timeout_us(1000), // Timeout after 1ms

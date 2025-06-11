@@ -120,17 +120,24 @@ pub struct DMA;
 
 #[allow(non_upper_case_globals)]
 pub trait SerialExt<Config>: Sized + Instance {
-    const NoTx: Option<Self::Tx<PushPull>> = None;
-    const NoRx: Option<Self::Rx<PushPull>> = None;
     fn usart<Otype>(
         self,
-        pins: (
-            Option<impl Into<Self::Tx<Otype>>>,
-            Option<impl Into<Self::Rx<PushPull>>>,
-        ),
+        pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
         config: impl Into<Config>,
         rcc: &mut Rcc,
     ) -> Result<Serial<Self, Otype>, InvalidConfig>;
+    fn tx<Otype>(
+        self,
+        tx: impl Into<Self::Tx<Otype>>,
+        config: impl Into<Config>,
+        rcc: &mut Rcc,
+    ) -> Result<Tx<Self, NoDMA, Otype>, InvalidConfig>;
+    fn rx(
+        self,
+        rx: impl Into<Self::Rx<PushPull>>,
+        config: impl Into<Config>,
+        rcc: &mut Rcc,
+    ) -> Result<Rx<Self, NoDMA>, InvalidConfig>;
 }
 
 impl<USART: Instance, Otype> fmt::Write for Serial<USART, Otype>
@@ -501,19 +508,45 @@ macro_rules! uart_lp {
         impl SerialExt<LowPowerConfig> for $USARTX {
             fn usart<Otype>(
                 self,
-                pins: (
-                    Option<impl Into<Self::Tx<Otype>>>,
-                    Option<impl Into<Self::Rx<PushPull>>>,
-                ),
+                pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
                 config: impl Into<LowPowerConfig>,
                 rcc: &mut Rcc,
             ) -> Result<Serial<Self, Otype>, InvalidConfig> {
                 Serial::$usartX(self, pins, config, rcc)
             }
+            fn tx<Otype>(
+                self,
+                tx: impl Into<Self::Tx<Otype>>,
+                config: impl Into<LowPowerConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Tx<Self, NoDMA, Otype>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (Some(tx), None::<Self::Rx<PushPull>>), config, rcc)
+                    .map(|s| s.split().0)
+            }
+            fn rx(
+                self,
+                rx: impl Into<Self::Rx<PushPull>>,
+                config: impl Into<LowPowerConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Rx<Self, NoDMA>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (None::<Self::Tx<PushPull>>, Some(rx)), config, rcc)
+                    .map(|s| s.split().1)
+            }
         }
 
         impl<Otype> Serial<$USARTX, Otype> {
             pub fn $usartX(
+                usart: $USARTX,
+                pins: (
+                    impl Into<<$USARTX as CommonPins>::Tx<Otype>>,
+                    impl Into<<$USARTX as CommonPins>::Rx<PushPull>>,
+                ),
+                config: impl Into<LowPowerConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Self, InvalidConfig> {
+                Self::_new(usart, (Some(pins.0), Some(pins.1)), config, rcc)
+            }
+            fn _new(
                 usart: $USARTX,
                 pins: (
                     Option<impl Into<<$USARTX as CommonPins>::Tx<Otype>>>,
@@ -629,19 +662,45 @@ macro_rules! uart_full {
         impl SerialExt<FullConfig> for $USARTX {
             fn usart<Otype>(
                 self,
-                pins: (
-                    Option<impl Into<Self::Tx<Otype>>>,
-                    Option<impl Into<Self::Rx<PushPull>>>,
-                ),
+                pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
                 config: impl Into<FullConfig>,
                 rcc: &mut Rcc,
             ) -> Result<Serial<Self, Otype>, InvalidConfig> {
                 Serial::$usartX(self, pins, config, rcc)
             }
+            fn tx<Otype>(
+                self,
+                tx: impl Into<Self::Tx<Otype>>,
+                config: impl Into<FullConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Tx<Self, NoDMA, Otype>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (Some(tx), None::<Self::Rx<PushPull>>), config, rcc)
+                    .map(|s| s.split().0)
+            }
+            fn rx(
+                self,
+                rx: impl Into<Self::Rx<PushPull>>,
+                config: impl Into<FullConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Rx<Self, NoDMA>, InvalidConfig> {
+                Serial::<Self, _>::_new(self, (None::<Self::Tx<PushPull>>, Some(rx)), config, rcc)
+                    .map(|s| s.split().1)
+            }
         }
 
         impl<Otype> Serial<$USARTX, Otype> {
             pub fn $usartX(
+                usart: $USARTX,
+                pins: (
+                    impl Into<<$USARTX as CommonPins>::Tx<Otype>>,
+                    impl Into<<$USARTX as CommonPins>::Rx<PushPull>>,
+                ),
+                config: impl Into<FullConfig>,
+                rcc: &mut Rcc,
+            ) -> Result<Self, InvalidConfig> {
+                Self::_new(usart, (Some(pins.0), Some(pins.1)), config, rcc)
+            }
+            fn _new(
                 usart: $USARTX,
                 pins: (
                     Option<impl Into<<$USARTX as CommonPins>::Tx<Otype>>>,

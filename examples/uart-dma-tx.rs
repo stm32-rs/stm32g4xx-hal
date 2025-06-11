@@ -39,8 +39,8 @@ fn main() -> ! {
 
     info!("Init UART");
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let tx = Some(gpioa.pa2.into_alternate());
-    let rx = Some(gpioa.pa3);
+    let tx = gpioa.pa2.into_alternate();
+    let rx = gpioa.pa3;
     let mut usart = dp.USART2.usart((tx, rx), 115200.bps(), &mut rcc).unwrap();
 
     let mut delay_syst = cp.SYST.delay(&rcc.clocks);
