@@ -68,6 +68,12 @@ pub struct LowPowerConfig {
     pub(crate) rx_fifo_interrupt: bool,
 }
 
+impl From<Bps> for LowPowerConfig {
+    fn from(value: Bps) -> Self {
+        Self::default().baudrate(value)
+    }
+}
+
 #[derive(PartialEq, PartialOrd, Clone, Copy)]
 pub struct FullConfig {
     pub(crate) baudrate: Bps,
@@ -82,6 +88,12 @@ pub struct FullConfig {
     pub(crate) rx_fifo_interrupt: bool,
     #[doc = "Number of bits no activity on rx line"]
     pub(crate) receiver_timeout: Option<u32>,
+}
+
+impl From<Bps> for FullConfig {
+    fn from(value: Bps) -> Self {
+        Self::default().baudrate(value)
+    }
 }
 
 impl LowPowerConfig {

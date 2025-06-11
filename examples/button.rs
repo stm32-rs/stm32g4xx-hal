@@ -17,7 +17,7 @@ use cortex_m_rt::entry;
 
 type ButtonPin = gpio::PC13<Input>;
 
-// Make LED pin globally available
+// Make LED and BUTTON pins globally available
 static G_BUTTON: Mutex<RefCell<Option<ButtonPin>>> = Mutex::new(RefCell::new(None));
 static G_LED_ON: AtomicBool = AtomicBool::new(true);
 
