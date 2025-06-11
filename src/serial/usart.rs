@@ -89,7 +89,9 @@ impl Event {
 pub use gpio::alt::SerialAsync as CommonPins;
 
 // Implemented by all USART/UART instances
-pub trait Instance: crate::Sealed + crate::Ptr + Enable + Reset + CommonPins {}
+pub trait Instance: crate::Sealed + crate::Ptr + Enable + Reset + CommonPins {
+    type Config;
+}
 
 /// Serial receiver
 pub struct Rx<USART: Instance, Dma = NoDMA> {
@@ -119,23 +121,23 @@ pub struct NoDMA;
 pub struct DMA;
 
 #[allow(non_upper_case_globals)]
-pub trait SerialExt<Config>: Sized + Instance {
+pub trait SerialExt: Sized + Instance {
     fn usart<Otype>(
         self,
         pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
-        config: impl Into<Config>,
+        config: impl Into<Self::Config>,
         rcc: &mut Rcc,
     ) -> Result<Serial<Self, Otype>, InvalidConfig>;
     fn tx<Otype>(
         self,
         tx: impl Into<Self::Tx<Otype>>,
-        config: impl Into<Config>,
+        config: impl Into<Self::Config>,
         rcc: &mut Rcc,
     ) -> Result<Tx<Self, NoDMA, Otype>, InvalidConfig>;
     fn rx(
         self,
         rx: impl Into<Self::Rx<PushPull>>,
-        config: impl Into<Config>,
+        config: impl Into<Self::Config>,
         rcc: &mut Rcc,
     ) -> Result<Rx<Self, NoDMA>, InvalidConfig>;
 }
@@ -168,8 +170,6 @@ where
 
 macro_rules! uart_shared {
     ($USARTX:ident, $dmamux_rx:ident, $dmamux_tx:ident) => {
-        impl Instance for $USARTX {}
-
         impl<Dma> Rx<$USARTX, Dma> {
             /// Starts listening for an interrupt event
             pub fn listen(&mut self) {
@@ -505,7 +505,11 @@ macro_rules! uart_lp {
     ($USARTX:ident,
         $usartX:ident, $clk_mul:expr
     ) => {
-        impl SerialExt<LowPowerConfig> for $USARTX {
+        impl Instance for $USARTX {
+            type Config = LowPowerConfig;
+        }
+
+        impl SerialExt for $USARTX {
             fn usart<Otype>(
                 self,
                 pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
@@ -661,7 +665,11 @@ macro_rules! uart_full {
     ($USARTX:ident,
         $usartX:ident
     ) => {
-        impl SerialExt<FullConfig> for $USARTX {
+        impl Instance for $USARTX {
+            type Config = FullConfig;
+        }
+
+        impl SerialExt for $USARTX {
             fn usart<Otype>(
                 self,
                 pins: (impl Into<Self::Tx<Otype>>, impl Into<Self::Rx<PushPull>>),
