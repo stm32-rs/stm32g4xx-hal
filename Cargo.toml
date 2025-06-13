@@ -180,6 +180,11 @@ required-features = ["hrtim"]
 path = "examples/hrtim/capture.rs"
 
 [[example]]
+name = "hrtim-deadtime"
+required-features = ["hrtim"]
+path = "examples/hrtim/deadtime.rs"
+
+[[example]]
 name = "hrtim-capture-dma"
 required-features = ["hrtim"]
 path = "examples/hrtim/capture-dma.rs"
