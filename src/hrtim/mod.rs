@@ -76,7 +76,7 @@ use gpio::{
 
 use gpio::gpioc::{PC6, PC7};
 
-trait HrtimPin<TIM>: ToHrOut<TIM> {
+pub trait HrtimPin<TIM>: ToHrOut<TIM> {
     fn connect_to_hrtim(self);
 }
 
