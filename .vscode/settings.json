@@ -8,6 +8,7 @@
   "rust-analyzer.cargo.features": [
     "stm32g484",
     "defmt",
-    "cordic"
+    "cordic",
+    "hrtim"
   ]
 }
