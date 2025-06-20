@@ -9,7 +9,7 @@ use crate::{
     gpio,
     rcc::{Enable, Reset},
     stm32::{
-        self, HRTIM_COMMON, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
+        HRTIM_COMMON, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
     },
 };
 use stm32_hrtim::{
@@ -25,8 +25,7 @@ pub trait HrControltExt {
 }
 
 impl HrControltExt for crate::stm32::HRTIM_COMMON {
-    fn hr_control(self, _rcc: &mut crate::rcc::Rcc) -> HrTimOngoingCalibration {
-        let rcc = unsafe { &*stm32::RCC::ptr() };
+    fn hr_control(self, rcc: &mut crate::rcc::Rcc) -> HrTimOngoingCalibration {
         HRTIM_COMMON::enable(rcc);
         HRTIM_COMMON::reset(rcc);
 

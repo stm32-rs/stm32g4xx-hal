@@ -7,7 +7,6 @@ use crate::{
         gpioa::{PA12, PA15},
         gpiob::{PB0, PB10, PB11},
         gpioc::{PC10, PC7},
-        AF13, AF3,
     },
 };
 
@@ -22,7 +21,7 @@ pub trait FaultInput<S> {
 macro_rules! impl_faults {
     ($(
         $input:ident:
-            PINS=[($pin:ident, $af:ident) $(,($pin_b:ident, $af_b:ident))*],
+            PINS=[($pin:ident, $af:literal) $(,($pin_b:ident, $af_b:literal))*],
             COMP=$compX:ident,
     )+) => {$(
         impl FaultInput<$pin<gpio::Alternate<$af>>> for fault::$input {
@@ -52,10 +51,10 @@ macro_rules! impl_faults {
 }
 
 impl_faults!(
-    FaultInput1: PINS=[(PA12, AF13)], COMP=COMP2,
-    FaultInput2: PINS=[(PA15, AF13)], COMP=COMP4,
-    FaultInput3: PINS=[(PB10, AF13)], COMP=COMP6,
-    FaultInput4: PINS=[(PB11, AF13)], COMP=COMP1,
-    FaultInput5: PINS=[(PB0, AF13), (PC7, AF3)], COMP=COMP3,
-    FaultInput6: PINS=[(PC10, AF13)], COMP=COMP5,
+    FaultInput1: PINS=[(PA12, 13)], COMP=COMP2,
+    FaultInput2: PINS=[(PA15, 13)], COMP=COMP4,
+    FaultInput3: PINS=[(PB10, 13)], COMP=COMP6,
+    FaultInput4: PINS=[(PB11, 13)], COMP=COMP1,
+    FaultInput5: PINS=[(PB0, 13), (PC7, 3)], COMP=COMP3,
+    FaultInput6: PINS=[(PC10, 13)], COMP=COMP5,
 );
