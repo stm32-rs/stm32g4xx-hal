@@ -67,7 +67,14 @@ pub fn await_p<const CYCLES_PER_US: u32>(
 }
 
 #[allow(dead_code)]
-pub fn test_pwm<const CYCLES_PER_US: u32>(timer: &Timer<CYCLES_PER_US>, pin_num: u8, t_lo: MicrosDurationU32, t_hi: MicrosDurationU32, t_max_deviation: MicrosDurationU32, first_start_mult: u32) {
+pub fn test_pwm<const CYCLES_PER_US: u32>(
+    timer: &Timer<CYCLES_PER_US>,
+    pin_num: u8,
+    t_lo: MicrosDurationU32,
+    t_hi: MicrosDurationU32,
+    t_max_deviation: MicrosDurationU32,
+    first_start_mult: u32,
+) {
     defmt::debug!("Awaiting first rising edge...");
 
     let t_lo_min = t_lo - t_max_deviation;

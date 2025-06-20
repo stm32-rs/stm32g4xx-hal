@@ -124,7 +124,10 @@ fn setup<P: stm32g4xx_hal::hrtim::HrtimPin<stm32::HRTIM_TIMA>>(
     hrtim_tima: stm32::HRTIM_TIMA,
     hrtim_common: stm32::HRTIM_COMMON,
     rcc: &mut Rcc,
-) -> (HrParts<stm32::HRTIM_TIMA, Pscl64, P::Out<Pscl64>>, HrPwmControl) {
+) -> (
+    HrParts<stm32::HRTIM_TIMA, Pscl64, P::Out<Pscl64>>,
+    HrPwmControl,
+) {
     use stm32g4xx_hal::hrtim::HrPwmBuilderExt;
     let (hr_control, ..) = hrtim_common.hr_control(rcc).wait_for_calibration();
     let mut hr_control = hr_control.constrain();

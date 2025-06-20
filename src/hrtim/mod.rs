@@ -8,9 +8,7 @@ use core::mem::MaybeUninit;
 use crate::{
     gpio,
     rcc::{Enable, Reset},
-    stm32::{
-        HRTIM_COMMON, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF,
-    },
+    stm32::{HRTIM_COMMON, HRTIM_TIMA, HRTIM_TIMB, HRTIM_TIMC, HRTIM_TIMD, HRTIM_TIME, HRTIM_TIMF},
 };
 use stm32_hrtim::{
     control::{HrPwmControl, HrTimOngoingCalibration},
