@@ -208,7 +208,7 @@ impl<I: Instance, const N: u8> Channel for C<I, N> {
         //NOTE(unsafe) Atomic write with no side-effects and we only access the bits
         // that belongs to the ChannelX
         let dma = unsafe { &*I::ptr() };
-        dma.ifcr().write(|w| w.ctcif(N).set_bit());
+        dma.ifcr().write(|w| w.cteif(N).set_bit());
         let _ = dma.isr().read();
         let _ = dma.isr().read(); // Delay 2 peripheral clocks
     }
@@ -224,7 +224,7 @@ impl<I: Instance, const N: u8> Channel for C<I, N> {
     fn get_transfer_error_flag(&self) -> bool {
         //NOTE(unsafe) Atomic read with no side effects
         let dma = unsafe { &*I::ptr() };
-        dma.isr().read().tcif(N).bit_is_set()
+        dma.isr().read().teif(N).bit_is_set()
     }
 
     #[inline(always)]
