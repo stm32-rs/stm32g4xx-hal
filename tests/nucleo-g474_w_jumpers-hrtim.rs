@@ -6,6 +6,8 @@
 #[path = "../examples/utils/mod.rs"]
 mod utils;
 
+mod common;
+
 use core::ops::Sub;
 
 use fugit::{ExtU32, HertzU32, MicrosDurationU32};
@@ -34,6 +36,7 @@ use stm32g4xx_hal::stasis::{Freeze, Frozen};
 
 pub const F_SYS: HertzU32 = HertzU32::MHz(120);
 pub const CYCLES_PER_US: u32 = F_SYS.raw() / 1_000_000;
+type Timer = crate::common::Timer<CYCLES_PER_US>;
 
 pub fn enable_timer(cp: &mut stm32::CorePeripherals) {
     cp.DCB.enable_trace();
@@ -54,9 +57,7 @@ mod tests {
     use stm32g4xx_hal::{dac::DacOut, stm32::GPIOA};
 
     use crate::{
-        abs_diff, now,
-        utils::test::{await_hi, await_lo},
-        F_SYS,
+        abs_diff, common::{await_hi, await_lo}, now, F_SYS
     };
 
     ///                | \
@@ -78,7 +79,7 @@ mod tests {
         let cr2_ticks_per_dac_trigger = 1024;
 
         let crate::Peripherals {
-            mut timer,
+            mut hrtimer,
             mut hr_control,
             eev_input4,
             comp,
@@ -88,22 +89,24 @@ mod tests {
             pa2,
             rcc,
             delay,
+            timer
         } = super::setup(
             prescaler,
             period,
             dac_step_per_trigger,
             cr2_ticks_per_dac_trigger,
         );
+        let pin_num = 8;
 
-        timer.cr1.set_duty(period / 10); // Set blanking window to give the ref_dac time to reset
+        hrtimer.cr1.set_duty(period / 10); // Set blanking window to give the ref_dac time to reset
                                          //out.enable_rst_event(&cr1); // Set low on compare match with cr1
-        timer.out.enable_rst_event(&eev_input4); // Set low on compare match with cr1
-        timer.out.enable_set_event(&timer.timer); // Set high at new period
+        hrtimer.out.enable_rst_event(&eev_input4); // Set low on compare match with cr1
+        hrtimer.out.enable_set_event(&hrtimer.timer); // Set high at new period
 
-        timer.out.enable();
-        timer.timer.start(&mut hr_control.control);
+        hrtimer.out.enable();
+        hrtimer.timer.start(&mut hr_control.control);
 
-        defmt::println!("state: {}", timer.out.get_state());
+        defmt::println!("state: {}", hrtimer.out.get_state());
 
         //out.enable_rst_event(&eev_input4);
 
@@ -120,7 +123,7 @@ mod tests {
             let out = comp.output();
             let ref_dac = ref_dac.get_value();
             let value_dac = value_dac.get_value();
-            let cnt = timer.timer.get_counter_value();
+            let cnt = hrtimer.timer.get_counter_value();
             defmt::println!(
                 "out: {}, ref: {}, val: {}, cnt: {}",
                 out,
@@ -151,12 +154,12 @@ mod tests {
                     let out = comp.output();
                     defmt::println!("out: {}", out);
                 }
-                let duration_until_lo = await_lo(gpioa, 8, timeout, now).unwrap();
-                let first_lo_duration = await_hi(gpioa, 8, timeout, now);
+                let duration_until_lo = await_lo(&timer, pin_num, timeout).unwrap();
+                let first_lo_duration = await_hi(&timer, pin_num, timeout);
 
                 let (period, duty) = match first_lo_duration {
                     Ok(lo_duration) => {
-                        let duty = await_lo(gpioa, 8, timeout, now).unwrap();
+                        let duty = await_lo(&timer, pin_num, timeout).unwrap();
                         let period = lo_duration + duty;
                         (period, duty)
                     }
@@ -194,7 +197,7 @@ fn abs_diff<T: Ord + Sub + Copy>(a: T, b: T) -> T::Output {
 const VREF_ADC_BITS: u16 = 1504;
 
 struct Peripherals<PSCL> {
-    timer:
+    hrtimer:
         HrParts<HRTIM_TIMA, PSCL, HrOut1<HRTIM_TIMA, PSCL, DacResetOnCounterReset, DacStepOnCmp2>, DacResetOnCounterReset, DacStepOnCmp2>,
     hr_control: HrPwmControl,
     eev_input4: ExternalEventSource<4, false>,
@@ -205,6 +208,7 @@ struct Peripherals<PSCL> {
     pa2: gpio::gpioa::PA2<gpio::Analog>,
     rcc: rcc::Rcc,
     delay: delay::SystDelay,
+    timer: Timer,
 }
 
 fn setup<PSCL: HrtimPrescaler>(
@@ -217,8 +221,9 @@ fn setup<PSCL: HrtimPrescaler>(
     //DAC1_OUT1 PA4 -> A2
 
     // TODO: Is it ok to steal these?
-    let mut cp = unsafe { stm32::CorePeripherals::steal() };
-    let dp = unsafe { stm32::Peripherals::steal() };
+    let mut cp = stm32::CorePeripherals::take().unwrap();
+    let dp = stm32::Peripherals::take().unwrap();
+    let timer = Timer::enable_timer(&mut cp);
     // Set system frequency to 16MHz * 15/1/2 = 120MHz
     // This would lead to HrTim running at 120MHz * 32 = 3.84...
     defmt::info!("rcc");
@@ -281,7 +286,7 @@ fn setup<PSCL: HrtimPrescaler>(
     let mut hr_control = hr_control.constrain();
     let eev_cfgs =
         EevCfgs::default().eev4(EevCfg::default().filter(EventFilter::BlankingResetToCmp1));
-    let mut timer: HrParts<_, PSCL, HrOut1<_, PSCL, DacResetOnCounterReset, DacStepOnCmp2>, DacResetOnCounterReset, DacStepOnCmp2> = dp
+    let mut hrtimer: HrParts<_, PSCL, HrOut1<_, PSCL, DacResetOnCounterReset, DacStepOnCmp2>, DacResetOnCounterReset, DacStepOnCmp2> = dp
         .HRTIM_TIMA
         .pwm_advanced(pa8)
         .prescaler(prescaler)
@@ -290,14 +295,14 @@ fn setup<PSCL: HrtimPrescaler>(
         .eev_cfg(eev_cfgs)
         .finalize(&mut hr_control);
 
-    timer.cr2.set_duty(cr2_ticks_per_dac_trigger);
+    hrtimer.cr2.set_duty(cr2_ticks_per_dac_trigger);
     let ref_dac = ref_dac.enable_sawtooth_generator(
         SawtoothConfig::with_slope(
             stm32g4xx_hal::dac::CountingDirection::Decrement,
             dac_step_per_trigger,
         )
-        .inc_trigger(&timer.cr2)
-        .reset_trigger(&timer.timer),
+        .inc_trigger(&hrtimer.cr2)
+        .reset_trigger(&hrtimer.timer),
         &mut rcc,
     );
 
@@ -306,9 +311,8 @@ fn setup<PSCL: HrtimPrescaler>(
         .comparator(pa1, comp_ref, comparator::Config::default(), &rcc.clocks)
         .enable();
 
-    let timer: HrParts<_, _, HrOut1<_, _, DacResetOnCounterReset, DacStepOnCmp2>, _, _> = timer;
     Peripherals {
-        timer,
+        hrtimer,
         hr_control,
         eev_input4,
         comp,
@@ -318,5 +322,6 @@ fn setup<PSCL: HrtimPrescaler>(
         pa2,
         rcc,
         delay,
+        timer,
     }
 }
