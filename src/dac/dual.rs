@@ -61,22 +61,14 @@ impl<DAC: Instance, F: SampleFormat> DualDac<DAC, F, Disabled> {
     #[inline(always)]
     pub fn enable_dma_double(&mut self, channel: u8, enable: bool) {
         let dac = unsafe { &(*DAC::ptr()) };
-        if enable {
-            dac.mcr().modify(|_, w| w.dmadouble(channel).set_bit());
-        } else {
-            dac.mcr().modify(|_, w| w.dmadouble(channel).clear_bit());
-        }
+        dac.mcr().modify(|_, w| w.dmadouble(channel).bit(enable));
     }
 
     /// Enable DMA for the specified channel
     #[inline(always)]
     pub fn enable_dma(&mut self, channel: DacChannel, enable: bool) {
         let dac = unsafe { &(*DAC::ptr()) };
-        if enable {
-            dac.cr().modify(|_, w| w.dmaen(channel as u8).set_bit());
-        } else {
-            dac.cr().modify(|_, w| w.dmaen(channel as u8).clear_bit());
-        }
+        dac.cr().modify(|_, w| w.dmaen(channel as u8).bit(enable));
     }
 
     /// Enable trigger for the specified channel and the [`DacTriggerSource`]
@@ -172,14 +164,7 @@ impl<DAC: Instance> DualDacExt for DAC {
 
         // Apply the format configuration to both channels
         for channel in 0..2 {
-            match F::SIGNED {
-                true => {
-                    dac.mcr().modify(|_, w| w.sinformat(channel).set_bit());
-                }
-                false => {
-                    dac.mcr().modify(|_, w| w.sinformat(channel).clear_bit());
-                }
-            };
+            dac.mcr().modify(|_, w| w.sinformat(channel).bit(F::SIGNED));
         }
 
         DualDac {
