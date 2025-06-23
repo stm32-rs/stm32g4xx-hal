@@ -59,9 +59,10 @@ impl<DAC: Instance, F: SampleFormat> DualDac<DAC, F, Disabled> {
     /// This creates a single DMA request for every
     /// two external hardware triggers (excluding software triggers).
     #[inline(always)]
-    pub fn enable_dma_double(&mut self, channel: u8, enable: bool) {
+    pub fn enable_dma_double(&mut self, channel: DacChannel, enable: bool) {
         let dac = unsafe { &(*DAC::ptr()) };
-        dac.mcr().modify(|_, w| w.dmadouble(channel).bit(enable));
+        dac.mcr()
+            .modify(|_, w| w.dmadouble(channel as u8).bit(enable));
     }
 
     /// Enable DMA for the specified channel
