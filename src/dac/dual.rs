@@ -130,15 +130,15 @@ impl<DAC: Instance, F: SampleFormat> DualDac<DAC, F, Enabled> {
         match F::DEPTH {
             format::SampleDepth::Bits12 => match F::ALIGNMENT {
                 format::Alignment::Left => {
-                    dac.dhr12ld().write(|w| unsafe { w.bits(bits as u32) });
+                    dac.dhr12ld().write(|w| unsafe { w.bits(bits) });
                 }
                 format::Alignment::Right => {
-                    dac.dhr12rd().write(|w| unsafe { w.bits(bits as u32) });
+                    dac.dhr12rd().write(|w| unsafe { w.bits(bits) });
                 }
             },
             format::SampleDepth::Bits8 => {
                 // NOTE: 8-bit is always right aligned
-                dac.dhr8rd().write(|w| unsafe { w.bits(bits as u32) });
+                dac.dhr8rd().write(|w| unsafe { w.bits(bits) });
             }
         }
     }
