@@ -2,23 +2,22 @@
 
 use fixed::types::{I1F15, I1F7};
 
-/// DAC Data Alignment
+/// Alignment of the samples in the DAC hold register.
+/// Left alignment is used for signed 2's complement data
 pub enum Alignment {
     Left,
     Right,
 }
 
+/// Sample bit depth and alignment
 pub enum SampleDepth {
-    Bits12,
+    Bits12(Alignment),
     Bits8,
 }
 
 pub trait SampleFormat {
     /// Bit depth of the sample format (8 or 12 bits)
     const DEPTH: SampleDepth;
-    /// Alignment of the samples in the DAC hold register.
-    /// Left alignment is used for signed 2's complement data
-    const ALIGNMENT: Alignment;
     /// Signedness of the sample format
     const SIGNED: bool;
     /// Shift amount for Channel 2 samples into the 32 bit hold register
@@ -67,7 +66,6 @@ impl ToDac for u8 {
 pub struct SampleU8;
 impl SampleFormat for SampleU8 {
     const DEPTH: SampleDepth = SampleDepth::Bits8;
-    const ALIGNMENT: Alignment = Alignment::Right;
     const SIGNED: bool = false;
     const CH2_SHIFT: u8 = 8;
     const CH1_MASK: u32 = 0xFF;
@@ -77,8 +75,7 @@ impl SampleFormat for SampleU8 {
 /// Unsigned 12-bit samples
 pub struct SampleU12;
 impl SampleFormat for SampleU12 {
-    const DEPTH: SampleDepth = SampleDepth::Bits12;
-    const ALIGNMENT: Alignment = Alignment::Right;
+    const DEPTH: SampleDepth = SampleDepth::Bits12(Alignment::Right);
     const SIGNED: bool = false;
     const CH2_SHIFT: u8 = 16;
     const CH1_MASK: u32 = 0xFFFF;
@@ -89,7 +86,6 @@ impl SampleFormat for SampleU12 {
 pub struct SampleQ7;
 impl SampleFormat for SampleQ7 {
     const DEPTH: SampleDepth = SampleDepth::Bits8;
-    const ALIGNMENT: Alignment = Alignment::Right;
     const SIGNED: bool = true;
     const CH2_SHIFT: u8 = 8;
     const CH1_MASK: u32 = 0xFF;
@@ -99,8 +95,7 @@ impl SampleFormat for SampleQ7 {
 /// Fixed point signed Q1.11 samples
 pub struct SampleQ11;
 impl SampleFormat for SampleQ11 {
-    const DEPTH: SampleDepth = SampleDepth::Bits12;
-    const ALIGNMENT: Alignment = Alignment::Left;
+    const DEPTH: SampleDepth = SampleDepth::Bits12(Alignment::Left);
     const SIGNED: bool = true;
     const CH2_SHIFT: u8 = 16;
     const CH1_MASK: u32 = 0xFFFF;
@@ -110,8 +105,7 @@ impl SampleFormat for SampleQ11 {
 /// Fixed point signed Q1.15 samples
 pub struct SampleQ15;
 impl SampleFormat for SampleQ15 {
-    const DEPTH: SampleDepth = SampleDepth::Bits12;
-    const ALIGNMENT: Alignment = Alignment::Left;
+    const DEPTH: SampleDepth = SampleDepth::Bits12(Alignment::Left);
     const SIGNED: bool = true;
     const CH2_SHIFT: u8 = 16;
     const CH1_MASK: u32 = 0xFFFF;

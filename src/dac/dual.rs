@@ -120,7 +120,7 @@ impl<DAC: Instance, F: SampleFormat> DualDac<DAC, F, Enabled> {
         let bits = (ch2.to_dac() as u32) << F::CH2_SHIFT | (ch1.to_dac() as u32) & F::CH1_MASK;
 
         match F::DEPTH {
-            format::SampleDepth::Bits12 => match F::ALIGNMENT {
+            format::SampleDepth::Bits12(alignment) => match alignment {
                 format::Alignment::Left => {
                     dac.dhr12ld().write(|w| unsafe { w.bits(bits) });
                 }
