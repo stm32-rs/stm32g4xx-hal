@@ -200,7 +200,7 @@ impl<Layout: BufferLayoutConfig> Fmac<Layout, Stopped> {
 
 impl<Layout: BufferLayoutConfig, S: State> Fmac<Layout, S> {
     /// Transition to the next state
-    pub fn next_state() -> Self {
+    fn next_state() -> Self {
         Fmac {
             _phantom: PhantomData,
         }

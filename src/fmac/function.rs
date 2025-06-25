@@ -1,5 +1,19 @@
 //! FMAC Functions
 
+/// Programmable gain parameter in the range 0dB to 42dB in 6dB increments.
+#[repr(u8)]
+#[derive(Copy, Clone)]
+pub enum Gain {
+    ZeroDB = 0,
+    SixDB = 1,
+    TwelveDB = 2,
+    EighteenDB = 3,
+    TwentyFourDB = 4,
+    ThirtyDB = 5,
+    ThirtySixDB = 6,
+    FortyTwoDB = 7,
+}
+
 /// FMAC Function trait. This defines the function specific data that is loaded into the PARAM register
 pub trait Function {
     /// The function ID loaded into the FUNC field
@@ -64,7 +78,8 @@ impl Function for LoadY {
 pub struct Convolution {
     /// Number of coefficients in the X2 buffer
     pub length: u8,
-    pub gain: u8,
+    /// Gain parameter in the range 0dB to 42dB in 6dB increments
+    pub gain: Gain,
 }
 
 /// Finite Impulse Response (FIR) / Convolution / Dot Product function
@@ -78,17 +93,20 @@ impl Function for Convolution {
 
     #[inline(always)]
     fn r(&self) -> Option<u8> {
-        Some(self.gain)
+        Some(self.gain as u8)
     }
 }
 
 /// Infinite Impulse Response (IIR) filter / Multiply Accumulate
 pub struct IIR {
     /// The number of feedforward coefficients in the X2 buffer
+    /// X2 buffer size should be at least 2*feedforward_coeffs + 2*feedback_coeffs
     pub feedforward_coeffs: u8,
     /// The number of feedback coefficients in the X2 buffer
+    /// X2 buffer size should be at least 2*feedforward_coeffs + 2*feedback_coeffs
     pub feedback_coeffs: u8,
-    pub gain: u8,
+    /// Gain parameter in the range 0dB to 42dB in 6dB increments
+    pub gain: Gain,
 }
 
 impl Function for IIR {
@@ -104,6 +122,6 @@ impl Function for IIR {
     }
 
     fn r(&self) -> Option<u8> {
-        Some(self.gain)
+        Some(self.gain as u8)
     }
 }

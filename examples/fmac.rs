@@ -3,7 +3,6 @@
 #![no_main]
 #![no_std]
 
-use cortex_m::asm::wfi;
 use hal::prelude::*;
 use hal::stm32;
 use stm32g4xx_hal as hal;
@@ -17,7 +16,7 @@ use utils::logger::info;
 
 use stm32g4xx_hal::fmac::{
     buffer::{BufferLayout, Watermark},
-    function::IIR,
+    function::{Gain, IIR},
     Buffer, FmacExt,
 };
 
@@ -76,7 +75,7 @@ fn main() -> ! {
     fmac.select_function(IIR {
         feedforward_coeffs: 1,
         feedback_coeffs: 1,
-        gain: 0,
+        gain: Gain::ZeroDB,
     });
 
     let fmac = fmac.start();
