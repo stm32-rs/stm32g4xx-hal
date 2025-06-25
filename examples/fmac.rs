@@ -37,7 +37,7 @@ fn main() -> ! {
     // The BufferLayout struct takes three generic consts and will calculate the base offsets at compile time,
     // which must be passed as a generic parameter to the constrain method of the FMAC instance.
     //
-    // Create an FMAC instance with a memory layout of 16 inputs, 2 coefficients, and 8 output buffer words
+    // Create an FMAC instance with a memory layout of 32 inputs, 2 coefficients, and 1 output buffer words
     //
     // For IIR filters, RM0440 indicates X2 coeffecient buffer should be 2N + 2M where
     // N is the number of feedforward coefficients and M is the number of feedback coefficients.
