@@ -71,7 +71,7 @@ fn main() -> ! {
     fmac.set_watermark(Buffer::X1, Watermark::Threshold1);
     fmac.set_watermark(Buffer::Y, Watermark::Threshold1);
 
-    // Select the IIR function, sepecifying the number of
+    // Select the IIR function, specifying the number of
     // feedforward and feedback coefficients, and the gain
     fmac.select_function(IIR {
         feedforward_coeffs: 1,
