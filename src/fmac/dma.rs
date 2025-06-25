@@ -47,7 +47,7 @@ unsafe impl ReadBuffer for FmacDmaReader {
 
 unsafe impl TargetAddress<MemoryToPeripheral> for FmacDmaWriter {
     type MemSize = u32;
-    const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::FMAC_Read as u8);
+    const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::FMAC_Write as u8);
 
     fn address(&self) -> u32 {
         self.wdata as u32
