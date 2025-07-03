@@ -2,6 +2,7 @@
 
 #![no_std]
 #![no_main]
+#![allow(clippy::uninlined_format_args)]
 
 use stm32g4xx_hal::adc::AdcClaim;
 use stm32g4xx_hal::adc::AdcCommonExt;

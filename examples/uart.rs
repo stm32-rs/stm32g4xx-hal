@@ -2,6 +2,7 @@
 #![deny(unsafe_code)]
 #![no_main]
 #![no_std]
+#![allow(clippy::uninlined_format_args)]
 
 use embedded_io::{Read, Write};
 use hal::prelude::*;

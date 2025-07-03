@@ -1,5 +1,6 @@
 #![no_main]
 #![no_std]
+#![allow(clippy::uninlined_format_args)]
 
 use crate::hal::{
     adc::{
