@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![allow(clippy::uninlined_format_args)]
 
 #[path = "../examples/utils/mod.rs"]
 mod utils;
@@ -49,7 +50,6 @@ mod tests {
         let dp = stm32::Peripherals::take().unwrap();
         let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
-        defmt::dbg!(rcc.clocks.sys_clk);
 
         let gpioa = dp.GPIOA.split(&mut rcc);
         let _pa1_important_dont_use_as_output = gpioa.pa1.into_floating_input();
@@ -132,19 +132,13 @@ mod tests {
             hi_duration = await_lo(&timer, pin_num, max).unwrap();
             assert!(
                 hi_duration > min && hi_duration < max,
-                "hi: {} < {} < {}",
-                min,
-                hi_duration,
-                max
+                "hi: {min} < {hi_duration} < {max}"
             );
 
             lo_duration = await_hi(&timer, pin_num, max).unwrap();
             assert!(
                 lo_duration > min && lo_duration < max,
-                "lo: {} < {} < {}",
-                min,
-                lo_duration,
-                max
+                "lo: {min} < {lo_duration} < {max}"
             );
         }
 
@@ -231,7 +225,7 @@ mod tests {
             adc::config::Resolution::Twelve,
         );
         debug!("temp: {}°C", temp);
-        assert!((20.0..35.0).contains(&temp), "20.0 < {} < 35.0", temp);
+        assert!((20.0..35.0).contains(&temp), "20.0 < {temp} < 35.0");
     }
 
     #[test]
@@ -265,7 +259,7 @@ mod tests {
         adc.configure_channel(&Vref, adc::config::Sequence::One, sample_time);
         adc.configure_channel(&Temperature, adc::config::Sequence::Two, sample_time);
 
-        defmt::info!("Setup DMA");
+        debug!("Setup DMA");
         let first_buffer = cortex_m::singleton!(: [u16; 2] = [0; 2]).unwrap();
         let mut transfer = channels.ch1.into_peripheral_to_memory_transfer(
             adc.enable_dma(adc::config::Dma::Single),
@@ -275,9 +269,9 @@ mod tests {
 
         transfer.start(|adc| adc.start_conversion());
 
-        defmt::info!("Wait for Conversion");
+        debug!("Wait for Conversion");
         while !transfer.get_transfer_complete_flag() {}
-        defmt::info!("Conversion Done");
+        debug!("Conversion Done");
 
         transfer.pause(|adc| adc.cancel_conversion());
         let (_ch1, adc, first_buffer) = transfer.free();
@@ -302,6 +296,6 @@ mod tests {
             adc::config::Resolution::Twelve,
         );
         debug!("temp: {}°C", temp);
-        assert!((20.0..35.0).contains(&temp), "20.0 < {} < 35.0", temp);
+        assert!((20.0..35.0).contains(&temp), "20.0 < {temp} < 35.0");
     }
 }
