@@ -1,10 +1,13 @@
 #![no_std]
 #![no_main]
+#![allow(clippy::uninlined_format_args)]
 
 // Requires a jumper from A1<->A2 (arduino naming) aka PA1<->PA4
 
 #[path = "../examples/utils/mod.rs"]
 mod utils;
+
+use utils::logger::println;
 
 mod common;
 
@@ -83,9 +86,7 @@ mod tests {
             let reading = adc.convert(&opamp, sample_time);
             assert!(
                 reading.abs_diff(setpoint) < 10,
-                "reading: {}, setpoint {}",
-                reading,
-                setpoint
+                "reading: {reading}, setpoint {setpoint}"
             );
         }
     }
@@ -114,9 +115,7 @@ mod tests {
             let reading = adc.convert(&pa2, sample_time);
             assert!(
                 reading.abs_diff(setpoint) < 10,
-                "reading: {}, setpoint {}",
-                reading,
-                setpoint
+                "reading: {reading}, setpoint {setpoint}"
             );
         }
     }
@@ -141,9 +140,7 @@ mod tests {
             let reading = adc.convert(&opamp, sample_time);
             assert!(
                 reading.abs_diff((setpoint * 2).min(4095)) < 20,
-                "reading: {}, setpoint {}",
-                reading,
-                setpoint
+                "reading: {reading}, setpoint {setpoint}"
             );
         }
     }
@@ -180,8 +177,7 @@ mod tests {
             let out = comp.output();
             assert!(
                 comp.output() == (value_setpoint > ref_setpoint),
-                "setpoint: {}, expected: '{}', got '{}'",
-                value_setpoint,
+                "setpoint: {value_setpoint}, expected: '{}', got '{}'",
                 if value_setpoint > ref_setpoint {
                     "HI"
                 } else {
@@ -224,8 +220,7 @@ mod tests {
             let out = comp.output();
             assert!(
                 comp.output() == (value_setpoint > ref_setpoint),
-                "setpoint: {}, expected: '{}', got '{}'",
-                value_setpoint,
+                "setpoint: {value_setpoint}, expected: '{}', got '{}'",
                 if value_setpoint > ref_setpoint {
                     "HI"
                 } else {
@@ -246,6 +241,7 @@ mod tests {
     ///
     #[test]
     fn comp_dac_dac() {
+        use super::*;
         let super::Peripherals {
             comp,
             mut value_dac,
@@ -264,7 +260,7 @@ mod tests {
         for s_ref in 4..=255 {
             let s_ref = s_ref << 4; // Convert from 8 to 12 bits
             if s_ref & 0xFF == 0 {
-                defmt::println!("{}/{}...", s_ref, 4095);
+                println!("{}/4095...", s_ref);
             }
             ref_dac.set_value(s_ref);
             for s_value in 0..=255 {
@@ -275,10 +271,7 @@ mod tests {
                 if s_value.abs_diff(s_ref) > 20 {
                     assert!(
                         out == (s_value > s_ref),
-                        "s_value: {}, s_ref: {}, out: {}",
-                        s_value,
-                        s_ref,
-                        out
+                        "s_value: {s_value}, s_ref: {s_ref}, out: {out}"
                     );
                 }
             }
