@@ -2,6 +2,7 @@
 #![deny(unsafe_code)]
 #![no_main]
 #![no_std]
+#![allow(clippy::uninlined_format_args)]
 
 mod utils;
 use utils::logger::info;

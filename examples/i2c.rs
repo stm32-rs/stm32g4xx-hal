@@ -2,6 +2,7 @@
 #![deny(unsafe_code)]
 #![no_main]
 #![no_std]
+#![allow(clippy::uninlined_format_args)]
 
 use hal::prelude::*;
 use hal::stm32;

@@ -1,5 +1,6 @@
 #![no_std]
 #![no_main]
+#![allow(clippy::uninlined_format_args)]
 
 use cortex_m_rt::entry;
 
