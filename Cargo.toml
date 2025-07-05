@@ -17,7 +17,7 @@ stm32g4 = { version = "0.16.0", features = ["atomics"] }
 paste = "1.0"
 fugit = "0.3.7"
 stm32-usbd = { version = "0.7.0", optional = true }
-fixed = { version = "1.28.0", optional = true }
+fixed = { version = "1.28.0" }
 embedded-io = "0.6"
 
 [dependencies.cortex-m]
@@ -106,7 +106,8 @@ defmt = [
     "embedded-io/defmt-03",
     "embedded-test/defmt",
 ]
-cordic = ["dep:fixed"]
+cordic = []
+fmac = []
 adc3 = []
 adc4 = []
 adc5 = []
@@ -152,6 +153,10 @@ required-features = ["usb"]
 [[example]]
 name = "cordic"
 required-features = ["cordic"]
+
+[[example]]
+name = "fmac"
+required-features = ["fmac"]
 
 [[test]]
 name = "nucleo-g474"
