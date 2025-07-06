@@ -140,6 +140,19 @@ codegen-units = 1
 incremental = false
 lto = true
 
+[[test]]
+name = "nucleo-g474"
+harness = false
+required-features = ["stm32g474", "defmt", "cordic"]
+
+[[test]]
+name = "nucleo-g474_w_jumpers"
+harness = false
+required-features = ["stm32g474", "defmt"]
+
+[lib]
+test = false
+
 [[example]]
 name = "can-echo"
 required-features = ["can"]
@@ -156,15 +169,52 @@ required-features = ["usb"]
 name = "cordic"
 required-features = ["cordic"]
 
-[[test]]
-name = "nucleo-g474"
-harness = false
-required-features = ["stm32g474", "defmt", "cordic"]
+[[example]]
+name = "hrtim-adc-trigger"
+required-features = ["hrtim"]
+path = "examples/hrtim/adc-trigger.rs"
 
-[[test]]
-name = "nucleo-g474_w_jumpers"
-harness = false
-required-features = ["stm32g474", "defmt", "cordic"]
+[[example]]
+name = "hrtim-capture"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture.rs"
 
-[lib]
-test = false
+[[example]]
+name = "hrtim-deadtime"
+required-features = ["hrtim"]
+path = "examples/hrtim/deadtime.rs"
+
+[[example]]
+name = "hrtim-capture-dma"
+required-features = ["hrtim"]
+path = "examples/hrtim/capture-dma.rs"
+
+[[example]]
+name = "hrtim-eev-comp"
+required-features = ["hrtim"]
+path = "examples/hrtim/eev-comp.rs"
+
+[[example]]
+name = "hrtim-eev"
+required-features = ["hrtim"]
+path = "examples/hrtim/eev.rs"
+
+[[example]]
+name = "hrtim-flt-comp"
+required-features = ["hrtim"]
+path = "examples/hrtim/flt-comp.rs"
+
+[[example]]
+name = "hrtim-flt"
+required-features = ["hrtim"]
+path = "examples/hrtim/flt.rs"
+
+[[example]]
+name = "hrtim"
+required-features = ["hrtim"]
+path = "examples/hrtim/hrtim.rs"
+
+[[example]]
+name = "hrtim-master"
+required-features = ["hrtim"]
+path = "examples/hrtim/master.rs"
