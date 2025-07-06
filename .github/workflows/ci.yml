@@ -19,7 +19,7 @@ jobs:
           - stm32g431
           - stm32g441
           - stm32g473
-          - stm32g474
+          - stm32g474,hrtim
           - stm32g483
           - stm32g484
           - stm32g491 # Does not seem ready yet
