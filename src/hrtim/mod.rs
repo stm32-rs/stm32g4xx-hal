@@ -108,7 +108,7 @@ macro_rules! pins_helper {
     ($TIMX:ty, $HrOutY:ident, $CHY:ident<$CHY_AF:literal>) => {
         //impl sealed::Sealed<$TIMX> for $CHY<GpioInputMode> {}
 
-        unsafe impl<DacRst, DacStp> ToHrOut<$TIMX, DacRst, DacStp> for $CHY<gpio::DefaultMode>
+        unsafe impl<DacRst, DacStp> ToHrOut<$TIMX, DacRst, DacStp> for $CHY
         where
             DacRst: DacResetTrigger,
             DacStp: DacStepTrigger,
@@ -116,7 +116,7 @@ macro_rules! pins_helper {
             type Out<PSCL> = $HrOutY<$TIMX, PSCL, DacRst, DacStp>;
         }
 
-        impl HrtimPin<$TIMX> for $CHY<gpio::DefaultMode> {
+        impl HrtimPin<$TIMX> for $CHY {
             // Pin<Gpio, Index, Alternate<PushPull, AF>>
             fn connect_to_hrtim(self) {
                 let _: $CHY<gpio::Alternate<{ $CHY_AF }>> = self.into_alternate();
