@@ -93,11 +93,35 @@ impl Config {
         self
     }
 
+    /// Invert the comparator output
+    ///
+    /// NOTE: This does NOT affect the value read by [Comparator::output]
+    ///
+    /// The following observers are affected by this setting
+    /// * Pin output
+    /// * EXTI interrupt/wakeup
+    /// * TIMx
+    ///
+    /// The following observers are NOT affected by this setting
+    /// * HRTIM
+    /// * Software using [Comparator::output]
     pub fn output_inverted(mut self) -> Self {
         self.inverted = true;
         self
     }
 
+    /// Invert the comparator output
+    ///
+    /// NOTE: This does NOT affect the value read by [Comparator::output]
+    ///
+    /// The following observers are affected by this setting
+    /// * Pin output
+    /// * EXTI interrupt/wakeup
+    /// * TIMx
+    ///
+    /// The following observers are NOT affected by this setting
+    /// * HRTIM
+    /// * Software using [Comparator::output]
     pub fn output_polarity(mut self, inverted: bool) -> Self {
         self.inverted = inverted;
         self
@@ -451,7 +475,25 @@ macro_rules! impl_comparator {
         }
 
         impl<ED: EnabledState> Comparator<$COMP, ED> {
+            /// Invert the comparator output
+            ///
+            /// NOTE: This does NOT affect the value read by [Comparator::output]
+            ///
+            /// The following observers are affected by this setting
+            /// * Pin output
+            /// * EXTI interrupt/wakeup
+            /// * TIMx
+            ///
+            /// The following observers are NOT affected by this setting
+            /// * HRTIM
+            /// * Software using [Comparator::output]
+            pub fn set_inverted(&mut self, inverted: bool) {
+                self.regs.csr().modify(|_, w| w.pol().bit(inverted));
+            }
+
             /// Returns the value of the output of the comparator
+            ///
+            /// NOTE: This is taken before any potential inversion
             pub fn output(&self) -> bool {
                 self.regs.csr().read().value().bit_is_set()
             }
