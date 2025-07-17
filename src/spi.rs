@@ -198,13 +198,13 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
     pub fn set_tx_only(&mut self) {
         self.spi
             .cr1()
-            .modify(|_, w| w.bidimode().set_bit().bidioe().set_bit());
+            .modify(|_, w| w.bidimode().bidirectional().bidioe().output_enabled());
     }
     #[inline]
     pub fn set_bidi(&mut self) {
         self.spi
             .cr1()
-            .modify(|_, w| w.bidimode().clear_bit().bidioe().clear_bit());
+            .modify(|_, w| w.bidimode().unidirectional().bidioe().output_disabled());
     }
     fn tx_fifo_cap(&self) -> u8 {
         match self.spi.sr().read().ftlvl().bits() {
@@ -271,7 +271,7 @@ fn setup_spi_regs(regs: &spi1::RegisterBlock, spi_freq: u32, bus_freq: u32, mode
             .rxonly()
             .clear_bit()
             .bidimode()
-            .clear_bit()
+            .unidirectional()
             .ssi()
             .set_bit()
             .spe()
