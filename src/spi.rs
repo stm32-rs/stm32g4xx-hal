@@ -12,7 +12,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
 use crate::stm32::SPI4;
 use crate::stm32::{spi1, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
-use core::{ptr, ops::Deref};
+use core::{ops::Deref, ptr};
 
 use embedded_hal::spi::ErrorKind;
 pub use embedded_hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
@@ -86,11 +86,7 @@ impl FrameSize for u16 {
 }
 
 pub trait Instance:
-    crate::Sealed
-    + Deref<Target = spi1::RegisterBlock>
-    + Enable
-    + Reset
-    + GetBusFreq
+    crate::Sealed + Deref<Target = spi1::RegisterBlock> + Enable + Reset + GetBusFreq
 {
     const DMA_MUX_RESOURCE: DmaMuxResources;
 }
@@ -140,9 +136,7 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
     }
 
     pub fn enable_tx_dma(self) -> Spi<SPI, PINS> {
-        self.spi
-            .cr2()
-            .modify(|_, w| w.txdmaen().set_bit());
+        self.spi.cr2().modify(|_, w| w.txdmaen().set_bit());
         Spi {
             spi: self.spi,
             pins: self.pins,
@@ -316,9 +310,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
         // flush data from previous operations, otherwise we'd get unwanted data
         self.flush_inner()?;
         // FIFO threshold to 16 bits
-        self.spi
-            .cr2()
-            .modify(|_, w| w.frxth().clear_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().clear_bit());
         self.set_bidi();
 
         let half_len = len / 2;
@@ -382,9 +374,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
                     u16::from_le_bytes(unsafe { *two.as_ptr().cast() }));
 
         // FIFO threshold to 16 bits
-        self.spi
-            .cr2()
-            .modify(|_, w| w.frxth().clear_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().clear_bit());
 
         // same prefill as in read, this time with actual data
         let prefill = core::cmp::min(self.tx_fifo_cap() as usize / 2, half_len);
@@ -440,9 +430,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
 
         self.flush_inner()?;
         self.set_bidi();
-        self.spi
-            .cr2()
-            .modify(|_, w| w.frxth().clear_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().clear_bit());
         let half_len = len / 2;
         let pair_left = len % 2;
 
@@ -495,9 +483,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
         // flush data from previous operations, otherwise we'd get unwanted data
         self.flush_inner()?;
         // FIFO threshold to 16 bits
-        self.spi
-            .cr2()
-            .modify(|_, w| w.frxth().clear_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().clear_bit());
         self.set_bidi();
         // prefill write fifo so that the clock doen't stop while fetch the read byte
         let prefill = core::cmp::min(self.tx_fifo_cap() as usize / 2, len);
@@ -530,9 +516,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
 
         self.flush_inner()?;
         // FIFO threshold to 16 bits
-        self.spi
-            .cr2()
-            .modify(|_, w| w.frxth().clear_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().clear_bit());
         self.set_bidi();
         let common_len = core::cmp::min(read.len(), write.len());
         // same prefill as in read, this time with actual data
@@ -567,9 +551,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
 
         self.flush_inner()?;
         self.set_bidi();
-        self.spi
-            .cr2()
-            .modify(|_, w| w.frxth().clear_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().clear_bit());
         let prefill = core::cmp::min(self.tx_fifo_cap() as usize / 2, len);
 
         for w in &words[..prefill] {
