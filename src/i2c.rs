@@ -14,8 +14,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
 use crate::stm32::I2C4;
 use crate::stm32::{I2C1, I2C2, I2C3};
 use crate::time::Hertz;
-use core::cmp;
-use core::convert::TryInto;
+use core::{convert::TryInto, cmp, ops::Deref};
 
 /// I2C bus configuration.
 #[derive(Debug, Clone, Copy)]
@@ -200,17 +199,13 @@ macro_rules! busy_wait {
     };
 }
 
-pub trait Instance: 
+pub trait Instance:
     crate::Sealed 
-    + Enable
-    + Reset
-    + GetBusFreq
-{
-    const PTR: *const crate::stm32::i2c1::RegisterBlock;
-    fn registers(&self) -> &crate::stm32::i2c1::RegisterBlock {
-        unsafe { &*Self::PTR }
-    }
-}
+        + Deref<Target = i2c1::RegisterBlock>
+        + Enable 
+        + Reset 
+        + GetBusFreq 
+{}
 
 macro_rules! i2c {
     ($I2CX:ident, $i2cx:ident,
@@ -227,9 +222,7 @@ macro_rules! i2c {
             impl SCLPin<$I2CX> for gpio::$PSCL<gpio::$AFCL<OpenDrain>> {}
         )+
 
-        impl Instance for $I2CX {
-            const PTR: *const crate::stm32::i2c1::RegisterBlock = $I2CX::PTR as *const crate::stm32::i2c1::RegisterBlock;
-        }
+        impl Instance for $I2CX {}
     }
 }
 
@@ -260,15 +253,15 @@ where
         I2C::reset(rcc);
 
         // Make sure the I2C unit is disabled so we can configure it
-        i2c.registers().cr1().modify(|_, w| w.pe().clear_bit());
+        i2c.cr1().modify(|_, w| w.pe().clear_bit());
 
         // Setup protocol timings
-        i2c.registers().timingr().write(|w|
+        i2c.timingr().write(|w|
             config.timing_bits(I2C::get_frequency(&rcc.clocks), w)
         );
 
         // Enable the I2C processing
-        i2c.registers().cr1().modify(|_, w| {
+        i2c.cr1().modify(|_, w| {
             w.pe()
                 .set_bit()
                 .dnf()
@@ -306,7 +299,7 @@ where
         // Process 255 bytes at a time
         for (i, buffer) in buffer.chunks_mut(0xFF).enumerate() {
             // Prepare to receive `bytes`
-            self.i2c.registers().cr2().modify(|_, w| {
+            self.i2c.cr2().modify(|_, w| {
                 if i == 0 {
                     w.add10().bit(addr_10b);
                     w.sadd().set(addr);
@@ -323,20 +316,20 @@ where
 
             for byte in buffer {
                 // Wait until we have received something
-                busy_wait!(self.i2c.registers(), rxne, is_not_empty);
-                *byte = self.i2c.registers().rxdr().read().rxdata().bits();
+                busy_wait!(self.i2c, rxne, is_not_empty);
+                *byte = self.i2c.rxdr().read().rxdata().bits();
             }
 
             if i != end {
                 // Wait until the last transmission is finished
-                busy_wait!(self.i2c.registers(), tcr, is_complete);
+                busy_wait!(self.i2c, tcr, is_complete);
             }
         }
 
         // Wait until the last transmission is finished
         // auto stop is set
-        busy_wait!(self.i2c.registers(), stopf, is_stop);
-        self.i2c.registers().icr().write(|w| w.stopcf().clear());
+        busy_wait!(self.i2c, stopf, is_stop);
+        self.i2c.icr().write(|w| w.stopcf().clear());
         Ok(())
     }
 
@@ -348,7 +341,7 @@ where
 
         if buffer.is_empty() {
             // 0 byte write
-            self.i2c.registers().cr2().modify(|_, w| {
+            self.i2c.cr2().modify(|_, w| {
                 w.add10().bit(addr_10b);
                 w.sadd().set(addr);
                 w.rd_wrn().write();
@@ -362,7 +355,7 @@ where
         // Process 255 bytes at a time
         for (i, buffer) in buffer.chunks(0xFF).enumerate() {
             // Prepare to receive `bytes`
-            self.i2c.registers().cr2().modify(|_, w| {
+            self.i2c.cr2().modify(|_, w| {
                 if i == 0 {
                     w.add10().bit(addr_10b);
                     w.sadd().set(addr);
@@ -380,20 +373,20 @@ where
             for byte in buffer {
                 // Wait until we are allowed to send data
                 // (START has been ACKed or last byte went through)
-                busy_wait!(self.i2c.registers(), txis, is_empty);
-                self.i2c.registers().txdr().write(|w| w.txdata().set(*byte));
+                busy_wait!(self.i2c, txis, is_empty);
+                self.i2c.txdr().write(|w| w.txdata().set(*byte));
             }
 
             if i != end {
                 // Wait until the last transmission is finished
-                busy_wait!(self.i2c.registers(), tcr, is_complete);
+                busy_wait!(self.i2c, tcr, is_complete);
             }
         }
 
         // Wait until the last transmission is finished
         // auto stop is set
-        busy_wait!(self.i2c.registers(), stopf, is_stop);
-        self.i2c.registers().icr().write(|w| w.stopcf().clear());
+        busy_wait!(self.i2c, stopf, is_stop);
+        self.i2c.icr().write(|w| w.stopcf().clear());
         Ok(())
     }
 }
@@ -417,7 +410,7 @@ where
         for op in operation {
             // Wait for any operation on the bus to finish
             // for example in the case of another bus master having claimed the bus
-            while self.i2c.registers().isr().read().busy().bit_is_set() {}
+            while self.i2c.isr().read().busy().bit_is_set() {}
             match op {
                 Operation::Read(data) => self.read_inner(address as u16, false, data)?,
                 Operation::Write(data) => self.write_inner(address as u16, false, data)?,
@@ -440,7 +433,7 @@ where
         for op in operation {
             // Wait for any operation on the bus to finish
             // for example in the case of another bus master having claimed the bus
-            while self.i2c.registers().isr().read().busy().bit_is_set() {}
+            while self.i2c.isr().read().busy().bit_is_set() {}
             match op {
                 Operation::Read(data) => self.read_inner(address, true, data)?,
                 Operation::Write(data) => self.write_inner(address, true, data)?,
