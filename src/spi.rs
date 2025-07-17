@@ -440,7 +440,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
             core::slice::from_raw_parts_mut(ptr as *mut [u8; 2], half_len)
         };
 
-        for b in words_alias.iter_mut().take(prefill as usize) {
+        for b in words_alias.iter_mut().take(prefill) {
             nb::block!(self.nb_write(u16::from_le_bytes(*b)))?;
         }
 
