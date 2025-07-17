@@ -12,7 +12,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
 use crate::stm32::SPI4;
 use crate::stm32::{spi1, SPI1, SPI2, SPI3};
 use crate::time::Hertz;
-use core::ptr;
+use core::{ptr, ops::Deref};
 
 use embedded_hal::spi::ErrorKind;
 pub use embedded_hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
@@ -87,17 +87,21 @@ impl FrameSize for u16 {
 
 pub trait Instance:
     crate::Sealed
-    // everything derefs to spi4, except spi1
-    // + Deref<Target = crate::stm32::spi1::RegisterBlock>
+    + Deref<Target = spi1::RegisterBlock>
     + Enable
     + Reset
     + GetBusFreq
 {
-    const PTR: *const spi1::RegisterBlock;
-    #[inline]
-    fn registers(&self) -> &spi1::RegisterBlock {
-        unsafe { &*Self::PTR }
+    const DMA_MUX_RESOURCE: DmaMuxResources;
+}
+
+unsafe impl<SPI: Instance, PINS> TargetAddress<MemoryToPeripheral> for Spi<SPI, PINS> {
+    #[inline(always)]
+    fn address(&self) -> u32 {
+        self.spi.dr() as *const _ as u32
     }
+    type MemSize = u8;
+    const REQUEST_LINE: Option<u8> = Some(SPI::DMA_MUX_RESOURCE as u8);
 }
 
 macro_rules! spi {
@@ -125,17 +129,7 @@ macro_rules! spi {
         )*
 
         impl Instance for $SPIX {
-            const PTR: *const crate::stm32::spi1::RegisterBlock = $SPIX::PTR as *const crate::stm32::spi1::RegisterBlock;
-        }
-
-        unsafe impl<PINS> TargetAddress<MemoryToPeripheral> for Spi<$SPIX, PINS> {
-            #[inline(always)]
-            fn address(&self) -> u32 {
-                // unsafe: only the Tx part accesses the Tx register
-                unsafe { &*<$SPIX>::ptr() }.dr() as *const _ as u32
-            }
-            type MemSize = u8;
-            const REQUEST_LINE: Option<u8> = Some($mux as u8);
+            const DMA_MUX_RESOURCE: DmaMuxResources = $mux;
         }
     }
 }
@@ -147,7 +141,6 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
 
     pub fn enable_tx_dma(self) -> Spi<SPI, PINS> {
         self.spi
-            .registers()
             .cr2()
             .modify(|_, w| w.txdmaen().set_bit());
         Spi {
@@ -158,7 +151,7 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
 
     #[inline]
     fn nb_read<W: FrameSize>(&mut self) -> nb::Result<W, Error> {
-        let sr = self.spi.registers().sr().read();
+        let sr = self.spi.sr().read();
         Err(if sr.ovr().bit_is_set() {
             nb::Error::Other(Error::Overrun)
         } else if sr.modf().bit_is_set() {
@@ -173,7 +166,7 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
     }
     #[inline]
     fn nb_write<W: FrameSize>(&mut self, word: W) -> nb::Result<(), Error> {
-        let sr = self.spi.registers().sr().read();
+        let sr = self.spi.sr().read();
         Err(if sr.ovr().bit_is_set() {
             nb::Error::Other(Error::Overrun)
         } else if sr.modf().bit_is_set() {
@@ -189,7 +182,7 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
     }
     #[inline]
     fn nb_read_no_err<W: FrameSize>(&mut self) -> nb::Result<W, core::convert::Infallible> {
-        if self.spi.registers().sr().read().rxne().bit_is_set() {
+        if self.spi.sr().read().rxne().bit_is_set() {
             Ok(self.read_unchecked())
         } else {
             Err(nb::Error::WouldBlock)
@@ -199,29 +192,28 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
     fn read_unchecked<W: FrameSize>(&mut self) -> W {
         // NOTE(read_volatile) read only 1 byte (the svd2rust API only allows
         // reading a half-word)
-        unsafe { ptr::read_volatile(&self.spi.registers().dr() as *const _ as *const W) }
+        unsafe { ptr::read_volatile(&self.spi.dr() as *const _ as *const W) }
     }
     #[inline]
     fn write_unchecked<W: FrameSize>(&mut self, word: W) {
-        let dr = self.spi.registers().dr().as_ptr() as *mut W;
+        // NOTE(write_volatile) see note above
+        let dr = self.spi.dr().as_ptr() as *mut W;
         unsafe { ptr::write_volatile(dr, word) };
     }
     #[inline]
     pub fn set_tx_only(&mut self) {
         self.spi
-            .registers()
             .cr1()
             .modify(|_, w| w.bidimode().set_bit().bidioe().set_bit());
     }
     #[inline]
     pub fn set_bidi(&mut self) {
         self.spi
-            .registers()
             .cr1()
             .modify(|_, w| w.bidimode().clear_bit().bidioe().clear_bit());
     }
     fn tx_fifo_cap(&self) -> u8 {
-        match self.spi.registers().sr().read().ftlvl().bits() {
+        match self.spi.sr().read().ftlvl().bits() {
             0 => 4,
             1 => 3,
             2 => 2,
@@ -231,7 +223,7 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
     fn flush_inner(&mut self) -> Result<(), Error> {
         // stop receiving data
         self.set_tx_only();
-        self.spi.registers().cr2().modify(|_, w| w.frxth().set_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().set_bit());
         // drain rx fifo
         while match self.nb_read::<u8>() {
             Ok(_) => true,
@@ -241,7 +233,7 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
             core::hint::spin_loop()
         }
         // wait for idle
-        Ok(while self.spi.registers().sr().read().bsy().bit() {
+        Ok(while self.spi.sr().read().bsy().bit() {
             core::hint::spin_loop()
         })
     }
@@ -303,7 +295,7 @@ impl<SPI: Instance> SpiExt<SPI> for SPI {
 
         let spi_freq = freq.into().raw();
         let bus_freq = SPI::get_frequency(&rcc.clocks).raw();
-        setup_spi_regs(self.registers(), spi_freq, bus_freq, mode);
+        setup_spi_regs(&self, spi_freq, bus_freq, mode);
 
         Spi { spi: self, pins }
     }
@@ -324,7 +316,6 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
         self.flush_inner()?;
         // FIFO threshold to 16 bits
         self.spi
-            .registers()
             .cr2()
             .modify(|_, w| w.frxth().clear_bit());
         self.set_bidi();
@@ -349,7 +340,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
 
         let odd_idx = len.saturating_sub(2 * prefill + pair_left);
         // FIFO threshold to 8 bits
-        self.spi.registers().cr2().modify(|_, w| w.frxth().set_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().set_bit());
         if pair_left == 1 {
             nb::block!(self.nb_write(0u8))?;
             words[odd_idx] = nb::block!(self.nb_read_no_err()).unwrap();
@@ -389,7 +380,6 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
 
         // FIFO threshold to 16 bits
         self.spi
-            .registers()
             .cr2()
             .modify(|_, w| w.frxth().clear_bit());
 
@@ -414,7 +404,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
         }
 
         // FIFO threshold to 8 bits
-        self.spi.registers().cr2().modify(|_, w| w.frxth().set_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().set_bit());
 
         if pair_left == 1 {
             let write_idx = common_len - 1;
@@ -448,7 +438,6 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
         self.flush_inner()?;
         self.set_bidi();
         self.spi
-            .registers()
             .cr2()
             .modify(|_, w| w.frxth().clear_bit());
         let half_len = len / 2;
@@ -471,7 +460,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
             let write = u16::from_le_bytes(words_alias[i + prefill]);
             nb::block!(self.nb_write(write))?;
         }
-        self.spi.registers().cr2().modify(|_, w| w.frxth().set_bit());
+        self.spi.cr2().modify(|_, w| w.frxth().set_bit());
 
         if pair_left == 1 {
             let read_idx = len - 2 * prefill - 1;
@@ -503,7 +492,6 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
         self.flush_inner()?;
         // FIFO threshold to 16 bits
         self.spi
-            .registers()
             .cr2()
             .modify(|_, w| w.frxth().clear_bit());
         self.set_bidi();
@@ -537,7 +525,6 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
         self.flush_inner()?;
         // FIFO threshold to 16 bits
         self.spi
-            .registers()
             .cr2()
             .modify(|_, w| w.frxth().clear_bit());
         self.set_bidi();
@@ -575,7 +562,6 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
         self.flush_inner()?;
         self.set_bidi();
         self.spi
-            .registers()
             .cr2()
             .modify(|_, w| w.frxth().clear_bit());
         let prefill = core::cmp::min(self.tx_fifo_cap() as usize / 2, len);
