@@ -233,9 +233,10 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
             core::hint::spin_loop()
         }
         // wait for idle
-        Ok(while self.spi.sr().read().bsy().bit() {
+        while self.spi.sr().read().bsy().bit() {
             core::hint::spin_loop()
-        })
+        }
+        Ok(())
     }
 }
 
@@ -346,22 +347,24 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
             words[odd_idx] = nb::block!(self.nb_read_no_err()).unwrap();
         }
 
-        Ok(for r in words[odd_idx + pair_left..].iter_mut() {
+        for r in words[odd_idx + pair_left..].iter_mut() {
             *r = nb::block!(self.nb_read())?;
-        })
+        }
+        Ok(())
     }
 
     fn write(&mut self, words: &[u8]) -> Result<(), Self::Error> {
         self.set_tx_only();
-        Ok(for w in words {
+        for w in words {
             nb::block!(self.nb_write(*w))?
-        })
+        }
+        Ok(())
     }
 
     fn transfer(&mut self, read: &mut [u8], write: &[u8]) -> Result<(), Self::Error> {
-        if read.len() == 0 {
+        if read.is_empty() {
             return self.write(write);
-        } else if write.len() == 0 {
+        } else if write.is_empty() {
             return self.read(read);
         }
 
@@ -449,7 +452,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
             core::slice::from_raw_parts_mut(ptr as *mut [u8; 2], half_len)
         };
 
-        for b in words_alias.into_iter().take(prefill as usize) {
+        for b in words_alias.iter_mut().take(prefill as usize) {
             nb::block!(self.nb_write(u16::from_le_bytes(*b)))?;
         }
 
@@ -474,9 +477,10 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
         }
 
         // read words left in the fifo
-        Ok(for r in words.iter_mut().skip(len - 2 * prefill) {
+        for r in words.iter_mut().skip(len - 2 * prefill) {
             *r = nb::block!(self.nb_read())?;
-        })
+        }
+        Ok(())
     }
     fn flush(&mut self) -> Result<(), Self::Error> {
         self.flush_inner()
@@ -505,20 +509,22 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
             *w = nb::block!(self.nb_read_no_err()).unwrap();
             nb::block!(self.nb_write(0u16))?;
         }
-        Ok(for w in &mut words[len - prefill..] {
+        for w in &mut words[len - prefill..] {
             *w = nb::block!(self.nb_read())?;
-        })
+        }
+        Ok(())
     }
     fn write(&mut self, words: &[u16]) -> Result<(), Self::Error> {
         self.set_tx_only();
-        Ok(for w in words {
+        for w in words {
             nb::block!(self.nb_write(*w))?
-        })
+        }
+        Ok(())
     }
     fn transfer(&mut self, read: &mut [u16], write: &[u16]) -> Result<(), Self::Error> {
-        if read.len() == 0 {
+        if read.is_empty() {
             return self.write(write);
-        } else if write.len() == 0 {
+        } else if write.is_empty() {
             return self.read(read);
         }
 
@@ -532,12 +538,12 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
         // same prefill as in read, this time with actual data
         let prefill = core::cmp::min(self.tx_fifo_cap() as usize / 2, common_len);
 
-        let mut write_iter = write.into_iter();
+        let mut write_iter = write.iter();
         for w in write_iter.by_ref().take(prefill) {
             nb::block!(self.nb_write(*w))?;
         }
 
-        let zipped = read.into_iter().zip(write_iter).take(common_len - prefill);
+        let zipped = read.iter_mut().zip(write_iter).take(common_len - prefill);
         for (r, w) in zipped {
             *r = nb::block!(self.nb_read_no_err()).unwrap();
             nb::block!(self.nb_write(*w))?;
@@ -576,9 +582,10 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u16> for Spi<SPI,
             nb::block!(self.nb_write(words[write_idx]))?;
         }
 
-        Ok(for r in &mut words[len - prefill..] {
+        for r in &mut words[len - prefill..] {
             *r = nb::block!(self.nb_read())?;
-        })
+        }
+        Ok(())
     }
     fn flush(&mut self) -> Result<(), Self::Error> {
         self.flush_inner()
