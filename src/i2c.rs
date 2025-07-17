@@ -14,7 +14,7 @@ use crate::rcc::{Enable, GetBusFreq, Rcc, Reset};
 use crate::stm32::I2C4;
 use crate::stm32::{I2C1, I2C2, I2C3};
 use crate::time::Hertz;
-use core::{convert::TryInto, cmp, ops::Deref};
+use core::{cmp, convert::TryInto, ops::Deref};
 
 /// I2C bus configuration.
 #[derive(Debug, Clone, Copy)]
@@ -200,12 +200,9 @@ macro_rules! busy_wait {
 }
 
 pub trait Instance:
-    crate::Sealed 
-        + Deref<Target = i2c1::RegisterBlock>
-        + Enable 
-        + Reset 
-        + GetBusFreq 
-{}
+    crate::Sealed + Deref<Target = i2c1::RegisterBlock> + Enable + Reset + GetBusFreq
+{
+}
 
 macro_rules! i2c {
     ($I2CX:ident, $i2cx:ident,
@@ -227,7 +224,13 @@ macro_rules! i2c {
 }
 
 impl<I2C: Instance> I2cExt<I2C> for I2C {
-    fn i2c<SDA, SCL>(self, sda: SDA, scl: SCL, config: impl Into<Config>, rcc: &mut Rcc) -> I2c<I2C, SDA, SCL>
+    fn i2c<SDA, SCL>(
+        self,
+        sda: SDA,
+        scl: SCL,
+        config: impl Into<Config>,
+        rcc: &mut Rcc,
+    ) -> I2c<I2C, SDA, SCL>
     where
         SDA: SDAPin<I2C>,
         SCL: SCLPin<I2C>,
@@ -256,9 +259,8 @@ where
         i2c.cr1().modify(|_, w| w.pe().clear_bit());
 
         // Setup protocol timings
-        i2c.timingr().write(|w|
-            config.timing_bits(I2C::get_frequency(&rcc.clocks), w)
-        );
+        i2c.timingr()
+            .write(|w| config.timing_bits(I2C::get_frequency(&rcc.clocks), w));
 
         // Enable the I2C processing
         i2c.cr1().modify(|_, w| {
