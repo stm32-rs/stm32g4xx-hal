@@ -205,7 +205,7 @@ pub trait Instance:
 }
 
 macro_rules! i2c {
-    ($I2CX:ident, $i2cx:ident,
+    ($I2CX:ident,
         sda: [ $($( #[ $pmetasda:meta ] )* $PSDA:ident<$AFDA:ident>,)+ ],
         scl: [ $($( #[ $pmetascl:meta ] )* $PSCL:ident<$AFCL:ident>,)+ ],
     ) => {
@@ -235,7 +235,7 @@ impl<I2C: Instance> I2cExt<I2C> for I2C {
         SDA: SDAPin<I2C>,
         SCL: SCLPin<I2C>,
     {
-        I2c::i2c(self, sda, scl, config.into(), rcc)
+        I2c::new(self, (sda, scl), config.into(), rcc)
     }
 }
 
@@ -246,7 +246,7 @@ where
     SCL: SCLPin<I2C>,
 {
     /// Initializes the I2C peripheral.
-    pub fn i2c(i2c: I2C, sda: SDA, scl: SCL, config: Config, rcc: &mut Rcc) -> Self
+    pub fn new(i2c: I2C, (sda, scl): (SDA, SCL), config: Config, rcc: &mut Rcc) -> Self
     where
         SDA: SDAPin<I2C>,
         SCL: SCLPin<I2C>,
@@ -490,7 +490,6 @@ where
 
 i2c!(
     I2C1,
-    i2c1,
     sda: [
         PA14<AF4>,
         PB7<AF4>,
@@ -505,7 +504,6 @@ i2c!(
 
 i2c!(
     I2C2,
-    i2c2,
     sda: [
         PA8<AF4>,
         PF0<AF4>,
@@ -525,7 +523,6 @@ i2c!(
 
 i2c!(
     I2C3,
-    i2c3,
     sda: [
         PB5<AF8>,
         PC11<AF8>,
@@ -573,7 +570,6 @@ i2c!(
 ))]
 i2c!(
     I2C4,
-    i2c4,
     sda: [
         PB7<AF3>,
         PC7<AF8>,
