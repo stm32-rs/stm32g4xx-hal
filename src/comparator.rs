@@ -93,17 +93,42 @@ impl Config {
         self
     }
 
+    /// Invert the comparator output
+    ///
+    /// NOTE: This does NOT affect the value read by [Comparator::output]
+    ///
+    /// The following observers are affected by this setting
+    /// * Pin output
+    /// * EXTI interrupt/wakeup
+    /// * TIMx
+    ///
+    /// The following observers are NOT affected by this setting
+    /// * HRTIM
+    /// * Software using [Comparator::output]
     pub fn output_inverted(mut self) -> Self {
         self.inverted = true;
         self
     }
 
-    pub fn output_polarity(mut self, inverted: bool) -> Self {
-        self.inverted = inverted;
+    /// Invert the comparator output
+    ///
+    /// NOTE: This does NOT affect the value read by [Comparator::output]
+    ///
+    /// The following observers are affected by this setting
+    /// * Pin output
+    /// * EXTI interrupt/wakeup
+    /// * TIMx
+    ///
+    /// The following observers are NOT affected by this setting
+    /// * HRTIM
+    /// * Software using [Comparator::output]
+    pub fn output_polarity(mut self, polarity: Polarity) -> Self {
+        self.inverted = matches!(polarity, Polarity::Inverted);
         self
     }
 }
 
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
 #[derive(Copy, Clone, Eq, PartialEq)]
 pub enum Hysteresis {
     None = 0b000,
@@ -114,6 +139,13 @@ pub enum Hysteresis {
     H50mV = 0b101,
     H60mV = 0b110,
     H70mV = 0b111,
+}
+
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Copy, Clone)]
+pub enum Polarity {
+    Normal,
+    Inverted,
 }
 
 /// Comparator positive input
@@ -451,7 +483,26 @@ macro_rules! impl_comparator {
         }
 
         impl<ED: EnabledState> Comparator<$COMP, ED> {
+            /// Invert the comparator output
+            ///
+            /// NOTE: This does NOT affect the value read by [Comparator::output]
+            ///
+            /// The following observers are affected by this setting
+            /// * Pin output
+            /// * EXTI interrupt/wakeup
+            /// * TIMx
+            ///
+            /// The following observers are NOT affected by this setting
+            /// * HRTIM
+            /// * Software using [Comparator::output]
+            pub fn set_polarity(&mut self, polarity: Polarity) {
+                let inverted = matches!(polarity, Polarity::Inverted);
+                self.regs.csr().modify(|_, w| w.pol().bit(inverted));
+            }
+
             /// Returns the value of the output of the comparator
+            ///
+            /// NOTE: This is taken before any potential inversion set by [Comparator::set_polarity] or similar
             pub fn output(&self) -> bool {
                 self.regs.csr().read().value().bit_is_set()
             }
