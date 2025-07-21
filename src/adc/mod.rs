@@ -714,14 +714,14 @@ impl<ADC: Instance> DynamicAdc<ADC> {
     #[inline(always)]
     pub fn set_end_of_conversion_interrupt(&mut self, eoc: config::Eoc) {
         self.config.end_of_conversion_interrupt = eoc;
-        let (en, eocs) = match eoc {
+        let (en_eoc, en_eos) = match eoc {
             config::Eoc::Disabled => (false, false),
-            config::Eoc::Conversion => (true, true),
-            config::Eoc::Sequence => (true, false),
+            config::Eoc::Conversion => (true, false),
+            config::Eoc::Sequence => (false, true),
         };
         self.adc_reg
             .ier()
-            .modify(|_, w| w.eosie().bit(eocs).eocie().bit(en));
+            .modify(|_, w| w.eosie().bit(en_eos).eocie().bit(en_eoc));
     }
 
     /// Enable/disable overrun interrupt
@@ -900,6 +900,12 @@ impl<ADC: Instance> DynamicAdc<ADC> {
     #[inline(always)]
     pub fn clear_end_of_conversion_flag(&mut self) {
         self.adc_reg.isr().modify(|_, w| w.eoc().clear());
+    }
+
+    /// Resets the end-of-sequence flag
+    #[inline(always)]
+    pub fn clear_end_of_sequence_flag(&mut self) {
+        self.adc_reg.isr().modify(|_, w| w.eos().clear());
     }
 
     /// Block until the conversion is completed and return to configured
@@ -1444,6 +1450,12 @@ impl<ADC: Instance> Adc<ADC, Active> {
     #[inline(always)]
     pub fn clear_end_conversion_flag(&mut self) {
         self.adc.clear_end_of_conversion_flag();
+    }
+
+    /// Clear the end of sequence interrupt flag
+    #[inline(always)]
+    pub fn clear_end_sequence_flag(&mut self) {
+        self.adc.clear_end_of_sequence_flag();
     }
 }
 
