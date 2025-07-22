@@ -53,7 +53,7 @@ fn main() -> ! {
 
     let mut dp = stm32::Peripherals::take().expect("cannot take peripherals");
     let mut rcc = dp.RCC.constrain();
-    let mut syscfg = dp.SYSCFG.constrain();
+    let mut syscfg = dp.SYSCFG.constrain(&mut rcc);
 
     println!("Led Init");
     // Configure PA5 pin to blink LED
@@ -80,7 +80,7 @@ fn main() -> ! {
 
     println!("Start Loop");
     loop {
-        wfi();
+        //wfi();
         println!("Check");
 
         if G_LED_ON.load(Ordering::Relaxed) {
