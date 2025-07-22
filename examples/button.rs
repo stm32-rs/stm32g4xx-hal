@@ -11,7 +11,7 @@ use stm32g4xx_hal::{
 
 use core::cell::RefCell;
 use core::sync::atomic::{AtomicBool, Ordering};
-use cortex_m::{asm::wfi, interrupt::Mutex};
+use cortex_m::interrupt::Mutex;
 use cortex_m_rt::entry;
 
 type ButtonPin = gpio::PC13<Input>;
