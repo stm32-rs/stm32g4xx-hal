@@ -5,14 +5,13 @@ use stm32g4xx_hal::{
     //delay::{DelayExt, SYSTDelayExt},
     gpio::{self, ExtiPin, GpioExt, Input, SignalEdge},
     rcc::RccExt,
-    stm32,
-    stm32::{interrupt, Interrupt},
+    stm32::{self, interrupt, Interrupt},
     syscfg::SysCfgExt,
 };
 
 use core::cell::RefCell;
 use core::sync::atomic::{AtomicBool, Ordering};
-use cortex_m::{asm::wfi, interrupt::Mutex};
+use cortex_m::interrupt::Mutex;
 use cortex_m_rt::entry;
 
 type ButtonPin = gpio::PC13<Input>;
@@ -52,8 +51,22 @@ fn main() -> ! {
     utils::logger::init();
 
     let mut dp = stm32::Peripherals::take().expect("cannot take peripherals");
+
+    // Workaround for RTT when using wfi instruction
+    // Enable the debug sleep bits in DBGMCU,
+    // then enable DMA peripheral clock in AHB1ENR
+    dp.DBGMCU.cr().modify(|_, w| {
+        w.dbg_sleep().set_bit();
+        w.dbg_stop().set_bit();
+        w.dbg_standby().set_bit()
+    });
+
     let mut rcc = dp.RCC.constrain();
-    let mut syscfg = dp.SYSCFG.constrain();
+
+    // Enable an AHB peripheral clock for debug probe with wfi
+    rcc.ahb1enr().modify(|_, w| w.dma1en().set_bit());
+
+    let mut syscfg = dp.SYSCFG.constrain(&mut rcc);
 
     println!("Led Init");
     // Configure PA5 pin to blink LED
@@ -80,7 +93,7 @@ fn main() -> ! {
 
     println!("Start Loop");
     loop {
-        wfi();
+        cortex_m::asm::wfi();
         println!("Check");
 
         if G_LED_ON.load(Ordering::Relaxed) {
