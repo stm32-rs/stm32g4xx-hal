@@ -111,8 +111,7 @@ impl From<Hertz> for Config {
 /// I2C abstraction
 pub struct I2c<I2C, SDA, SCL> {
     i2c: I2C,
-    sda: SDA,
-    scl: SCL,
+    pins: (SDA, SCL),
 }
 
 /// I2C SDA pin
@@ -148,8 +147,7 @@ impl embedded_hal::i2c::Error for Error {
 pub trait I2cExt<I2C> {
     fn i2c<SDA, SCL>(
         self,
-        sda: SDA,
-        scl: SCL,
+        pins: (SDA, SCL),
         config: impl Into<Config>,
         rcc: &mut Rcc,
     ) -> I2c<I2C, SDA, SCL>
@@ -226,8 +224,7 @@ macro_rules! i2c {
 impl<I2C: Instance> I2cExt<I2C> for I2C {
     fn i2c<SDA, SCL>(
         self,
-        sda: SDA,
-        scl: SCL,
+        pins: (SDA, SCL),
         config: impl Into<Config>,
         rcc: &mut Rcc,
     ) -> I2c<I2C, SDA, SCL>
@@ -235,7 +232,30 @@ impl<I2C: Instance> I2cExt<I2C> for I2C {
         SDA: SDAPin<I2C>,
         SCL: SCLPin<I2C>,
     {
-        I2c::new(self, (sda, scl), config.into(), rcc)
+        let config = config.into();
+
+        // Enable and reset I2C
+        I2C::enable(rcc);
+        I2C::reset(rcc);
+
+        // Make sure the I2C unit is disabled so we can configure it
+        self.cr1().modify(|_, w| w.pe().clear_bit());
+
+        // Setup protocol timings
+        self.timingr()
+            .write(|w| config.timing_bits(I2C::get_frequency(&rcc.clocks), w));
+
+        // Enable the I2C processing
+        self.cr1().modify(|_, w| {
+            w.pe()
+                .set_bit()
+                .dnf()
+                .set(config.digital_filter)
+                .anfoff()
+                .bit(!config.analog_filter)
+        });
+
+        I2c { i2c: self, pins }
     }
 }
 
@@ -245,45 +265,15 @@ where
     SDA: SDAPin<I2C>,
     SCL: SCLPin<I2C>,
 {
-    /// Initializes the I2C peripheral.
-    pub fn new(i2c: I2C, (sda, scl): (SDA, SCL), config: Config, rcc: &mut Rcc) -> Self
-    where
-        SDA: SDAPin<I2C>,
-        SCL: SCLPin<I2C>,
-    {
-        // Enable and reset I2C
-        I2C::enable(rcc);
-        I2C::reset(rcc);
-
-        // Make sure the I2C unit is disabled so we can configure it
-        i2c.cr1().modify(|_, w| w.pe().clear_bit());
-
-        // Setup protocol timings
-        i2c.timingr()
-            .write(|w| config.timing_bits(I2C::get_frequency(&rcc.clocks), w));
-
-        // Enable the I2C processing
-        i2c.cr1().modify(|_, w| {
-            w.pe()
-                .set_bit()
-                .dnf()
-                .set(config.digital_filter)
-                .anfoff()
-                .bit(!config.analog_filter)
-        });
-
-        I2c { i2c, sda, scl }
-    }
-
     /// Disables I2C and releases the peripheral as well as the pins.
-    pub fn release(self) -> (I2C, SDA, SCL) {
+    pub fn release(self) -> (I2C, (SDA, SCL)) {
         // Disable I2C.
         unsafe {
             I2C::reset_unchecked();
             I2C::disable_unchecked();
         }
 
-        (self.i2c, self.sda, self.scl)
+        (self.i2c, self.pins)
     }
 
     // copied from f3 hal
