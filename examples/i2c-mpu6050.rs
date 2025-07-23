@@ -29,7 +29,7 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let scl = gpiob.pb8.into_alternate_open_drain();
 
-    let i2c = dp.I2C1.i2c(sda, scl, 100.kHz(), &mut rcc);
+    let i2c = dp.I2C1.i2c((sda, scl), 100.kHz(), &mut rcc);
 
     let mut mpu = Mpu6050::new(i2c);
     let mut delay = cp.SYST.delay(&rcc.clocks);

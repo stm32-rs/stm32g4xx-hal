@@ -33,7 +33,7 @@ fn main() -> ! {
     let sda = gpiob.pb9.into_alternate_open_drain();
     let scl = gpiob.pb8.into_alternate_open_drain();
 
-    let i2c = dp.I2C1.i2c(sda, scl, Config::new(100.kHz()), &mut rcc);
+    let i2c = dp.I2C1.i2c((sda, scl), Config::new(100.kHz()), &mut rcc);
 
     let mut delayer = cp.SYST.delay(&rcc.clocks);
     let timer2 = Timer::new(dp.TIM2, &rcc.clocks);
