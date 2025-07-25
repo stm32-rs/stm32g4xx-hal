@@ -186,7 +186,7 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
     fn read_unchecked<W: FrameSize>(&mut self) -> W {
         // NOTE(read_volatile) read only 1 byte (the svd2rust API only allows
         // reading a half-word)
-        unsafe { ptr::read_volatile(&self.spi.dr() as *const _ as *const W) }
+        unsafe { ptr::read_volatile(self.spi.dr().as_ptr() as *const W) }
     }
     #[inline]
     fn write_unchecked<W: FrameSize>(&mut self, word: W) {
@@ -194,12 +194,16 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
         let dr = self.spi.dr().as_ptr() as *mut W;
         unsafe { ptr::write_volatile(dr, word) };
     }
+    /// disables rx
     #[inline]
     pub fn set_tx_only(&mut self) {
+        // very counter-intuitively, setting spi bidi mode on disables rx while transmitting
+        // it's made for half-duplex spi, which they called bidirectional in the manual
         self.spi
             .cr1()
             .modify(|_, w| w.bidimode().bidirectional().bidioe().output_enabled());
     }
+    /// re-enables rx if it was disabled
     #[inline]
     pub fn set_bidi(&mut self) {
         self.spi
@@ -314,6 +318,7 @@ impl<SPI: Instance, PINS: Pins<SPI>> embedded_hal::spi::SpiBus<u8> for Spi<SPI, 
         self.set_bidi();
 
         let half_len = len / 2;
+        // leftover write/read operation because bytes are not a multiple of 2
         let pair_left = len % 2;
 
         // prefill write fifo so that the clock doen't stop while fetch the read byte
