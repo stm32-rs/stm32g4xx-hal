@@ -18,8 +18,8 @@ use hal::{
 };
 
 use cortex_m_rt::entry;
-use log::info;
 use stm32g4xx_hal as hal;
+use utils::logger::info;
 
 #[macro_use]
 mod utils;
@@ -59,7 +59,7 @@ fn main() -> ! {
         cs.set_low();
         // transmit and receive at the same time
         spi.transfer(&mut received_msg, message).unwrap();
-        info!("{received_msg:?}");
+        info!("{:?}", &received_msg);
         cs.set_high();
 
         delay_tim2.delay_ms(1000);
