@@ -2,46 +2,122 @@
 #![no_main]
 #![allow(clippy::uninlined_format_args)]
 
-// Requires a jumper from A1<->A2 (arduino naming) aka PA1<->PA4
+//! Requires jumpers between
+//! - A1<->A2 (arduino naming) aka PA1<->PA4
+//! - D11<->D12 (arduino naming) aka PA6<->PA7
 
 #[path = "../examples/utils/mod.rs"]
 mod utils;
 
-use utils::logger::println;
-
 mod common;
-
-use stm32g4xx_hal::adc::{self, AdcClaim, AdcCommonExt};
-use stm32g4xx_hal::comparator::{self, ComparatorSplit};
-use stm32g4xx_hal::dac::{self, DacExt, DacOut};
-use stm32g4xx_hal::delay::{self, SYSTDelayExt};
-use stm32g4xx_hal::gpio::{self, GpioExt};
-use stm32g4xx_hal::opamp::{self, Opamp1, OpampEx};
-use stm32g4xx_hal::rcc::{self, RccExt};
-
-use hal::stm32;
-use stm32g4xx_hal as hal;
 
 #[embedded_test::tests]
 mod tests {
+    use crate::utils::logger::{info, println};
+
     use embedded_hal::delay::DelayNs;
     use stm32g4xx_hal::{
-        adc::{self},
-        comparator::{self, ComparatorExt},
-        dac::DacOut,
-        opamp::{self, IntoFollower, IntoPga},
+        adc::{self, AdcClaim, AdcCommonExt},
+        comparator::{self, ComparatorExt, ComparatorSplit},
+        dac::{self, DacExt, DacOut},
+        delay, gpio,
+        opamp::{self, IntoFollower, IntoPga, Opamp1},
+        pac,
+        prelude::*,
+        rcc, spi,
         stasis::Freeze,
+        time::RateExtU32,
     };
 
     use crate::VREF_ADC_BITS;
+
+    type Spi1 = spi::Spi<
+        pac::SPI1,
+        (
+            gpio::gpioa::PA5<gpio::AF5>,
+            gpio::gpioa::PA6<gpio::AF5>,
+            gpio::gpioa::PA7<gpio::AF5>,
+        ),
+    >;
+    struct Peripherals {
+        opamp: opamp::Disabled<Opamp1>,
+        comp: comparator::COMP1,
+        value_dac: dac::Dac1Ch1<{ dac::M_EXT_PIN }, dac::Enabled>,
+        ref_dac: dac::Dac3Ch1<{ dac::M_INT_SIG }, dac::Enabled>,
+        adc: adc::Adc<pac::ADC1, adc::Disabled>,
+        pa1: gpio::gpioa::PA1<gpio::Analog>,
+        pa2: gpio::gpioa::PA2<gpio::Analog>,
+        rcc: rcc::Rcc,
+        delay: delay::SystDelay,
+        spi: Spi1,
+        cs: gpio::gpioa::PA8<gpio::Output<gpio::PushPull>>,
+    }
+
+    #[init]
+    fn init() -> Peripherals {
+        //op1+ PA1 -> A1
+        //DAC1_OUT1 PA4 -> A2
+
+        let cp = pac::CorePeripherals::take().unwrap();
+        let dp = pac::Peripherals::take().unwrap();
+        let mut rcc = dp.RCC.constrain();
+        let mut delay = cp.SYST.delay(&rcc.clocks);
+
+        let adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
+        let adc = adc12_common.claim(dp.ADC1, &mut delay);
+
+        let gpioa = dp.GPIOA.split(&mut rcc);
+        let pa1 = gpioa.pa1.into_analog();
+        let pa2 = gpioa.pa2.into_analog();
+        let pa4 = gpioa.pa4.into_analog();
+
+        let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
+        let dac3ch1 = dp.DAC3.constrain(dac::Dac3IntSig1, &mut rcc);
+
+        let mut value_dac = dac1ch1.calibrate_buffer(&mut delay).enable(&mut rcc);
+        let mut ref_dac = dac3ch1.enable(&mut rcc); // TODO: should calibrate_buffer be available on dacs without outputs?
+        value_dac.set_value(0);
+        ref_dac.set_value(0);
+
+        let (opamp, ..) = dp.OPAMP.split(&mut rcc);
+        let (comp, ..) = dp.COMP.split(&mut rcc);
+
+        let sclk = gpioa.pa5.into_alternate();
+        let miso = gpioa.pa6.into_alternate();
+        let mosi = gpioa.pa7.into_alternate();
+
+        // 1/8 SPI/SysClk ratio seems to be the upper limit for continuous transmission
+        // one byte at a time
+        // 1/4 works well when writing two packed bytes at once
+        // At 1/2 the clock stays on for ~80% of the time
+        let spi = dp
+            .SPI1
+            .spi((sclk, miso, mosi), spi::MODE_0, 8.MHz(), &mut rcc);
+        let mut cs = gpioa.pa8.into_push_pull_output();
+        cs.set_high();
+
+        Peripherals {
+            opamp,
+            comp,
+            value_dac,
+            ref_dac,
+            adc,
+            pa1,
+            pa2,
+            rcc,
+            delay,
+            spi,
+            cs,
+        }
+    }
 
     #[test]
     fn dac() {
         use super::*;
 
         // TODO: Is it ok to steal these?
-        let cp = unsafe { stm32::CorePeripherals::steal() };
-        let dp = unsafe { stm32::Peripherals::steal() };
+        let cp = unsafe { pac::CorePeripherals::steal() };
+        let dp = unsafe { pac::Peripherals::steal() };
         let mut rcc = dp.RCC.constrain();
         let mut delay = cp.SYST.delay(&rcc.clocks);
 
@@ -50,7 +126,7 @@ mod tests {
         let pa4 = gpioa.pa4.into_analog();
         let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
 
-        let gpioa = unsafe { &*stm32::GPIOA::PTR };
+        let gpioa = unsafe { &*pac::GPIOA::PTR };
 
         // dac_manual will have its value set manually
         let mut dac = dac1ch1.calibrate_buffer(&mut delay).enable(&mut rcc);
@@ -65,15 +141,15 @@ mod tests {
     }
 
     #[test]
-    fn opamp_follower_dac_adc() {
-        let super::Peripherals {
+    fn opamp_follower_dac_adc(state: Peripherals) {
+        let Peripherals {
             opamp,
             mut value_dac,
             mut adc,
             pa1,
             mut delay,
             ..
-        } = super::setup_opamp_comp_dac();
+        } = state;
         let opamp = opamp.follower(pa1);
         delay.delay_ms(10);
 
@@ -92,8 +168,8 @@ mod tests {
     }
 
     #[test]
-    fn opamp_follower_ext_pin_dac_adc() {
-        let super::Peripherals {
+    fn opamp_follower_ext_pin_dac_adc(state: Peripherals) {
+        let Peripherals {
             opamp,
             mut value_dac,
             mut adc,
@@ -101,7 +177,7 @@ mod tests {
             pa2,
             mut delay,
             ..
-        } = super::setup_opamp_comp_dac();
+        } = state;
         let (pa2, [pa2_token]) = pa2.freeze();
         let _opamp = opamp.follower(pa1).enable_output(pa2_token);
         delay.delay_ms(10);
@@ -121,15 +197,15 @@ mod tests {
     }
 
     #[test]
-    fn opamp_pga_dac_adc() {
-        let super::Peripherals {
+    fn opamp_pga_dac_adc(state: Peripherals) {
+        let Peripherals {
             opamp,
             mut value_dac,
             mut adc,
             pa1,
             mut delay,
             ..
-        } = super::setup_opamp_comp_dac();
+        } = state;
         let opamp = opamp.pga(pa1, opamp::Gain::Gain2);
 
         let sample_time = adc::config::SampleTime::Cycles_640_5;
@@ -154,15 +230,15 @@ mod tests {
     ///            | /
     ///
     #[test]
-    fn comp_dac_vref() {
-        let super::Peripherals {
+    fn comp_dac_vref(state: Peripherals) {
+        let Peripherals {
             comp,
             mut value_dac,
             pa1,
             rcc,
             mut delay,
             ..
-        } = super::setup_opamp_comp_dac();
+        } = state;
 
         let r = comparator::refint_input::VRefint;
         let ref_setpoint = VREF_ADC_BITS;
@@ -197,15 +273,15 @@ mod tests {
     ///            | /
     ///
     #[test]
-    fn comp_dac_half_vref() {
-        let super::Peripherals {
+    fn comp_dac_half_vref(state: Peripherals) {
+        let Peripherals {
             comp,
             mut value_dac,
             pa1,
             rcc,
             mut delay,
             ..
-        } = super::setup_opamp_comp_dac();
+        } = state;
 
         let r = comparator::refint_input::VRefintM12;
         let ref_setpoint = VREF_ADC_BITS / 2;
@@ -240,9 +316,8 @@ mod tests {
     ///                | /
     ///
     #[test]
-    fn comp_dac_dac() {
-        use super::*;
-        let super::Peripherals {
+    fn comp_dac_dac(state: Peripherals) {
+        let Peripherals {
             comp,
             mut value_dac,
             ref_dac,
@@ -250,7 +325,7 @@ mod tests {
             rcc,
             mut delay,
             ..
-        } = super::setup_opamp_comp_dac();
+        } = state;
         let (mut ref_dac, [comp_ref]) = ref_dac.freeze();
         let comp = comp
             .comparator(pa1, comp_ref, comparator::Config::default(), &rcc.clocks)
@@ -277,9 +352,65 @@ mod tests {
             }
         }
     }
+
+    #[test]
+    fn spi_loopback(state: Peripherals) {
+        let mut spi = state.spi;
+        let mut cs = state.cs;
+
+        // Odd number of bits to test packing edge case
+        const MESSAGE: &[u8] = "Hello world, but longer".as_bytes();
+        cs.set_low();
+        spi.write(MESSAGE).unwrap();
+        SpiBus::<u8>::flush(&mut spi).unwrap();
+        cs.set_high();
+
+        let received = &mut [0u8; MESSAGE.len()];
+        spi.read(received).unwrap();
+
+        cortex_m::asm::delay(100);
+        cs.set_low();
+        spi.transfer(received, MESSAGE).unwrap();
+        // downside of having 8 and 16 bit impls on the same struct is you have to specify which flush
+        // impl to call, although internally they call the same function
+        SpiBus::<u8>::flush(&mut spi).unwrap();
+        cs.set_high();
+
+        info!("Received {:?}", core::str::from_utf8(received).ok());
+        assert_eq!(MESSAGE, received);
+
+        cs.set_low();
+        spi.transfer_in_place(received).unwrap();
+        SpiBus::<u8>::flush(&mut spi).unwrap();
+        cs.set_high();
+
+        info!("Received {:?}", core::str::from_utf8(received).ok());
+        assert_eq!(MESSAGE, received);
+
+        // Switch between 8 and 16 bit frames on the fly
+        const TX_16B: &[u16] = &[0xf00f, 0xfeef, 0xfaaf];
+        let mut rx_16b = [0u16; TX_16B.len()];
+
+        cs.set_low();
+        spi.transfer(&mut rx_16b, TX_16B).unwrap();
+        // internally works the same as SpiBus::<u8>::flush()
+        SpiBus::<u16>::flush(&mut spi).unwrap();
+        cs.set_high();
+
+        info!("Received {:?}", &rx_16b);
+        assert_eq!(TX_16B, rx_16b);
+
+        cs.set_low();
+        spi.transfer_in_place(&mut rx_16b).unwrap();
+        SpiBus::<u16>::flush(&mut spi).unwrap();
+        cs.set_high();
+
+        info!("Received {:?}", &rx_16b);
+        assert_eq!(TX_16B, rx_16b);
+    }
 }
 
-fn is_pax_low(gpioa: &stm32::gpioa::RegisterBlock, x: u8) -> bool {
+fn is_pax_low(gpioa: &stm32g4xx_hal::pac::gpioa::RegisterBlock, x: u8) -> bool {
     gpioa.idr().read().idr(x).is_low()
 }
 
@@ -287,55 +418,3 @@ fn is_pax_low(gpioa: &stm32::gpioa::RegisterBlock, x: u8) -> bool {
 /// Vref+ = 3.3V for nucleo
 /// 1.212V/3.3V*4095 = 1504 adc value
 const VREF_ADC_BITS: u16 = 1504;
-
-struct Peripherals {
-    opamp: opamp::Disabled<Opamp1>,
-    comp: comparator::COMP1,
-    value_dac: dac::Dac1Ch1<{ dac::M_EXT_PIN }, dac::Enabled>,
-    ref_dac: dac::Dac3Ch1<{ dac::M_INT_SIG }, dac::Enabled>,
-    adc: adc::Adc<stm32::ADC1, adc::Disabled>,
-    pa1: gpio::gpioa::PA1<gpio::Analog>,
-    pa2: gpio::gpioa::PA2<gpio::Analog>,
-    rcc: rcc::Rcc,
-    delay: delay::SystDelay,
-}
-
-fn setup_opamp_comp_dac() -> Peripherals {
-    //op1+ PA1 -> A1
-    //DAC1_OUT1 PA4 -> A2
-
-    let cp = stm32::CorePeripherals::take().unwrap();
-    let dp = stm32::Peripherals::take().unwrap();
-    let mut rcc = dp.RCC.constrain();
-    let mut delay = cp.SYST.delay(&rcc.clocks);
-
-    let adc12_common = dp.ADC12_COMMON.claim(Default::default(), &mut rcc);
-    let adc = adc12_common.claim(dp.ADC1, &mut delay);
-
-    let gpioa = dp.GPIOA.split(&mut rcc);
-    let pa1 = gpioa.pa1.into_analog();
-    let pa2 = gpioa.pa2.into_analog();
-    let pa4 = gpioa.pa4.into_analog();
-
-    let dac1ch1 = dp.DAC1.constrain(pa4, &mut rcc);
-    let dac3ch1 = dp.DAC3.constrain(dac::Dac3IntSig1, &mut rcc);
-
-    let mut value_dac = dac1ch1.calibrate_buffer(&mut delay).enable(&mut rcc);
-    let mut ref_dac = dac3ch1.enable(&mut rcc); // TODO: should calibrate_buffer be available on dacs without outputs?
-    value_dac.set_value(0);
-    ref_dac.set_value(0);
-
-    let (opamp, ..) = dp.OPAMP.split(&mut rcc);
-    let (comp, ..) = dp.COMP.split(&mut rcc);
-    Peripherals {
-        opamp,
-        comp,
-        value_dac,
-        ref_dac,
-        adc,
-        pa1,
-        pa2,
-        rcc,
-        delay,
-    }
-}

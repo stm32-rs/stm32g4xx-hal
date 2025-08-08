@@ -8,7 +8,6 @@
 use hal::{
     delay::DelayFromCountDownTimer,
     gpio::{AF5, PA5, PA6, PA7},
-    hal_02::spi::FullDuplex,
     prelude::*,
     pwr::PwrExt,
     rcc::Config,
@@ -19,8 +18,8 @@ use hal::{
 };
 
 use cortex_m_rt::entry;
-use log::info;
 use stm32g4xx_hal as hal;
+use utils::logger::info;
 
 #[macro_use]
 mod utils;
@@ -49,17 +48,20 @@ fn main() -> ! {
 
     // "Hello world!"
     let message = b"Hello world!";
-    let mut received_byte: u8;
+    let mut received_msg = [0u8; 12];
 
     loop {
-        for &byte in message {
-            cs.set_low();
-            spi.send(byte).unwrap();
-            received_byte = nb::block!(FullDuplex::read(&mut spi)).unwrap();
-            cs.set_high();
+        cs.set_low();
+        // write only, nothing is received
+        spi.write(message).unwrap();
+        cs.set_high();
 
-            info!("{}", received_byte as char);
-        }
+        cs.set_low();
+        // transmit and receive at the same time
+        spi.transfer(&mut received_msg, message).unwrap();
+        info!("{:?}", &received_msg);
+        cs.set_high();
+
         delay_tim2.delay_ms(1000);
     }
 }
