@@ -52,17 +52,9 @@ fn main() -> ! {
 
     let mut dp = stm32::Peripherals::take().expect("cannot take peripherals");
 
-    // Workaround for RTT when using wfi instruction
-    // Enable the debug sleep bits in DBGMCU,
-    // then enable DMA peripheral clock in AHB1ENR
-    dp.DBGMCU.cr().modify(|_, w| {
-        w.dbg_sleep().set_bit();
-        w.dbg_stop().set_bit();
-        w.dbg_standby().set_bit()
-    });
-
     let mut rcc = dp.RCC.constrain();
 
+    // Workaround for RTT when using wfi instruction
     // Enable an AHB peripheral clock for debug probe with wfi
     rcc.ahb1enr().modify(|_, w| w.dma1en().set_bit());
 
