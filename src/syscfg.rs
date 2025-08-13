@@ -1,4 +1,4 @@
-use crate::rcc::Rcc;
+use crate::rcc::{Enable, Rcc, Reset};
 use crate::stm32::SYSCFG;
 use core::ops::Deref;
 
@@ -10,8 +10,8 @@ pub trait SysCfgExt {
 
 impl SysCfgExt for SYSCFG {
     fn constrain(self, rcc: &mut Rcc) -> SysCfg {
-        // Enable SYSCFG peripheral clock in APB2ENR register
-        rcc.apb2enr().modify(|_, w| w.syscfgen().set_bit());
+        SYSCFG::enable(rcc);
+        SYSCFG::reset(rcc);
 
         SysCfg(self)
     }
