@@ -850,7 +850,7 @@ pub mod op {
         (CosH<N1>, One, One, CosH),
         (SinH<N1>, One, One, SinH),
         (SinHCosH<N1>, One, Two, SinH),
-        (ATanH<N1>, One, One, ATan),
+        (ATanH<N1>, One, One, ATanH),
     }
 
     impls_multi_scale! {
