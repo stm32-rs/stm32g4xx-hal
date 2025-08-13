@@ -136,6 +136,12 @@ impl Rng<Running> {
     ///
     /// Returns an [`RngError`] if the RNG is not ready or reports an error condition.
     ///
+    /// Once the RNG is ready, 4 consecutive 32 bit reads can be performed without blocking,
+    /// at which point the internal FIFO will be refilled after 216 periods of the AHB clock
+    /// (RM0440 26.7.3)
+    ///
+    /// While the RNG is filling the FIFO, the function will return [`RngError::NotReady`].
+    ///
     /// For blocking reads use [`read_blocking()`]
     pub fn read_non_blocking(&self) -> Result<u32, RngError> {
         // Read the SR register to check if there is an error condition,
@@ -153,7 +159,10 @@ impl Rng<Running> {
 
         if status.drdy().bit_is_set() {
             // Data is ready. Read the DR register and return the value.
-            Ok(unsafe { (*RNG::ptr()).dr().read().bits() })
+            match unsafe { (*RNG::ptr()).dr().read().bits() } {
+                0 => Err(RngError::SeedError),
+                data => Ok(data),
+            }
         } else {
             Err(RngError::NotReady)
         }
