@@ -428,7 +428,7 @@ pub struct Parts {
 }
 impl Parts {
     #[cfg(any(feature = "stm32g431", feature = "stm32g441",))]
-    pub fn writer(&mut self, flash_sz: FlashSize) -> FlashWriter<{ 2 * SZ_1K }> {
+    pub fn writer<'a>(&'a mut self, flash_sz: FlashSize) -> FlashWriter<'a, { 2 * SZ_1K }> {
         FlashWriter {
             flash: self,
             flash_sz,
@@ -443,10 +443,10 @@ impl Parts {
         feature = "stm32g491",
         feature = "stm32g4a1",
     ))]
-    pub fn writer<const PAGE_SIZE_KB: u32>(
-        &mut self,
+    pub fn writer<'a, const PAGE_SIZE_KB: u32>(
+        &'a mut self,
         flash_sz: FlashSize,
-    ) -> FlashWriter<PAGE_SIZE_KB> {
+    ) -> FlashWriter<'a, PAGE_SIZE_KB> {
         FlashWriter {
             flash: self,
             flash_sz,
