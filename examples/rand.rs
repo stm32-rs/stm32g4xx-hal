@@ -58,7 +58,7 @@ fn main() -> ! {
         info!("Random u8: {}", random_u8);
 
         let random_array: [f32; 8] = rng.unwrap_err().random();
-        info!("Random array {}", &random_array);
+        info!("Random array {:?}", &random_array);
 
         let random_dist = between.sample(&mut rng.unwrap_err());
         info!("Random dist: {}", random_dist);
@@ -67,7 +67,7 @@ fn main() -> ! {
         info!("Random range: {}", random_range);
 
         let random_choice = slice.choose(&mut rng.unwrap_err());
-        info!("Random choice: {}", random_choice);
+        info!("Random choice: {:?}", random_choice);
 
         let random_bernoulli = bernoulli.sample(&mut rng.unwrap_err());
         info!("Random bernoulli: {}", random_bernoulli);
