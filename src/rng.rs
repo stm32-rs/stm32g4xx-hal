@@ -1,6 +1,6 @@
 //! True Random Number Generator (TRNG)
 
-use rand::TryRngCore;
+use rand_core::TryRngCore;
 
 use crate::{rcc::Rcc, stm32::RNG};
 use core::{fmt::Formatter, marker::PhantomData};
@@ -24,6 +24,17 @@ impl core::fmt::Debug for RngError {
 impl core::fmt::Display for RngError {
     fn fmt(&self, f: &mut Formatter<'_>) -> core::fmt::Result {
         core::fmt::Debug::fmt(self, f)
+    }
+}
+
+#[cfg(feature = "defmt")]
+impl defmt::Format for RngError {
+    fn format(&self, fmt: defmt::Formatter) {
+        match self {
+            RngError::NotReady => defmt::write!(fmt, "RNG Not ready"),
+            RngError::SeedError => defmt::write!(fmt, "RNG Seed error"),
+            RngError::ClockError => defmt::write!(fmt, "RNG Clock error"),
+        }
     }
 }
 
