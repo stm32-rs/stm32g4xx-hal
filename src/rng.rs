@@ -5,9 +5,15 @@ use rand_core::TryRngCore;
 use crate::{rcc::Rcc, stm32::RNG};
 use core::{fmt::Formatter, marker::PhantomData};
 
+/// Error type for the RNG peripheral
 pub enum RngError {
+    /// The DRDY bit is not set in the status register.
     NotReady,
+    /// A noise source seed error was detected. [`seed_error_recovery()`]
+    /// should be called to recover from the error.
     SeedError,
+    /// A clock error was detected. fRNGCLOCK is less than fHCLK/32
+    /// The clock error condition is automatically cleared when the clock condition returns to normal.
     ClockError,
 }
 
@@ -116,6 +122,27 @@ impl Rng<Running> {
         unsafe { (*RNG::ptr()).sr().read().ceis().bit_is_set() }
     }
 
+    /// Perform recovery sequence of a seed error from RM0440 26.3.7
+    ///
+    /// The SEIS bit is cleared, and 12 words and read and discarded from the DR register.
+    ///
+    /// If the recovery sequence was successful, the function returns `Ok(())`.
+    /// If the SEIS bit is still set after the recovery sequence, [`RngError::SeedError`] is returned.
+    pub fn seed_error_recovery(&mut self) -> Result<(), RngError> {
+        // Clear SEIS bit
+        unsafe { (*RNG::ptr()).sr().clear_bits(|w| w.seis().clear_bit()) };
+        // Read and discard 12 words from DR register
+        for _ in 0..12 {
+            unsafe { (*RNG::ptr()).dr().read() };
+        }
+        // Confirm SEIS is still clear
+        if unsafe { (*RNG::ptr()).sr().read().seis().bit_is_clear() } {
+            Ok(())
+        } else {
+            Err(RngError::SeedError)
+        }
+    }
+
     /// Blocking read of a random u32 from the RNG in polling mode.
     ///
     /// Returns an [`RngError`] if the RNG reports an error condition.
@@ -158,7 +185,9 @@ impl Rng<Running> {
         }
 
         if status.drdy().bit_is_set() {
-            // Data is ready. Read the DR register and return the value.
+            // The data ready bit is set. Read the DR register and check if it is zero.
+            // A zero read indicates a seed error between reading SR and DR registers
+            // see RM0440 26.7.3 RNDATA description.
             match unsafe { (*RNG::ptr()).dr().read().bits() } {
                 0 => Err(RngError::SeedError),
                 data => Ok(data),
