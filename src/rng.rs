@@ -113,11 +113,13 @@ impl Rng<Running> {
     }
 
     /// Check if the seed error flag is set
+    #[inline(always)]
     pub fn is_seed_error(&self) -> bool {
         unsafe { (*RNG::ptr()).sr().read().seis().bit_is_set() }
     }
 
     /// Check if the clock error flag is set
+    #[inline(always)]
     pub fn is_clock_error(&self) -> bool {
         unsafe { (*RNG::ptr()).sr().read().ceis().bit_is_set() }
     }
