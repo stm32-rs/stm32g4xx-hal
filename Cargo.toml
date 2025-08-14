@@ -74,6 +74,7 @@ embedded-sdmmc = "0.3.0"
 usb-device = { version = "0.3.2", features = ["defmt"] }
 usbd-serial = "0.2.2"
 rand = { version = "0.9", default-features = false }
+as5600 = "0.8.0"
 
 #TODO: Separate feature sets
 [features]
@@ -84,9 +85,23 @@ usb = ["dep:stm32-usbd"]
 stm32g431 = ["stm32g4/stm32g431", "cat2"]
 stm32g441 = ["stm32g4/stm32g441", "cat2"]
 stm32g473 = ["stm32g4/stm32g473", "cat3", "adc3", "adc4", "adc5"]
-stm32g474 = ["stm32g4/stm32g474", "cat3", "adc3", "adc4", "adc5", "stm32-hrtim/stm32g474"]
+stm32g474 = [
+    "stm32g4/stm32g474",
+    "cat3",
+    "adc3",
+    "adc4",
+    "adc5",
+    "stm32-hrtim/stm32g474",
+]
 stm32g483 = ["stm32g4/stm32g483", "cat3", "adc3", "adc4", "adc5"]
-stm32g484 = ["stm32g4/stm32g484", "cat3", "adc3", "adc4", "adc5", "stm32-hrtim/stm32g484"]
+stm32g484 = [
+    "stm32g4/stm32g484",
+    "cat3",
+    "adc3",
+    "adc4",
+    "adc5",
+    "stm32-hrtim/stm32g484",
+]
 stm32g491 = ["stm32g4/stm32g491", "cat4", "adc3"]
 stm32g4a1 = ["stm32g4/stm32g4a1", "cat4", "adc3"]
 
@@ -108,7 +123,7 @@ defmt = [
     "embedded-hal/defmt-03",
     "embedded-io/defmt-03",
     "embedded-test/defmt",
-    "stm32-hrtim?/defmt"
+    "stm32-hrtim?/defmt",
 ]
 cordic = ["dep:fixed"]
 adc3 = []
