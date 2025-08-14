@@ -5,7 +5,7 @@
 //!
 //! The I2C bus is configured with Fast Mode Plus (FMP) enabled in SysCfg, and a 1MHz I2C clock rate.
 //!
-//! ```DEFMT_LOG=debug cargo run --release --example rand --features stm32g431,defmt -- --chip STM32G431KBTx```
+//! ```DEFMT_LOG=debug cargo run --release --example i2c-fmp-as5600 --features stm32g431,defmt -- --chip STM32G431KBTx```
 
 #![deny(warnings)]
 #![deny(unsafe_code)]
