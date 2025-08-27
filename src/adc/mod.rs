@@ -1343,6 +1343,13 @@ impl<ADC: Instance> Adc<ADC, Configured> {
         }
     }
 
+    /// Releases the Adc as a DynamicAdc.
+    /// While this is not unsafe; using methods while the Adc is in the wrong state will mess it up.
+    #[inline(always)]
+    pub fn into_dynamic_adc(self) -> DynamicAdc<ADC> {
+        self.adc
+    }
+
     /// Starts conversion sequence. Waits for the hardware to indicate it's actually started.
     #[inline(always)]
     pub fn start_conversion(mut self) -> Adc<ADC, Active> {
