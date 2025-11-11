@@ -581,6 +581,10 @@ macro_rules! uart_lp {
                         .bits(config.stopbits.bits())
                         .swap()
                         .bit(config.swap)
+                        .txinv()
+                        .bit(config.tx_invert)
+                        .rxinv()
+                        .bit(config.rx_invert)
                 });
 
                 usart.cr3().write(|w| unsafe {
@@ -726,6 +730,10 @@ macro_rules! uart_full {
                         .bits(config.stopbits.bits())
                         .swap()
                         .bit(config.swap)
+                        .txinv()
+                        .bit(config.tx_invert)
+                        .rxinv()
+                        .bit(config.rx_invert)
                 });
 
                 if let Some(timeout) = config.receiver_timeout {
