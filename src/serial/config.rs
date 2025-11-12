@@ -109,6 +109,11 @@ impl LowPowerConfig {
         self
     }
 
+    pub fn wordlength_7(mut self) -> Self {
+        self.wordlength = WordLength::DataBits7;
+        self
+    }
+
     pub fn wordlength_8(mut self) -> Self {
         self.wordlength = WordLength::DataBits8;
         self
@@ -194,6 +199,11 @@ impl FullConfig {
 
     pub fn parity_odd(mut self) -> Self {
         self.parity = Parity::ParityOdd;
+        self
+    }
+
+    pub fn wordlength_7(mut self) -> Self {
+        self.wordlength = WordLength::DataBits7;
         self
     }
 
