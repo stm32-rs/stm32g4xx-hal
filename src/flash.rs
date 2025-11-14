@@ -148,7 +148,7 @@ impl<const SECTOR_SZ_KB: u32> FlashWriter<'_, SECTOR_SZ_KB> {
             return Err(Error::LengthTooLong);
         }
 
-        if !force_padding && length % 8 != 0 {
+        if !force_padding && !length.is_multiple_of(8) {
             return Err(Error::ArrayMustBeDivisibleBy8);
         }
 
