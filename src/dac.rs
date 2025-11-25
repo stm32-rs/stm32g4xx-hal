@@ -9,11 +9,26 @@ use core::marker::PhantomData;
 use core::mem::MaybeUninit;
 use core::ops::Deref;
 
+use crate::dac::trigger::DacTriggerSource;
+use crate::dma::mux::DmaMuxResources;
+use crate::dma::traits::TargetAddress;
+use crate::dma::MemoryToPeripheral;
 use crate::gpio::{Analog, PA4, PA5, PA6};
 use crate::pac;
 use crate::rcc::{self, *};
 use crate::stm32::dac1::mcr::HFSEL;
 use embedded_hal::delay::DelayNs;
+
+pub mod dual;
+pub mod format;
+pub mod trigger;
+
+/// DAC Channel identifier
+#[repr(u8)]
+pub enum DacChannel {
+    Ch1 = 0,
+    Ch2 = 1,
+}
 
 pub trait DacOut<V> {
     fn get_value(&mut self) -> V;
@@ -137,6 +152,7 @@ impl SawtoothConfig {
 
 /// Enabled DAC (type state)
 pub struct Enabled;
+pub struct EnabledDma;
 // / Enabled DAC without output buffer (type state)
 //pub struct EnabledUnbuffered;
 /// Enabled DAC wave generator for triangle or noise wave form (type state)
@@ -278,6 +294,43 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS,
         dac.mcr()
             .modify(|_, w| unsafe { w.hfsel().variant(hfsel(rcc)).mode(CH).bits(MODE_BITS) });
         dac.cr().modify(|_, w| w.en(CH).set_bit());
+
+        DacCh::new()
+    }
+
+    /// Enable trigger for the channel using the trigger source provided as a generic type parameter.
+    ///
+    /// This will cause the DAC to copy the hold register to the output register
+    /// when the trigger is raised by a timer signal or external interrupt,
+    /// and issue a new DMA request if DMA is enabled.
+    #[inline(always)]
+    pub fn enable_trigger<Source>(&mut self)
+    where
+        Source: DacTriggerSource<DAC>,
+    {
+        // Set the TSELx bits to the trigger signal identifier from the DacTriggerSource impl
+        let dac = unsafe { &(*DAC::ptr()) };
+        if CH == DacChannel::Ch1 as u8 {
+            unsafe { dac.cr().modify(|_, w| w.tsel1().bits(Source::SIGNAL)) };
+        }
+        if CH == DacChannel::Ch2 as u8 {
+            unsafe { dac.cr().modify(|_, w| w.tsel2().bits(Source::SIGNAL)) };
+        }
+
+        // Enable the TENx flag in DAC CR
+        dac.cr().modify(|_, w| w.ten(CH).set_bit());
+    }
+
+    pub fn enable_dma(self, rcc: &mut Rcc) -> DacCh<DAC, CH, MODE_BITS, EnabledDma> {
+        let dac = unsafe { &(*DAC::ptr()) };
+
+        dac.mcr()
+            .modify(|_, w| unsafe { w.hfsel().variant(hfsel(rcc)).mode(CH).bits(MODE_BITS) });
+
+        dac.cr()
+            .modify(|_, w| w.dmaen(CH).set_bit().en(CH).set_bit());
+
+        dac.dhr12r(CH as usize).write(|w| unsafe { w.bits(0) });
 
         DacCh::new()
     }
@@ -450,7 +503,16 @@ impl<DAC: Instance, const CH: u8, const MODE_BITS: u8>
     }
 }
 
-pub trait DacExt: Sized {
+/// DMA state implementation
+impl<DAC: Instance, const CH: u8, const MODE_BITS: u8> DacCh<DAC, CH, MODE_BITS, EnabledDma> {
+    pub fn start(&mut self, val: u16) {
+        let dac = unsafe { &(*DAC::ptr()) };
+        dac.dhr12r(CH as usize)
+            .write(|w| unsafe { w.bits(val as u32) });
+    }
+}
+
+pub trait DacExt: Instance + Sized {
     fn constrain<PINS>(self, pins: PINS, rcc: &mut Rcc) -> PINS::Output
     where
         PINS: Pins<Self>;
@@ -478,3 +540,28 @@ macro_rules! impl_dac_ext {
 }
 
 impl_dac_ext!(pac::DAC1, pac::DAC2, pac::DAC3, pac::DAC4,);
+
+macro_rules! impl_dac_dma {
+    ($($DAC:ty, $channel:expr, $dmamux:ident)+) => {$(
+        unsafe impl<const MODE_BITS: u8, ED> TargetAddress<MemoryToPeripheral>
+            for DacCh<$DAC, $channel, MODE_BITS, ED>
+            where $DAC: Instance
+        {
+            type MemSize = u32;
+            const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::$dmamux as u8);
+
+            fn address(&self) -> u32 {
+                let dac = unsafe { &(*<$DAC>::ptr()) };
+                dac.dhr12r($channel as usize) as *const _ as u32
+            }
+        }
+    )+};
+}
+
+impl_dac_dma!(pac::DAC1, 0, DAC1_CH1);
+impl_dac_dma!(pac::DAC1, 1, DAC1_CH2);
+impl_dac_dma!(pac::DAC2, 0, DAC2_CH1);
+impl_dac_dma!(pac::DAC3, 0, DAC3_CH1);
+impl_dac_dma!(pac::DAC3, 1, DAC3_CH2);
+impl_dac_dma!(pac::DAC4, 0, DAC4_CH1);
+impl_dac_dma!(pac::DAC4, 1, DAC4_CH2);
