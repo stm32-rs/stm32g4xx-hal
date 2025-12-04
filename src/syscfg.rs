@@ -1,25 +1,17 @@
-use crate::bb;
-use crate::stm32::{RCC, SYSCFG};
+use crate::rcc::Rcc;
+use crate::stm32::SYSCFG;
 use core::ops::Deref;
 
 /// Extension trait that constrains the `SYSCFG` peripheral
 pub trait SysCfgExt {
     /// Constrains the `SYSCFG` peripheral so it plays nicely with the other abstractions
-    fn constrain(self) -> SysCfg;
+    fn constrain(self, rcc: &mut Rcc) -> SysCfg;
 }
 
 impl SysCfgExt for SYSCFG {
-    fn constrain(self) -> SysCfg {
-        unsafe {
-            // NOTE(unsafe) this reference will only be used for atomic writes with no side effects.
-            let rcc = &(*RCC::ptr());
-
-            // Enable clock.
-            bb::set(&rcc.apb2enr(), 0);
-
-            // Stall the pipeline to work around erratum 2.1.13 (DM00037591)
-            cortex_m::asm::dsb();
-        }
+    fn constrain(self, rcc: &mut Rcc) -> SysCfg {
+        // Enable SYSCFG peripheral clock in APB2ENR register
+        rcc.apb2enr().modify(|_, w| w.syscfgen().set_bit());
 
         SysCfg(self)
     }
