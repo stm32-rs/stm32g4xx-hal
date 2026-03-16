@@ -157,6 +157,10 @@ name = "nucleo-g474_hrtim"
 harness = false
 required-features = ["stm32g474", "defmt", "hrtim"]
 
+[[test]]
+name = "nucleo-g474_w_jumpers-hrtim"
+harness = false
+
 [lib]
 test = false
 
