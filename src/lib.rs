@@ -69,6 +69,8 @@ pub mod can;
 pub mod comparator;
 #[cfg(feature = "cordic")]
 pub mod cordic;
+#[cfg(feature = "fmac")]
+pub mod fmac;
 // pub mod crc;
 pub mod dac;
 pub mod delay;
