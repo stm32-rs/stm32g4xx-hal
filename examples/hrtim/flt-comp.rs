@@ -12,7 +12,7 @@ use fugit::ExtU32 as _;
 use stm32_hrtim::{
     compare_register::HrCompareRegister,
     fault::{FaultAction, FaultMonitor},
-    output::HrOutput,
+    output::{self, HrOutput},
     timer::HrTimer,
     HrParts, HrPwmAdvExt, Polarity, Pscl4,
 };
@@ -111,11 +111,11 @@ fn main() -> ! {
     let HrParts {
         mut timer,
         mut cr1,
-        out: mut out1,
+        mut out1,
         ..
     } = dp
         .HRTIM_TIMA
-        .pwm_advanced(pin_a)
+        .pwm_advanced(pin_a, output::NoPin)
         .prescaler(prescaler)
         .period(0xFFFF)
         .with_fault_source(fault_source5) // Set fault source

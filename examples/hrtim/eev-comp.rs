@@ -11,7 +11,7 @@ use cortex_m_rt::entry;
 use stm32_hrtim::{
     compare_register::HrCompareRegister,
     external_event::{self, ToExternalEventSource},
-    output::HrOutput,
+    output::{self, HrOutput},
     timer::HrTimer,
     timer_eev_cfg::{EevCfg, EevCfgs},
     HrParts, HrPwmAdvExt, Polarity, Pscl4,
@@ -109,22 +109,22 @@ fn main() -> ! {
     let HrParts {
         mut timer,
         mut cr1,
-        mut out,
+        mut out1,
         ..
     } = dp
         .HRTIM_TIMA
-        .pwm_advanced(pin_a)
+        .pwm_advanced(pin_a, output::NoPin)
         .prescaler(prescaler)
         .eev_cfg(EevCfgs::default().eev4(EevCfg::default()))
         .period(0xFFFF)
         .finalize(&mut hr_control);
 
-    out.enable_rst_event(&cr1); // Set low on compare match with cr1
-    out.enable_rst_event(&eev_input4);
-    out.enable_set_event(&timer); // Set high at new period
+    out1.enable_rst_event(&cr1); // Set low on compare match with cr1
+    out1.enable_rst_event(&eev_input4);
+    out1.enable_set_event(&timer); // Set high at new period
     cr1.set_duty(timer.get_period() / 3);
 
-    out.enable();
+    out1.enable();
     timer.start(&mut hr_control.control);
 
     info!("Started");

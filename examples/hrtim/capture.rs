@@ -11,7 +11,7 @@ use stm32_hrtim::{
     capture::HrCapture,
     compare_register::HrCompareRegister,
     external_event::{self, ToExternalEventSource},
-    output::HrOutput,
+    output::{self, HrOutput},
     timer::{HrSlaveTimerCpt, HrTimer},
     HrParts, HrPwmAdvExt, Pscl128,
 };
@@ -81,21 +81,21 @@ fn main() -> ! {
     let HrParts {
         mut timer,
         mut cr1,
-        mut out,
+        mut out1,
         ..
     } = dp
         .HRTIM_TIMA
-        .pwm_advanced(pin_a)
+        .pwm_advanced(pin_a, output::NoPin)
         .prescaler(prescaler)
         .period(period)
         .finalize(&mut hr_control);
 
-    out.enable_rst_event(&cr1); // Set low on compare match with cr1
-    out.enable_set_event(&timer); // Set high at new period
+    out1.enable_rst_event(&cr1); // Set low on compare match with cr1
+    out1.enable_set_event(&timer); // Set high at new period
 
     cr1.set_duty(period / 2);
     timer.start(&mut hr_control.control);
-    out.enable();
+    out1.enable();
 
     let capture = timer.capture_ch1();
     capture.enable_interrupt(true, &mut hr_control);

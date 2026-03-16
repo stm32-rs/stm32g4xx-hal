@@ -84,11 +84,12 @@ fn main() -> ! {
         mut cr1,
         mut cr3,
         mut cr4,
-        out: (mut out1, mut out2),
+        mut out1,
+        mut out2,
         ..
     } = dp
         .HRTIM_TIMA
-        .pwm_advanced((pin_a, pin_b))
+        .pwm_advanced(pin_a, pin_b)
         .prescaler(prescaler)
         .period(period)
         .finalize(&mut hr_control);

@@ -69,11 +69,12 @@ fn main() -> ! {
     let HrParts {
         mut timer,
         mut cr1,
-        out: (mut out1, mut out2),
+        mut out1,
+        mut out2,
         ..
     } = dp
         .HRTIM_TIMA
-        .pwm_advanced((pin_a, pin_b))
+        .pwm_advanced(pin_a, pin_b)
         .prescaler(prescaler)
         .period(0xFFFF)
         .push_pull_mode(true) // Set push pull mode, out1 and out2 are
