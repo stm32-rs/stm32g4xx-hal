@@ -31,14 +31,7 @@ mod tests {
 
     use crate::VREF_ADC_BITS;
 
-    type Spi1 = spi::Spi<
-        pac::SPI1,
-        (
-            gpio::gpioa::PA5<gpio::AF5>,
-            gpio::gpioa::PA6<gpio::AF5>,
-            gpio::gpioa::PA7<gpio::AF5>,
-        ),
-    >;
+    type Spi1 = spi::Spi<pac::SPI1>;
     struct Peripherals {
         opamp: opamp::Disabled<Opamp1>,
         comp: comparator::COMP1,
@@ -82,9 +75,9 @@ mod tests {
         let (opamp, ..) = dp.OPAMP.split(&mut rcc);
         let (comp, ..) = dp.COMP.split(&mut rcc);
 
-        let sclk = gpioa.pa5.into_alternate();
-        let miso = gpioa.pa6.into_alternate();
-        let mosi = gpioa.pa7.into_alternate();
+        let sclk = Some(gpioa.pa5);
+        let miso = Some(gpioa.pa6);
+        let mosi = Some(gpioa.pa7);
 
         // 1/8 SPI/SysClk ratio seems to be the upper limit for continuous transmission
         // one byte at a time

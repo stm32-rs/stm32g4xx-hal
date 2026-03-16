@@ -43,9 +43,12 @@ fn main() -> ! {
     let miso: PB14<AF5> = gpiob.pb14.into_alternate();
     let mosi: PB15<AF5> = gpiob.pb15.into_alternate();
 
-    let spi = dp
-        .SPI2
-        .spi((sck, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
+    let spi = dp.SPI2.spi(
+        (Some(sck), Some(miso), Some(mosi)),
+        spi::MODE_0,
+        400.kHz(),
+        &mut rcc,
+    );
 
     struct Clock;
 

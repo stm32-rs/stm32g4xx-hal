@@ -40,9 +40,12 @@ fn main() -> ! {
     let miso: PA6<AF5> = gpioa.pa6.into_alternate();
     let mosi: PA7<AF5> = gpioa.pa7.into_alternate();
 
-    let mut spi = dp
-        .SPI1
-        .spi((sclk, miso, mosi), spi::MODE_0, 400.kHz(), &mut rcc);
+    let mut spi = dp.SPI1.spi(
+        (Some(sclk), Some(miso), Some(mosi)),
+        spi::MODE_0,
+        400.kHz(),
+        &mut rcc,
+    );
     let mut cs = gpioa.pa8.into_push_pull_output();
     cs.set_high();
 

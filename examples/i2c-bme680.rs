@@ -30,8 +30,8 @@ fn main() -> ! {
     let mut rcc = dp.RCC.constrain();
     let gpiob = dp.GPIOB.split(&mut rcc);
 
-    let sda = gpiob.pb9.into_alternate_open_drain();
-    let scl = gpiob.pb8.into_alternate_open_drain();
+    let sda = gpiob.pb9;
+    let scl = gpiob.pb8;
 
     let i2c = dp.I2C1.i2c((sda, scl), Config::new(100.kHz()), &mut rcc);
 

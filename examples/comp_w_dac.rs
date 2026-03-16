@@ -10,16 +10,17 @@ use rt::entry;
 
 #[entry]
 fn main() -> ! {
-    use hal::comparator::{self, ComparatorExt, ComparatorSplit};
-    use hal::dac::{Dac1IntSig1, DacExt, DacOut};
-    use hal::delay::SYSTDelayExt;
-    use hal::gpio::GpioExt;
-    use hal::rcc::RccExt;
-    use hal::stasis::Freeze;
-    use hal::stm32;
-    use stm32g4xx_hal as hal;
+    use stm32g4xx_hal::{
+        comparator::{self, ComparatorExt, ComparatorSplit},
+        dac::{Dac1IntSig1, DacExt, DacOut},
+        delay::SYSTDelayExt,
+        gpio::{GpioExt, PushPull},
+        pac,
+        rcc::RccExt,
+        stasis::Freeze,
+    };
 
-    let dp = stm32::Peripherals::take().expect("cannot take peripherals");
+    let dp = pac::Peripherals::take().expect("cannot take peripherals");
     let cp = cortex_m::Peripherals::take().expect("cannot take core peripherals");
 
     let mut rcc = dp.RCC.constrain();
@@ -34,20 +35,19 @@ fn main() -> ! {
     let (mut dac, [dac_token]) = dac.freeze();
 
     let (comp1, _comp2, ..) = dp.COMP.split(&mut rcc);
-    let pa1 = gpioa.pa1.into_analog();
 
     // Set up comparator with pa1 as positive, and the DAC as negative input
     let comp = comp1.comparator(
-        pa1,
+        gpioa.pa1,
         dac_token,
         comparator::Config::default().hysteresis(comparator::Hysteresis::None),
         &rcc.clocks,
     );
 
-    let led2 = gpioa.pa0.into_push_pull_output();
+    let led2 = gpioa.pa0;
     // Configure PA12 to the comparator's alternate function so it gets
     // changed directly by the comparator.
-    comp.output_pin(led2);
+    comp.output_pin::<PushPull>(led2);
     let _comp1 = comp.enable().lock();
 
     enum Direction {

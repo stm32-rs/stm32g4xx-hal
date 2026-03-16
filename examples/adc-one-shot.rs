@@ -44,13 +44,12 @@ fn main() -> ! {
     info!("Setup Gpio");
 
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let pa7 = gpioa.pa7.into_analog();
 
     info!("Enter Loop");
 
     loop {
         info!("Convert");
-        let sample = adc.convert(&pa7, SampleTime::Cycles_640_5);
+        let sample = adc.convert(&gpioa.pa7, SampleTime::Cycles_640_5);
         info!("sample to mv");
         let millivolts = adc.sample_to_millivolts(sample);
         info!("pa7: {}mV", millivolts);

@@ -483,7 +483,7 @@ where
 
 macro_rules! impl_serial_timeout {
     ($($uart:ident, )*) => {$(
-        impl<CHANNEL, BUF, Pin> CircTransfer<CHANNEL, crate::serial::Rx<crate::stm32::$uart, Pin, crate::serial::DMA>, BUF>
+        impl<CHANNEL, BUF> CircTransfer<CHANNEL, crate::serial::Rx<crate::stm32::$uart, crate::serial::DMA>, BUF>
         where
             CHANNEL: Channel,
             /*BUF: StaticWriteBuffer + Deref*/ {

@@ -83,19 +83,225 @@ rt = ["stm32g4/rt"]
 usb = ["dep:stm32-usbd"]
 stm32g431 = ["stm32g4/stm32g431", "cat2"]
 stm32g441 = ["stm32g4/stm32g441", "cat2"]
-stm32g473 = ["stm32g4/stm32g473", "cat3", "adc3", "adc4", "adc5"]
-stm32g474 = ["stm32g4/stm32g474", "cat3", "adc3", "adc4", "adc5", "stm32-hrtim/stm32g474"]
-stm32g483 = ["stm32g4/stm32g483", "cat3", "adc3", "adc4", "adc5"]
-stm32g484 = ["stm32g4/stm32g484", "cat3", "adc3", "adc4", "adc5", "stm32-hrtim/stm32g484"]
-stm32g491 = ["stm32g4/stm32g491", "cat4", "adc3"]
-stm32g4a1 = ["stm32g4/stm32g4a1", "cat4", "adc3"]
+stm32g473 = ["stm32g4/stm32g473", "cat3"]
+stm32g474 = ["stm32g4/stm32g474", "cat3", "stm32-hrtim/stm32g474"]
+stm32g483 = ["stm32g4/stm32g483", "cat3"]
+stm32g484 = ["stm32g4/stm32g484", "cat3", "stm32-hrtim/stm32g484"]
+stm32g491 = ["stm32g4/stm32g491", "cat4"]
+stm32g4a1 = ["stm32g4/stm32g4a1", "cat4"]
 
+gpio-g43x = [
+    "comp1",
+    "comp2",
+    "comp3",
+    "comp4",
+    "crs",
+    "fdcan1",
+    "gpioa",
+    "gpiob",
+    "gpioc",
+    "gpiod",
+    "gpioe",
+    "gpiof",
+    "gpiog",
+    "i2c1",
+    "i2c2",
+    "i2c3",
+    "i2s",
+    "i2s2",
+    "i2s3",
+    "ir",
+    "lptim1",
+    "lpuart1",
+    "rcc",
+    "rtc",
+    "sai1",
+    "spi1",
+    "spi2",
+    "spi3",
+    "sys",
+    "tim1",
+    "tim15",
+    "tim16",
+    "tim17",
+    "tim2",
+    "tim3",
+    "tim4",
+    "tim8",
+    "uart4",
+    "ucpd1",
+    "usart1",
+    "usart2",
+    "usart3",
+]
+gpio-g47x = [
+    "adc3",
+    "adc4",
+    "adc5",
+    "comp1",
+    "comp2",
+    "comp3",
+    "comp4",
+    "comp5",
+    "comp6",
+    "comp7",
+    "crs",
+    "fdcan1",
+    "fdcan2",
+    "fdcan3",
+    "fmc",
+    "gpioa",
+    "gpiob",
+    "gpioc",
+    "gpiod",
+    "gpioe",
+    "gpiof",
+    "gpiog",
+    "hrtim1",
+    "i2c1",
+    "i2c2",
+    "i2c3",
+    "i2c4",
+    "i2s",
+    "i2s2",
+    "i2s3",
+    "ir",
+    "lptim1",
+    "lpuart1",
+    "quadspi1",
+    "rcc",
+    "rtc",
+    "sai1",
+    "spi1",
+    "spi2",
+    "spi3",
+    "spi4",
+    "sys",
+    "tim1",
+    "tim15",
+    "tim16",
+    "tim17",
+    "tim2",
+    "tim20",
+    "tim3",
+    "tim4",
+    "tim5",
+    "tim8",
+    "uart4",
+    "uart5",
+    "ucpd1",
+    "usart1",
+    "usart2",
+    "usart3",
+]
+gpio-g49x = [
+    "adc3",
+    "comp1",
+    "comp2",
+    "comp3",
+    "comp4",
+    "crs",
+    "fdcan1",
+    "fdcan2",
+    "gpioa",
+    "gpiob",
+    "gpioc",
+    "gpiod",
+    "gpioe",
+    "gpiof",
+    "gpiog",
+    "i2c1",
+    "i2c2",
+    "i2c3",
+    "i2s",
+    "i2s2",
+    "i2s3",
+    "ir",
+    "lptim1",
+    "lpuart1",
+    "quadspi1",
+    "rcc",
+    "rtc",
+    "sai1",
+    "spi1",
+    "spi2",
+    "spi3",
+    "sys",
+    "tim1",
+    "tim15",
+    "tim16",
+    "tim17",
+    "tim2",
+    "tim20",
+    "tim3",
+    "tim4",
+    "tim8",
+    "uart4",
+    "uart5",
+    "ucpd1",
+    "usart1",
+    "usart2",
+    "usart3",
+]
 
-gpio-g43x = []
-
-gpio-g47x = []
-
-gpio-g49x = []
+adc3 = []
+adc4 = []
+adc5 = []
+comp1 = []
+comp2 = []
+comp3 = []
+comp4 = []
+comp5 = []
+comp6 = []
+comp7 = []
+crs = []
+fdcan1 = []
+fdcan2 = []
+fdcan3 = []
+fmc = []
+gpioa = []
+gpiob = []
+gpioc = []
+gpiod = []
+gpioe = []
+gpiof = []
+gpiog = []
+hrtim1 = []
+i2c1 = []
+i2c2 = []
+i2c3 = []
+i2c4 = []
+i2s = []
+i2s2 = []
+i2s3 = []
+ir = []
+lptim1 = []
+lpuart1 = []
+quadspi1 = []
+rcc = []
+rtc = []
+sai1 = []
+spi1 = []
+spi2 = []
+spi3 = []
+spi4 = []
+sys = []
+tim1 = []
+tim15 = []
+tim16 = []
+tim17 = []
+tim2 = []
+tim20 = []
+tim3 = []
+tim4 = []
+tim5 = []
+tim8 = []
+uart4 = []
+uart5 = []
+ucpd1 = []
+usart1 = []
+usart2 = []
+usart3 = []
 
 log-itm = ["cortex-m-log/itm"]
 log-rtt = []
@@ -111,9 +317,6 @@ defmt = [
     "stm32-hrtim?/defmt"
 ]
 cordic = ["dep:fixed"]
-adc3 = []
-adc4 = []
-adc5 = []
 
 # Device category
 cat2 = ["gpio-g43x"]

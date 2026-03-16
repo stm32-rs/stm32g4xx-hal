@@ -43,7 +43,6 @@ fn main() -> ! {
 
     info!("Setup Gpio");
     let gpioa = dp.GPIOA.split(&mut rcc);
-    let pa0 = gpioa.pa0.into_analog();
 
     info!("Setup Adc1");
     let mut delay = cp.SYST.delay(&rcc.clocks);
@@ -55,7 +54,7 @@ fn main() -> ! {
     adc.set_auto_delay(true);
     adc.set_continuous(Continuous::Continuous);
     adc.reset_sequence();
-    adc.configure_channel(&pa0, Sequence::One, SampleTime::Cycles_640_5);
+    adc.configure_channel(&gpioa.pa0, Sequence::One, SampleTime::Cycles_640_5);
     adc.configure_channel(&Vref, Sequence::Two, SampleTime::Cycles_640_5);
     adc.configure_channel(&Temperature, Sequence::Three, SampleTime::Cycles_640_5);
     let adc = adc.enable();

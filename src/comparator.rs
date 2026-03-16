@@ -9,7 +9,7 @@ use core::marker::PhantomData;
 
 use crate::dac;
 use crate::exti::{Event as ExtiEvent, ExtiExt};
-use crate::gpio::{self, Analog, OpenDrain, Output, PushPull, SignalEdge};
+use crate::gpio::{self, alt::CompOutput, Analog, SignalEdge};
 
 use crate::rcc::{Clocks, Rcc};
 use crate::stasis;
@@ -157,28 +157,13 @@ positive_input_pin!(COMP2, PA7, PA3);
 positive_input_pin!(COMP3, PA0, PC1);
 positive_input_pin!(COMP4, PB0, PE7);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp5")]
 positive_input_pin!(COMP5, PB13, PD12);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp6")]
 positive_input_pin!(COMP6, PB11, PD11);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp7")]
 positive_input_pin!(COMP7, PB14, PD14);
 
 macro_rules! negative_input_pin_helper {
@@ -207,12 +192,7 @@ negative_input_pin! {
     COMP4: gpio::PE8<Analog>, gpio::PB2<Analog>,
 }
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp7")]
 negative_input_pin! {
     COMP5: gpio::PB10<Analog>, gpio::PD13<Analog>,
     COMP6: gpio::PD10<Analog>, gpio::PB15<Analog>,
@@ -273,12 +253,7 @@ macro_rules! refint_input {
 
 refint_input!(COMP1, COMP2, COMP3, COMP4,);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp7")]
 refint_input!(COMP5, COMP6, COMP7,);
 
 macro_rules! dac_input_helper {
@@ -312,49 +287,19 @@ dac_input!(COMP3: Dac1Ch1, 0b101);
 dac_input!(COMP4: Dac3Ch2, 0b100);
 dac_input!(COMP4: Dac1Ch1, 0b101);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp5")]
 dac_input!(COMP5: Dac4Ch1, 0b100);
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp5")]
 dac_input!(COMP5: Dac1Ch2, 0b101);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp6")]
 dac_input!(COMP6: Dac4Ch2, 0b100);
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp6")]
 dac_input!(COMP6: Dac2Ch1, 0b101);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp7")]
 dac_input!(COMP7: Dac4Ch1, 0b100);
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp7")]
 dac_input!(COMP7: Dac2Ch1, 0b101);
 
 pub struct Comparator<C, ED> {
@@ -400,14 +345,10 @@ macro_rules! impl_comparator {
                 let voltage_scaler_delay = clocks.sys_clk.raw() / (1_000_000 / 200); // 200us
                 cortex_m::asm::delay(voltage_scaler_delay);
                 self.csr().modify(|_, w| unsafe {
-                    w.hyst()
-                        .bits(config.hysteresis as u8)
-                        .scalen()
-                        .bit(NP::USE_VREFINT)
-                        .brgen()
-                        .bit(NP::USE_RESISTOR_DIVIDER)
-                        .pol()
-                        .bit(config.inverted)
+                    w.hyst().bits(config.hysteresis as u8);
+                    w.scalen().bit(NP::USE_VREFINT);
+                    w.brgen().bit(NP::USE_RESISTOR_DIVIDER);
+                    w.pol().bit(config.inverted)
                 });
 
                 Comparator {
@@ -492,15 +433,17 @@ macro_rules! impl_comparator {
             pub fn unpend(&self, exti: &EXTI) {
                 exti.unpend($Event);
             }
-
-            /// Configures a GPIO pin to output the signal of the comparator
-            ///
-            /// Multiple GPIO pins may be configured as the output simultaneously.
-            pub fn output_pin<P: OutputPin<$COMP>>(&self, pin: P) {
-                pin.setup();
-            }
         }
     };
+}
+
+impl<COMP: CompOutput, ED> Comparator<COMP, ED> {
+    /// Configures a GPIO pin to output the signal of the comparator
+    ///
+    /// Multiple GPIO pins may be configured as the output simultaneously.
+    pub fn output_pin<Otype>(&self, pin: impl Into<COMP::Out<Otype>>) {
+        let _pin = pin.into();
+    }
 }
 
 impl_comparator!(COMP1, comp1, ExtiEvent::COMP1);
@@ -508,44 +451,19 @@ impl_comparator!(COMP2, comp2, ExtiEvent::COMP2);
 impl_comparator!(COMP3, comp1, ExtiEvent::COMP3);
 impl_comparator!(COMP4, comp2, ExtiEvent::COMP4);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp5")]
 impl_comparator!(COMP5, comp1, ExtiEvent::COMP5);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp6")]
 impl_comparator!(COMP6, comp2, ExtiEvent::COMP6);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp7")]
 impl_comparator!(COMP7, comp2, ExtiEvent::COMP7);
 
-#[cfg(not(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-)))]
+#[cfg(not(feature = "comp7"))]
 type Comparators = (COMP1, COMP2, COMP3, COMP4);
 
-#[cfg(any(
-    feature = "stm32g473",
-    feature = "stm32g483",
-    feature = "stm32g474",
-    feature = "stm32g484"
-))]
+#[cfg(feature = "comp7")]
 type Comparators = (COMP1, COMP2, COMP3, COMP4, COMP5, COMP6, COMP7);
 
 /// Enables the comparator peripheral, and splits the [`COMP`] into independent [`COMP1`] and [`COMP2`]
@@ -562,26 +480,11 @@ pub fn split(_comp: COMP, rcc: &mut Rcc) -> Comparators {
         COMP2 { _rb: PhantomData },
         COMP3 { _rb: PhantomData },
         COMP4 { _rb: PhantomData },
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g483",
-            feature = "stm32g474",
-            feature = "stm32g484"
-        ))]
+        #[cfg(feature = "comp5")]
         COMP5 { _rb: PhantomData },
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g483",
-            feature = "stm32g474",
-            feature = "stm32g484"
-        ))]
+        #[cfg(feature = "comp6")]
         COMP6 { _rb: PhantomData },
-        #[cfg(any(
-            feature = "stm32g473",
-            feature = "stm32g483",
-            feature = "stm32g474",
-            feature = "stm32g484"
-        ))]
+        #[cfg(feature = "comp7")]
         COMP7 { _rb: PhantomData },
     )
 }
@@ -595,57 +498,4 @@ impl ComparatorSplit for COMP {
     fn split(self, rcc: &mut Rcc) -> Comparators {
         split(self, rcc)
     }
-}
-
-pub trait OutputPin<COMP> {
-    fn setup(self);
-}
-
-#[allow(unused_macros)] // TODO: add support for more devices
-macro_rules! output_pin {
-    ($COMP:ident, $pin:ident, $AF:literal, $mode_t:ident, $into:ident) => {
-        impl OutputPin<$COMP> for gpio::$pin<Output<$mode_t>> {
-            fn setup(self) {
-                self.$into::<$AF>();
-            }
-        }
-    };
-    ($($COMP:ident: $pin:ident, $AF:literal,)+) => {$(
-        output_pin!($COMP, $pin, $AF, PushPull, into_alternate);
-        output_pin!($COMP, $pin, $AF, OpenDrain, into_alternate_open_drain);
-    )+};
-}
-
-output_pin! {
-    COMP1: PA0,  8,
-    COMP1: PA6,  8,
-    COMP1: PA11, 8,
-    COMP1: PB8,  8,
-
-    COMP2: PA2,  8,
-    COMP2: PA7,  8,
-    COMP2: PA12, 8,
-    COMP2: PB9,  8,
-
-    COMP3: PB7,  8,
-    COMP3: PB15, 3,
-    COMP3: PC2,  3,
-
-    COMP4: PB1,  8,
-    COMP4: PB6,  8,
-    COMP4: PB14, 8,
-}
-
-#[cfg(feature = "gpio-g47x")]
-output_pin! {
-    COMP1: PF4,  2,
-
-    COMP5: PA9,  8,
-    COMP5: PC7,  7,
-
-    COMP6: PA10, 8,
-    COMP6: PC6,  7,
-
-    COMP7: PA8, 8,
-    COMP7: PC8, 7,
 }
