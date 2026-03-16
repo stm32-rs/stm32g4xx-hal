@@ -44,3 +44,7 @@ pub use crate::pwm::PwmExt as _;
 // pub use crate::watchdog::IWDGExt as _;
 // pub use crate::watchdog::WWDGExt as _;
 pub use crate::pwr::PwrExt as _;
+
+pub use crate::ClearFlags as _;
+pub use crate::Listen as _;
+pub use crate::ReadFlags as _;

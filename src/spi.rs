@@ -16,6 +16,7 @@ use core::ptr;
 
 use embedded_hal::spi::ErrorKind;
 pub use embedded_hal::spi::{Mode, Phase, Polarity, MODE_0, MODE_1, MODE_2, MODE_3};
+use enumflags2::BitFlags;
 
 /// SPI error
 #[derive(Debug)]
@@ -36,6 +37,61 @@ impl embedded_hal::spi::Error for Error {
             Self::Crc => ErrorKind::Other,
         }
     }
+}
+
+/// SPI interrupt events
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u16)]
+pub enum Event {
+    /// An error occurred.
+    ///
+    /// This bit controls the generation of an interrupt
+    /// when an error condition occurs
+    /// (OVR, CRCERR, MODF, FRE in SPI mode,
+    /// and UDR, OVR, FRE in I2S mode)
+    Error = 1 << 5,
+    /// New data has been received
+    ///
+    /// RX buffer not empty interrupt enable
+    RxNotEmpty = 1 << 6,
+    /// Data can be sent
+    ///
+    /// Tx buffer empty interrupt enable
+    TxEmpty = 1 << 7,
+}
+
+/// SPI status flags
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u16)]
+pub enum Flag {
+    /// Receive buffer not empty
+    RxNotEmpty = 1 << 0,
+    /// Transmit buffer empty
+    TxEmpty = 1 << 1,
+    /// CRC error flag
+    CrcError = 1 << 4,
+    /// Mode fault
+    ModeFault = 1 << 5,
+    /// Overrun flag
+    Overrun = 1 << 6,
+    /// Busy flag
+    Busy = 1 << 7,
+    /// Frame Error
+    FrameError = 1 << 8,
+}
+
+/// SPI clearable flags
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u16)]
+pub enum CFlag {
+    /// CRC error flag
+    CrcError = 1 << 4,
 }
 
 /// A filler type for when the SCK pin is unnecessary
@@ -143,34 +199,38 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
 
     #[inline]
     fn nb_read<W: FrameSize>(&mut self) -> nb::Result<W, Error> {
-        let sr = self.spi.sr().read();
-        Err(if sr.ovr().bit_is_set() {
-            nb::Error::Other(Error::Overrun)
-        } else if sr.modf().bit_is_set() {
-            nb::Error::Other(Error::ModeFault)
-        } else if sr.crcerr().bit_is_set() {
-            nb::Error::Other(Error::Crc)
-        } else if sr.rxne().bit_is_set() {
-            return Ok(self.read_unchecked());
+        let flags = self.flags_unchecked();
+        if flags.intersects(Flag::Overrun | Flag::ModeFault | Flag::CrcError) {
+            Err(if flags.contains(Flag::Overrun) {
+                nb::Error::Other(Error::Overrun)
+            } else if flags.contains(Flag::ModeFault) {
+                nb::Error::Other(Error::ModeFault)
+            } else {
+                nb::Error::Other(Error::Crc)
+            })
+        } else if flags.contains(Flag::RxNotEmpty) {
+            Ok(self.read_unchecked())
         } else {
-            nb::Error::WouldBlock
-        })
+            Err(nb::Error::WouldBlock)
+        }
     }
     #[inline]
     fn nb_write<W: FrameSize>(&mut self, word: W) -> nb::Result<(), Error> {
-        let sr = self.spi.sr().read();
-        Err(if sr.ovr().bit_is_set() {
-            nb::Error::Other(Error::Overrun)
-        } else if sr.modf().bit_is_set() {
-            nb::Error::Other(Error::ModeFault)
-        } else if sr.crcerr().bit_is_set() {
-            nb::Error::Other(Error::Crc)
-        } else if sr.txe().bit_is_set() {
+        let flags = self.flags_unchecked();
+        if flags.intersects(Flag::Overrun | Flag::ModeFault | Flag::CrcError) {
+            Err(if flags.contains(Flag::Overrun) {
+                nb::Error::Other(Error::Overrun)
+            } else if flags.contains(Flag::ModeFault) {
+                nb::Error::Other(Error::ModeFault)
+            } else {
+                nb::Error::Other(Error::Crc)
+            })
+        } else if flags.contains(Flag::TxEmpty) {
             self.write_unchecked(word);
             return Ok(());
         } else {
-            nb::Error::WouldBlock
-        })
+            Err(nb::Error::WouldBlock)
+        }
     }
     #[inline]
     fn nb_read_no_err<W: FrameSize>(&mut self) -> nb::Result<W, core::convert::Infallible> {
@@ -233,6 +293,65 @@ impl<SPI: Instance, PINS> Spi<SPI, PINS> {
             core::hint::spin_loop()
         }
         Ok(())
+    }
+
+    #[inline]
+    fn listen_event(&mut self, disable: Option<BitFlags<Event>>, enable: Option<BitFlags<Event>>) {
+        self.spi.cr2().modify(|r, w| unsafe {
+            w.bits({
+                let mut bits = r.bits();
+                if let Some(d) = disable {
+                    bits &= !d.bits();
+                }
+                if let Some(e) = enable {
+                    bits |= e.bits();
+                }
+                bits
+            })
+        });
+    }
+
+    #[inline(always)]
+    fn flags_unchecked(&self) -> BitFlags<Flag> {
+        unsafe { BitFlags::from_bits_unchecked(self.spi.sr().read().bits()) }
+    }
+
+    #[inline(always)]
+    fn clear_flags(&mut self, flags: BitFlags<CFlag>) {
+        self.spi
+            .sr()
+            .write(|w| unsafe { w.bits(!0 & flags.bits()) });
+    }
+}
+
+impl<SPI: Instance, PINS> crate::Listen for Spi<SPI, PINS> {
+    type Event = Event;
+
+    #[inline(always)]
+    fn listen_event(
+        &mut self,
+        disable: Option<BitFlags<Self::Event>>,
+        enable: Option<BitFlags<Self::Event>>,
+    ) {
+        self.listen_event(disable, enable)
+    }
+}
+
+impl<SPI: Instance, PINS> crate::ClearFlags for Spi<SPI, PINS> {
+    type Flag = CFlag;
+
+    #[inline(always)]
+    fn clear_flags(&mut self, flags: impl Into<BitFlags<Self::Flag>>) {
+        self.clear_flags(flags.into());
+    }
+}
+
+impl<SPI: Instance, PINS> crate::ReadFlags for Spi<SPI, PINS> {
+    type Flag = Flag;
+
+    #[inline(always)]
+    fn flags(&self) -> BitFlags<Self::Flag> {
+        BitFlags::from_bits_truncate(self.flags_unchecked().bits())
     }
 }
 

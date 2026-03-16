@@ -9,6 +9,7 @@ use crate::rcc::{BusClock, Enable, Rcc, RccBus, Reset};
 use crate::stm32::*;
 
 use cortex_m::interrupt;
+use enumflags2::BitFlags;
 use nb::block;
 
 use embedded_hal_old::serial::Write;
@@ -40,50 +41,181 @@ impl embedded_io::Error for Error {
     }
 }
 
-/// Interrupt event
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u32)]
 pub enum Event {
-    /// TXFIFO reaches the threshold
-    TXFT = 1 << 27,
-    /// This bit is set by hardware when the threshold programmed in RXFTCFG in USART_CR3 register is reached.
-    RXFT = 1 << 26,
-
-    /// RXFIFO full
-    RXFF = 1 << 24,
-    /// TXFIFO empty
-    TXFE = 1 << 23,
-
-    /// Active when a communication is ongoing on the RX line
-    BUSY = 1 << 16,
-
-    /// Receiver timeout.This bit is set by hardware when the timeout value,
-    /// programmed in the RTOR register has lapsed, without any communication.
-    RTOF = 1 << 11,
-    /// Transmit data register empty. New data can be sent
-    Txe = 1 << 7,
-
-    /// Transmission Complete. The last data written in the USART_TDR has been transmitted out of the shift register.
-    TC = 1 << 6,
-    /// New data has been received
-    Rxne = 1 << 5,
-    /// Idle line state detected
+    /// IDLE interrupt
     Idle = 1 << 4,
-
-    /// Overrun error
-    ORE = 1 << 3,
-
-    /// Noise detection flag
-    NE = 1 << 2,
-
-    /// Framing error
-    FE = 1 << 1,
-
-    /// Parity error
-    PE = 1 << 0,
+    /// RX buffer not empty interrupt
+    RxNotEmpty = 1 << 5,
+    /// TX complete interrupt
+    TransmissionComplete = 1 << 6,
+    /// Tx buffer empty interrupt
+    TxEmpty = 1 << 7,
+    /// Parity error interrupt
+    ParityError = 1 << 8,
+    /// Character match interrupt enable
+    CharacterMatch = 1 << 14,
+    /// Receiver timeout interrupt
+    ReceiverTimeout = 1 << 26,
+    /// End-of-block interrupt
+    EndOfBlock = 1 << 27,
+    /// TXFIFO empty interrupt
+    TxFifoEmpty = 1 << 30,
+    /// RXFIFO full interrupt
+    RxFifoFull = 1 << 31,
 }
-impl Event {
-    fn val(self) -> u32 {
-        self as u32
-    }
+
+/// UART interrupt events
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u32)]
+pub enum RxEvent {
+    /// IDLE interrupt enable
+    Idle = 1 << 4,
+    /// RXNE interrupt enable
+    RxNotEmpty = 1 << 5,
+    /// PE interrupt enable
+    ParityError = 1 << 8,
+    /// Character match interrupt enable
+    CharacterMatch = 1 << 14,
+    /// Receiver timeout interrupt
+    ReceiverTimeout = 1 << 26,
+    /// End-of-block interrupt
+    EndOfBlock = 1 << 27,
+    /// RXFIFO full interrupt
+    RxFifoFull = 1 << 31,
+}
+
+/// UART interrupt events
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u32)]
+pub enum TxEvent {
+    /// Transmission complete interrupt enable
+    TransmissionComplete = 1 << 6,
+    /// TXE interrupt enable
+    TxEmpty = 1 << 7,
+    /// TXFIFO empty interrupt
+    TxFifoEmpty = 1 << 30,
+}
+
+/// UART/USART status flags
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u32)]
+pub enum Flag {
+    /// Parity error
+    ParityError = 1 << 0,
+    /// Framing error
+    FramingError = 1 << 1,
+    /// Noise detected flag
+    Noise = 1 << 2,
+    /// Overrun error
+    Overrun = 1 << 3,
+    /// IDLE line detected
+    Idle = 1 << 4,
+    /// Read data register not empty
+    ///
+    /// New data has been received
+    RxNotEmpty = 1 << 5,
+    /// Transmission complete
+    ///
+    /// The last data written in the USART_TDR has been transmitted out of the shift register
+    TransmissionComplete = 1 << 6,
+    /// Transmit data register empty
+    ///
+    /// New data can be sent
+    TxEmpty = 1 << 7,
+    /// LIN break detection flag
+    LinBreak = 1 << 8,
+    /// CTS interrupt
+    CtsInterrupt = 1 << 9,
+    /// CTS flag
+    CtsStatus = 1 << 10,
+    /// Receiver timeout
+    ///
+    /// This bit is set by hardware when the timeout value,
+    /// programmed in the RTOR register has lapsed, without any communication
+    ReceiverTimeout = 1 << 11,
+    /// End of block
+    EndOfBlock = 1 << 12,
+    /// SPI slave underrun error flag
+    Underrun = 1 << 13,
+    /// Auto baud rate error
+    AutoBaudRateError = 1 << 14,
+    /// Auto baud rate
+    AutoBaudRateFlag = 1 << 15,
+    /// Busy flag
+    ///
+    /// Active when a communication is ongoing on the RX line
+    Busy = 1 << 16,
+    /// Character match
+    CharacterMatch = 1 << 17,
+    /// Send break
+    SendBreak = 1 << 18,
+    /// Receiver wakeup from Mute mode
+    ReceiverWakeup = 1 << 19,
+    /// Wake-up from low-power mode flag
+    Wakeup = 1 << 20,
+    /// Transmit enable acknowledge
+    TransmitEnableAck = 1 << 21,
+    /// Receive enable acknowledge
+    ReceiveEnableAck = 1 << 22,
+    /// TXFIFO empty
+    TxFifoEmpty = 1 << 23,
+    /// RXFIFO full
+    RxFifoFull = 1 << 24,
+    /// Transmission complete before guard time
+    TransmissionCompleteBeforeGuard = 1 << 25,
+    /// RXFIFO threshold flag
+    ///
+    /// This bit is set by hardware when the threshold programmed in RXFTCFG in USART_CR3 register is reached
+    RxFifoThreshold,
+    /// TXFIFO reaches the threshold
+    TxFifoThreshold,
+}
+
+#[enumflags2::bitflags]
+#[cfg_attr(feature = "defmt", derive(defmt::Format))]
+#[derive(Debug, Eq, PartialEq, Copy, Clone)]
+#[repr(u32)]
+pub enum CFlag {
+    /// Parity error
+    ParityError = 1 << 0,
+    /// Framing error
+    FramingError = 1 << 1,
+    /// Noise detected flag
+    Noise = 1 << 2,
+    /// Overrun error
+    Overrun = 1 << 3,
+    /// IDLE line detected
+    Idle = 1 << 4,
+    /// Read data register not empty
+    RxNotEmpty = 1 << 5,
+    /// Transmission complete
+    TransmissionComplete = 1 << 6,
+    /// Transmit data register empty
+    TxEmpty = 1 << 7,
+    /// LIN break detection flag
+    LinBreak = 1 << 8,
+    /// CTS interrupt
+    CtsInterrupt = 1 << 9,
+    /// Receiver timeout
+    ReceiverTimeout = 1 << 11,
+    /// End of block
+    EndOfBlock = 1 << 12,
+    /// SPI slave underrun error flag
+    Underrun = 1 << 13,
+    /// Character match
+    CharacterMatch = 1 << 17,
+    /// Wake-up from low-power mode flag
+    Wakeup = 1 << 20,
 }
 
 /// Serial receiver
@@ -182,32 +314,6 @@ macro_rules! uart_shared {
             }
         )+
 
-        impl<Pin, Dma> Rx<$USARTX, Pin, Dma> {
-            /// Starts listening for an interrupt event
-            pub fn listen(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.rxneie().set_bit());
-            }
-
-            /// Stop listening for an interrupt event
-            pub fn unlisten(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.rxneie().clear_bit());
-            }
-
-            /// Return true if the rx register is not empty (and can be read)
-            pub fn is_rxne(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().rxne().bit_is_set()
-            }
-
-            /// Returns true if the rx fifo threshold has been reached.
-            pub fn fifo_threshold_reached(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().rxft().bit_is_set()
-            }
-        }
-
         impl<Pin> Rx<$USARTX, Pin, NoDMA> {
             pub fn enable_dma(self) -> Rx<$USARTX, Pin, DMA> {
                 // NOTE(unsafe) critical section prevents races
@@ -277,32 +383,6 @@ macro_rules! uart_shared {
 
             fn read(&mut self) -> nb::Result<u8, Error> {
                 self.rx.read()
-            }
-        }
-
-        impl<Pin, Dma> Tx<$USARTX, Pin, Dma> {
-            /// Starts listening for an interrupt event
-            pub fn listen(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.txeie().set_bit());
-            }
-
-            /// Stop listening for an interrupt event
-            pub fn unlisten(&mut self) {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.cr1().modify(|_, w| w.txeie().clear_bit());
-            }
-
-            /// Return true if the tx register is empty (and can accept data)
-            pub fn is_txe(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().txe().bit_is_set()
-            }
-
-            /// Returns true if the tx fifo threshold has been reached.
-            pub fn fifo_threshold_reached(&self) -> bool {
-                let usart = unsafe { &(*$USARTX::ptr()) };
-                usart.isr().read().txft().bit_is_set()
             }
         }
 
@@ -519,6 +599,99 @@ macro_rules! uart_shared {
 
             const REQUEST_LINE: Option<u8> = Some(DmaMuxResources::$dmamux_rx as u8);
         }
+
+        impl<TX, RX> crate::Listen for Serial<$USARTX, TX, RX> {
+            type Event = Event;
+            #[inline(always)]
+            fn listen_event(
+                &mut self,
+                disable: Option<BitFlags<Self::Event>>,
+                enable: Option<BitFlags<Self::Event>>,
+            ) {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.listen_event(disable.map(BitFlags::bits), enable.map(BitFlags::bits))
+            }
+        }
+
+        impl<Pin, Dma> crate::Listen for Rx<$USARTX, Pin, Dma> {
+            type Event = RxEvent;
+            #[inline(always)]
+            fn listen_event(
+                &mut self,
+                disable: Option<BitFlags<Self::Event>>,
+                enable: Option<BitFlags<Self::Event>>,
+            ) {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.listen_event(disable.map(BitFlags::bits), enable.map(BitFlags::bits))
+            }
+        }
+
+        impl<Pin, Dma> crate::Listen for Tx<$USARTX, Pin, Dma> {
+            type Event = TxEvent;
+            #[inline(always)]
+            fn listen_event(
+                &mut self,
+                disable: Option<BitFlags<Self::Event>>,
+                enable: Option<BitFlags<Self::Event>>,
+            ) {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.listen_event(disable.map(BitFlags::bits), enable.map(BitFlags::bits))
+            }
+        }
+
+        impl<TX, RX> crate::ReadFlags for Serial<$USARTX, TX, RX> {
+            type Flag = Flag;
+            #[inline(always)]
+            fn flags(&self) -> BitFlags<Self::Flag> {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.flags()
+            }
+        }
+
+        impl<TX, RX> crate::ClearFlags for Serial<$USARTX, TX, RX> {
+            type Flag = CFlag;
+            #[inline(always)]
+            fn clear_flags(&mut self, flags: impl Into<BitFlags<CFlag>>) {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.clear_flags(flags.into())
+            }
+        }
+
+        impl<Pin, Dma> crate::ReadFlags for Rx<$USARTX, Pin, Dma> {
+            type Flag = Flag;
+            #[inline(always)]
+            fn flags(&self) -> BitFlags<Self::Flag> {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.flags()
+            }
+        }
+
+        impl<Pin, Dma> crate::ClearFlags for Rx<$USARTX, Pin, Dma> {
+            type Flag = CFlag;
+            #[inline(always)]
+            fn clear_flags(&mut self, flags: impl Into<BitFlags<CFlag>>) {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.clear_flags(flags.into())
+            }
+        }
+
+        impl<Pin, Dma> crate::ReadFlags for Tx<$USARTX, Pin, Dma> {
+            type Flag = Flag;
+            #[inline(always)]
+            fn flags(&self) -> BitFlags<Self::Flag> {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.flags()
+            }
+        }
+
+        impl<Pin, Dma> crate::ClearFlags for Tx<$USARTX, Pin, Dma> {
+            type Flag = CFlag;
+            #[inline(always)]
+            fn clear_flags(&mut self, flags: impl Into<BitFlags<CFlag>>) {
+                let usart = unsafe { &(*$USARTX::ptr()) };
+                usart.clear_flags(flags.into())
+            }
+        }
     }
 }
 
@@ -631,44 +804,48 @@ macro_rules! uart_lp {
                     },
                 })
             }
+        }
+    };
+}
 
-            /// Starts listening for an interrupt event
-            pub fn listen(&mut self, event: Event) {
-                match event {
-                    Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().set_bit()),
-                    Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().set_bit()),
-                    Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().set_bit()),
-                    _ => unimplemented!(),
-                };
+pub trait RBExt {
+    fn flags(&self) -> BitFlags<Flag>;
+    fn clear_flags(&self, flags: BitFlags<CFlag>);
+    fn listen_event(&self, disable: Option<u32>, enable: Option<u32>);
+}
+
+macro_rules! rbext {
+    ($usartX:ident) => {
+        impl RBExt for crate::pac::$usartX::RegisterBlock {
+            #[inline(always)]
+            fn flags(&self) -> BitFlags<Flag> {
+                unsafe { BitFlags::from_bits_unchecked(self.isr().read().bits()) }
             }
-
-            /// Stop listening for an interrupt event
-            pub fn unlisten(&mut self, event: Event) {
-                match event {
-                    Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().clear_bit()),
-                    Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().clear_bit()),
-                    Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().clear_bit()),
-                    _ => unimplemented!(),
-                };
+            #[inline(always)]
+            fn clear_flags(&self, flags: BitFlags<CFlag>) {
+                self.icr().write(|w| unsafe { w.bits(flags.bits()) });
             }
-
-            /// Check if interrupt event is pending
-            pub fn is_pending(&mut self, event: Event) -> bool {
-                (self.tx.usart.isr().read().bits() & event.val()) != 0
-            }
-
-            /// Clear pending interrupt
-            pub fn unpend(&mut self, event: Event) {
-                // mask the allowed bits
-                let mask: u32 = 0x123BFF;
-                self.tx
-                    .usart
-                    .icr()
-                    .write(|w| unsafe { w.bits(event.val() & mask) });
+            #[inline(always)]
+            fn listen_event(&self, disable: Option<u32>, enable: Option<u32>) {
+                self.cr1().modify(|r, w| unsafe {
+                    w.bits({
+                        let mut bits = r.bits();
+                        if let Some(d) = disable {
+                            bits &= !d;
+                        }
+                        if let Some(e) = enable {
+                            bits |= e;
+                        }
+                        bits
+                    })
+                });
             }
         }
     };
 }
+rbext!(usart1);
+rbext!(uart4);
+rbext!(lpuart1);
 
 macro_rules! uart_full {
     ($USARTX:ident,
@@ -785,41 +962,6 @@ macro_rules! uart_full {
                         _dma: PhantomData,
                     },
                 })
-            }
-
-            /// Starts listening for an interrupt event
-            pub fn listen(&mut self, event: Event) {
-                match event {
-                    Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().set_bit()),
-                    Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().set_bit()),
-                    Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().set_bit()),
-                    _ => unimplemented!(),
-                };
-            }
-
-            /// Stop listening for an interrupt event
-            pub fn unlisten(&mut self, event: Event) {
-                match event {
-                    Event::Rxne => self.tx.usart.cr1().modify(|_, w| w.rxneie().clear_bit()),
-                    Event::Txe => self.tx.usart.cr1().modify(|_, w| w.txeie().clear_bit()),
-                    Event::Idle => self.tx.usart.cr1().modify(|_, w| w.idleie().clear_bit()),
-                    _ => unimplemented!(),
-                };
-            }
-
-            /// Check if interrupt event is pending
-            pub fn is_pending(&mut self, event: Event) -> bool {
-                (self.tx.usart.isr().read().bits() & event.val()) != 0
-            }
-
-            /// Clear pending interrupt
-            pub fn unpend(&mut self, event: Event) {
-                // mask the allowed bits
-                let mask: u32 = 0x123BFF;
-                self.tx
-                    .usart
-                    .icr()
-                    .write(|w| unsafe { w.bits(event.val() & mask) });
             }
         }
 
