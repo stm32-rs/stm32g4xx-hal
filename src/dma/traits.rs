@@ -176,7 +176,7 @@ pub trait Direction {
 /// and for the DMA.
 pub unsafe trait TargetAddress<D: Direction> {
     /// Memory size of the target address
-    type MemSize;
+    type MemSize: 'static;
 
     /// The address to be used by the DMA channel
     fn address(&self) -> u32;

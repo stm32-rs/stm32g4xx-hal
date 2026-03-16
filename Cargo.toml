@@ -17,7 +17,7 @@ stm32g4 = { version = "0.16.0", features = ["atomics"] }
 paste = "1.0"
 fugit = "0.3.7"
 stm32-usbd = { version = "0.7.0", optional = true }
-fixed = { version = "1.28.0", optional = true }
+fixed = { version = "1.28.0" }
 embedded-io = "0.6"
 stm32-hrtim = { version = "0.1.0", optional = true }
 rand_core = { version = "0.9", default-features = false }
@@ -110,7 +110,7 @@ defmt = [
     "embedded-test/defmt",
     "stm32-hrtim?/defmt"
 ]
-cordic = ["dep:fixed"]
+cordic = []
 adc3 = []
 adc4 = []
 adc5 = []
