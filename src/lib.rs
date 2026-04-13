@@ -104,6 +104,8 @@ compile_error!("`hrtim` is only available for stm32g474 and stm32g484");
 #[cfg(feature = "hrtim")]
 pub mod hrtim;
 pub mod independent_watchdog;
+#[cfg(feature = "quadspi")]
+pub mod quadspi;
 #[cfg(feature = "usb")]
 pub mod usb;
 
