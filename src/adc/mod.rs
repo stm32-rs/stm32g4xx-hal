@@ -822,27 +822,27 @@ impl<ADC: Instance> DynamicAdc<ADC> {
         });
 
         let ch = CHANNEL::channel();
-        let reg_i = u8::from(sequence) / 4;
-        let i = u8::from(sequence) % 4;
+        let seq = u8::from(sequence);
 
-        //Set the channel in the right sequence field
-        match reg_i {
-            0 => self
+        //Set the channel in the right sequence field. SQR1 holds SQ1..SQ4,
+        //SQR2 holds SQ5..SQ9, SQR3 holds SQ10..SQ14 and SQR4 holds SQ15..SQ16.
+        match seq {
+            0..=3 => self
                 .adc_reg
                 .sqr1()
-                .modify(|_, w| unsafe { w.sq(i).bits(ch) }),
-            1 => self
+                .modify(|_, w| unsafe { w.sq(seq).bits(ch) }),
+            4..=8 => self
                 .adc_reg
                 .sqr2()
-                .modify(|_, w| unsafe { w.sq(i).bits(ch) }),
-            2 => self
+                .modify(|_, w| unsafe { w.sq(seq - 4).bits(ch) }),
+            9..=13 => self
                 .adc_reg
                 .sqr3()
-                .modify(|_, w| unsafe { w.sq(i).bits(ch) }),
-            3 => self
+                .modify(|_, w| unsafe { w.sq(seq - 9).bits(ch) }),
+            14..=15 => self
                 .adc_reg
                 .sqr4()
-                .modify(|_, w| unsafe { w.sq(i).bits(ch) }),
+                .modify(|_, w| unsafe { w.sq(seq - 14).bits(ch) }),
             _ => unreachable!(),
         };
 
