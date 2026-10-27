@@ -109,6 +109,8 @@ macro_rules! mco {
                             0b110
                         },
                         MCOSrc::LSE => {
+                            // RCC_BDCR is write-protected until PWR_CR1.DBP is set
+                            rcc.unlock_rtc();
                             rcc.enable_lse(false);
                             0b111
                         },
